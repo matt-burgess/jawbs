@@ -1,0 +1,658 @@
+<!doctype html>
+<html data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Jawbs · Settings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="../styles/job-copilot.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="jc-page">
+      <header class="jc-toolbar options-header">
+        <div class="toolbar-row">
+          <span class="jc__wordmark">
+            <img class="jc__brand-logo" src="../assets/jawb-logo.png" alt="" aria-hidden="true" />
+            <span class="jc-brand jc-brand--xl">Settings</span>
+          </span>
+        </div>
+        <nav class="settings-tabs" role="tablist" aria-label="Settings sections">
+          <button class="tab-btn" role="tab" data-tab="you" aria-selected="true" type="button">
+            <span class="tab-btn__label">You</span>
+            <span class="tab-btn__hint">Profile, resume, preferences</span>
+          </button>
+          <button class="tab-btn" role="tab" data-tab="ai" aria-selected="false" type="button">
+            <span class="tab-btn__label">AI</span>
+            <span class="tab-btn__hint">Providers, models, routing</span>
+          </button>
+          <button class="tab-btn" role="tab" data-tab="system" aria-selected="false" type="button">
+            <span class="tab-btn__label">System</span>
+            <span class="tab-btn__hint">Diagnostics, usage, backup</span>
+          </button>
+        </nav>
+      </header>
+
+      <main class="options-main">
+
+        <!-- ================================================================
+             TAB 1 · YOU — everything the AI uses to know / act like you
+             ================================================================ -->
+        <div class="tab-panel" data-panel="you" role="tabpanel" aria-labelledby="tab-you">
+          <nav class="settings-subnav" aria-label="You sections">
+            <a href="#you-about"      class="settings-subnav__chip" data-subnav>About me</a>
+            <a href="#you-materials"  class="settings-subnav__chip" data-subnav>Materials</a>
+            <a href="#you-params"     class="settings-subnav__chip" data-subnav>Search parameters</a>
+            <a href="#you-shortcuts"  class="settings-subnav__chip" data-subnav>Shortcuts</a>
+          </nav>
+
+          <p class="tab-intro">
+            Everything the analyses read as context about you. Profile is the required minimum;
+            add the rest as you have material.
+          </p>
+
+          <!-- ============================================================
+               SUBSECTION · ABOUT ME — narrative context
+               ============================================================ -->
+          <div class="settings-group" id="you-about" data-group="about">
+            <div class="settings-group__head">
+              <h3 class="settings-group__title">About me</h3>
+              <span class="settings-group__hint">Who you are, in your own words. Every analysis prompt reads this.</span>
+            </div>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Profile</h2>
+                <p class="jc-footnote">The primary intro. Positioning anchors, current situation, values.
+                  Load an existing <code>about-me.md</code> to populate.</p>
+              </div>
+              <textarea id="profile" class="jc-textarea" rows="12" spellcheck="false"></textarea>
+              <div class="jc-btn-row">
+                <button id="saveProfile" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <button id="generateProfile" class="jc-btn" data-size="sm" type="button" title="Generate a fresh Profile from your Master Resume using Anthropic. Overwrites the textarea; nothing is saved until you click Save.">✨ Generate from resume</button>
+                <label for="loadProfileFile" class="jc-btn" data-size="sm">Load .md file</label>
+                <input id="loadProfileFile" type="file" accept=".md,text/markdown,text/plain" hidden />
+                <button id="resetProfile" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Reset to default</button>
+                <span id="profileStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Extended knowledge base <span class="section-tag">optional</span></h2>
+                <p class="jc-footnote">Longer markdown doc (the full <code>about-me.md</code>). Prepended to
+                  every analysis prompt on top of Profile. Leave blank if Profile is enough.</p>
+              </div>
+              <textarea id="knowledgeBase" class="jc-textarea" rows="10" spellcheck="false" placeholder="Paste or load a markdown knowledge document…"></textarea>
+              <div class="jc-btn-row">
+                <button id="saveKnowledge" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <button id="generateKnowledge" class="jc-btn" data-size="sm" type="button" title="Generate a fresh Knowledge Base from your Master Resume using Anthropic. Overwrites the textarea; nothing is saved until you click Save.">✨ Generate from resume</button>
+                <label for="loadKnowledgeFile" class="jc-btn" data-size="sm">Load .md file</label>
+                <input id="loadKnowledgeFile" type="file" accept=".md,text/markdown,text/plain" hidden />
+                <button id="clearKnowledge" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Clear</button>
+                <span id="knowledgeStatus" class="jc-footnote"></span>
+                <span id="knowledgeLen" class="jc-footnote"></span>
+              </div>
+            </section>
+          </div>
+
+          <!-- ============================================================
+               SUBSECTION · MATERIALS — content the LLM copies from
+               ============================================================ -->
+          <div class="settings-group" id="you-materials" data-group="materials">
+            <div class="settings-group__head">
+              <h3 class="settings-group__title">Materials</h3>
+              <span class="settings-group__hint">Source-of-truth documents. Tailored resumes and cover letters must trace back to bullets and phrasing here.</span>
+            </div>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Master resume</h2>
+                <p class="jc-footnote">Paste your comprehensive resume here. Every bullet the LLM writes for a tailored
+                  resume must trace back to a bullet in this field. Click <em>Generate</em> to have Claude
+                  clean up formatting without changing any of your content.</p>
+              </div>
+              <textarea id="resume" class="jc-textarea" rows="12" spellcheck="false" placeholder="Paste your full master resume as plain text or markdown…"></textarea>
+              <div class="jc-btn-row">
+                <button id="saveResume" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <button id="generateResumeField" class="jc-btn" data-size="sm" type="button" title="Clean up formatting on the pasted resume. Preserves every specific claim; normalizes headings, bullets, and line breaks.">✨ Generate / clean up</button>
+                <span id="resumeStatus" class="jc-footnote"></span>
+                <span id="resumeLen" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Writing samples <span class="section-tag">voice</span></h2>
+                <p class="jc-footnote">Two or three paragraphs you've actually written. Anchors your voice
+                  for cover letters and question answers.</p>
+              </div>
+              <textarea id="samples" class="jc-textarea" rows="8" spellcheck="false" placeholder="Paste 2–3 paragraphs in your voice…"></textarea>
+              <div class="jc-btn-row">
+                <button id="saveSamples" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="samplesStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Question Prep questions</h2>
+                <p class="jc-footnote">One question per line. Order matters — the Jawbar's Bait
+                  hands the whole list to the model and gets back an answer per question,
+                  in order, grounded in your profile, resume, writing samples, and the specific posting.</p>
+              </div>
+              <textarea id="prepQuestions" class="jc-textarea" rows="12" spellcheck="false" placeholder="Why are you interested in this role?&#10;Describe a time you scaled a team.&#10;…"></textarea>
+              <div class="jc-btn-row">
+                <button id="savePrepQuestions" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <button id="resetPrepQuestions" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Reset to defaults</button>
+                <span id="prepQuestionsStatus" class="jc-footnote"></span>
+                <span id="prepQuestionsCount" class="jc-footnote"></span>
+              </div>
+            </section>
+          </div>
+
+          <!-- ============================================================
+               SUBSECTION · SEARCH PARAMETERS — hard filters
+               ============================================================ -->
+          <div class="settings-group" id="you-params" data-group="params">
+            <div class="settings-group__head">
+              <h3 class="settings-group__title">Search parameters</h3>
+              <span class="settings-group__hint">Hard constraints. Fit and Comp analyses use these to flag postings that don't match.</span>
+            </div>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Work locations &amp; preferences</h2>
+                <p class="jc-footnote">Places you'll actually work from. Fit analysis flags postings labeled
+                  "Remote" but restricted to somewhere you don't live.</p>
+              </div>
+              <ul id="workLocationsList" class="locations-list"></ul>
+              <div class="jc-btn-row" style="align-items: stretch">
+                <input id="newLocation" class="jc-input" type="text" placeholder="City, State/Region, Country" style="flex:1;min-width:0" />
+                <button id="addLocation" class="jc-btn" data-variant="primary" data-size="sm" type="button">Add</button>
+              </div>
+              <div class="prefs-row">
+                <span class="jc-eyebrow">Accept these work types</span>
+                <label class="pref-check"><input type="checkbox" id="prefRemote" /> <span>Remote</span></label>
+                <label class="pref-check"><input type="checkbox" id="prefHybrid" /> <span>Hybrid</span></label>
+                <label class="pref-check"><input type="checkbox" id="prefOnsite" /> <span>On-site</span></label>
+              </div>
+              <div class="jc-btn-row">
+                <button id="savePreferences" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="workLocStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Compensation targets</h2>
+                <p class="jc-footnote">Base-salary anchors. Comp analysis flags any posting whose low end falls below your floor.</p>
+              </div>
+              <div class="comp-grid">
+                <label>
+                  <span>Floor (USD base)</span>
+                  <input id="compFloor" class="jc-input" type="number" min="0" step="1000" />
+                </label>
+                <label>
+                  <span>Target (USD base)</span>
+                  <input id="compTarget" class="jc-input" type="number" min="0" step="1000" />
+                </label>
+                <label>
+                  <span>Walk-away (USD base)</span>
+                  <input id="compWalkAway" class="jc-input" type="number" min="0" step="1000" />
+                </label>
+                <label>
+                  <span>Current benchmark (USD base)</span>
+                  <input id="compCurrent" class="jc-input" type="number" min="0" step="1000" />
+                </label>
+              </div>
+              <div class="jc-btn-row">
+                <button id="saveComp" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="compStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Negative keywords</h2>
+                <p class="jc-footnote">One phrase per line. LinkedIn jawb cards matching any of these
+                  in the title, company, or location get dimmed on search-results pages so they're
+                  easy to skip. Case-insensitive substring match.</p>
+              </div>
+              <textarea id="negativeKeywords" class="jc-textarea" rows="8" spellcheck="false" placeholder="junior&#10;bootcamp&#10;contract&#10;on-site only in NYC"></textarea>
+              <div class="jc-btn-row">
+                <button id="saveNegativeKeywords" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="negativeKeywordsStatus" class="jc-footnote"></span>
+                <span id="negativeKeywordsCount" class="jc-footnote"></span>
+              </div>
+            </section>
+          </div>
+
+          <!-- ============================================================
+               SUBSECTION · SHORTCUTS — form-fill utilities
+               ============================================================ -->
+          <div class="settings-group" id="you-shortcuts" data-group="shortcuts">
+            <div class="settings-group__head">
+              <h3 class="settings-group__title">Shortcuts</h3>
+              <span class="settings-group__hint">Form-fill helpers used on LinkedIn and known ATS domains. Not read by the analyses.</span>
+            </div>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Contact quick-fill</h2>
+                <p class="jc-footnote">A floating toolbar appears above any focused text field on extension pages
+                  and known ATS domains, with one pill per value below that's set. Click a pill to paste that value
+                  into the field. Field context is intentionally ignored — the toolbar shows every value you've saved.</p>
+              </div>
+              <label>
+                <span>Email</span>
+                <input type="email" id="contactEmail" class="jc-input" placeholder="you@example.com" data-fill="none" />
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveContactEmail" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="contactEmailStatus" class="jc-footnote"></span>
+              </div>
+              <label>
+                <span>Phone number</span>
+                <input type="tel" id="contactPhone" class="jc-input" placeholder="+1 555 555 5555" data-fill="none" />
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveContactPhone" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="contactPhoneStatus" class="jc-footnote"></span>
+              </div>
+              <label>
+                <span>LinkedIn profile URL</span>
+                <input type="url" id="linkedInUrl" class="jc-input" placeholder="https://www.linkedin.com/in/yourhandle" data-fill="none" />
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveLinkedIn" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="linkedInStatus" class="jc-footnote"></span>
+              </div>
+              <label>
+                <span>City, State</span>
+                <input type="text" id="contactLocation" class="jc-input" placeholder="Austin, TX" data-fill="none" />
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveContactLocation" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="contactLocationStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             TAB 2 · AI — providers, models, routing
+             ================================================================ -->
+        <div class="tab-panel" data-panel="ai" role="tabpanel" aria-labelledby="tab-ai" hidden>
+          <nav class="settings-subnav" aria-label="AI sections">
+            <a href="#ai-cloud" class="settings-subnav__chip" data-subnav>Cloud (Anthropic)</a>
+            <a href="#ai-local" class="settings-subnav__chip" data-subnav>Local (Ollama)</a>
+            <a href="#ai-auto"  class="settings-subnav__chip" data-subnav>Automation</a>
+          </nav>
+
+          <p class="tab-intro">
+            Two providers, one jawb. <strong>Cloud (Anthropic)</strong> handles anything you don't
+            route locally and is the fallback when Ollama fails. <strong>Local (Ollama)</strong>
+            is opt-in per feature — great for routine tasks, keeps tokens off your bill.
+          </p>
+
+          <!-- ============================================================
+               GROUP · CLOUD PROVIDER
+               ============================================================ -->
+          <div class="settings-group" id="ai-cloud" data-group="cloud">
+            <div class="settings-group__head">
+              <h3 class="settings-group__title">Cloud provider — Anthropic</h3>
+              <span class="settings-group__hint">Required. Handles everything not routed locally.</span>
+            </div>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>API key</h2>
+                <p class="jc-footnote">Stored locally in <code>chrome.storage.local</code>.
+                  Never included in exports.</p>
+              </div>
+              <label>
+                <span>API key</span>
+                <input type="password" id="apiKey" class="jc-input" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveKey" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save key</button>
+                <button id="revealKey" class="jc-btn" data-size="sm" type="button">Show</button>
+                <span id="keyStatus" class="jc-footnote"></span>
+              </div>
+
+              <!-- Setup walkthrough — auto-expanded when no key present. -->
+              <details id="anthropicSetup" class="setup-guide">
+                <summary class="setup-guide__head">
+                  <span class="setup-guide__chev" aria-hidden="true">▸</span>
+                  <span>How to get an Anthropic API key</span>
+                </summary>
+                <ol class="setup-guide__steps">
+                  <li>
+                    <strong>Create an Anthropic account.</strong>
+                    Go to <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>
+                    and sign up (or log in). Free to create; you only pay for API usage.
+                  </li>
+                  <li>
+                    <strong>Add credit.</strong>
+                    Under <em>Settings → Billing → Plans</em>, add a payment method and buy any amount of
+                    credits ($5 is more than enough to start). Typical Jawbs use is fractions of a
+                    cent per analysis.
+                  </li>
+                  <li>
+                    <strong>Create an API key.</strong>
+                    Under <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Settings → API keys</a>,
+                    click <em>Create Key</em>, give it a name (e.g. "Jawbs"), and copy the
+                    <code>sk-ant-…</code> value. <strong>You will not see this key again</strong> — copy it now.
+                  </li>
+                  <li>
+                    <strong>Paste it above and click Save key.</strong>
+                    Run the diagnostic in <em>System → Diagnostic</em> to confirm it works.
+                  </li>
+                </ol>
+                <p class="jc-footnote">
+                  <strong>Privacy:</strong> the key is stored in your browser only. Nothing except
+                  API calls to <code>api.anthropic.com</code> ever leaves your machine.
+                </p>
+              </details>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Model per feature <span class="section-tag">advanced</span></h2>
+                <p class="jc-footnote">Which Anthropic model ID runs each cloud feature. Cost vs quality trade-off.</p>
+              </div>
+              <div class="model-grid" id="modelGrid"></div>
+              <div class="jc-btn-row">
+                <button id="saveModels" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <button id="resetModels" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Reset to defaults</button>
+                <span id="modelStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+          </div>
+
+          <!-- ============================================================
+               GROUP · LOCAL PROVIDER
+               ============================================================ -->
+          <div class="settings-group" id="ai-local" data-group="local">
+            <div class="settings-group__head">
+              <h3 class="settings-group__title">Local provider — Ollama</h3>
+              <span class="settings-group__hint">Optional. Runs on this machine at <code>localhost:11434</code>. Falls back to cloud on any failure.</span>
+            </div>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Connection</h2>
+                <p class="jc-footnote">Verifies Ollama is running and offers a setup script if it isn't.</p>
+              </div>
+
+              <div class="local-status-row">
+                <span class="jc-eyebrow">Status</span>
+                <div id="ollamaStatusDisplay" class="ollama-status" data-status="unknown">Checking…</div>
+                <button id="recheckOllama" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Recheck</button>
+              </div>
+
+              <div id="ollamaSetup" class="ollama-setup" hidden>
+                <p class="jc-prose">Ollama isn't reachable at <code>localhost:11434</code>. Download and run the setup script for your OS:</p>
+                <div class="jc-btn-row">
+                  <button id="dlSetupMac" class="jc-btn" data-size="sm" type="button">macOS script</button>
+                  <button id="dlSetupWin" class="jc-btn" data-size="sm" type="button">Windows script</button>
+                  <button id="dlSetupLinux" class="jc-btn" data-size="sm" type="button">Linux script</button>
+                </div>
+                <p class="jc-footnote">The script installs Ollama, sets CORS so this extension can call it,
+                  and pulls the recommended model. Click <strong>Recheck</strong> when done.</p>
+              </div>
+
+              <details class="setup-guide">
+                <summary class="setup-guide__head">
+                  <span class="setup-guide__chev" aria-hidden="true">▸</span>
+                  <span>Manual setup (if the scripts aren't your style)</span>
+                </summary>
+                <ol class="setup-guide__steps">
+                  <li>
+                    <strong>Install Ollama.</strong>
+                    Download from <a href="https://ollama.ai/download" target="_blank" rel="noopener">ollama.ai/download</a>.
+                    macOS installs a menu-bar app; Linux runs as a service.
+                  </li>
+                  <li>
+                    <strong>Allow this extension to call Ollama (CORS).</strong>
+                    Ollama refuses requests from browser extensions by default. Set
+                    <code>OLLAMA_ORIGINS</code> so it accepts them:
+                    <pre class="setup-guide__code">launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"
+# then restart Ollama from the menu bar (macOS)
+
+# Linux / systemd:
+sudo systemctl edit ollama
+# add:  Environment="OLLAMA_ORIGINS=chrome-extension://*"
+sudo systemctl restart ollama
+
+# Windows (PowerShell):
+[Environment]::SetEnvironmentVariable("OLLAMA_ORIGINS", "chrome-extension://*", "User")
+# then restart Ollama</pre>
+                  </li>
+                  <li>
+                    <strong>Pull a capable model.</strong>
+                    Recommended: <code>qwen2.5:14b-instruct</code> (works well for Fit + Question Prep on
+                    a 32 GB machine). Smaller: <code>qwen2.5:7b-instruct</code>.
+                    <pre class="setup-guide__code">ollama pull qwen2.5:14b-instruct</pre>
+                  </li>
+                  <li>
+                    <strong>Enable the local provider above</strong> and check which features to route
+                    locally. Cover Letter and Tailored Resume stay cloud-only by default — they benefit
+                    from the stronger model.
+                  </li>
+                </ol>
+                <p class="jc-footnote">
+                  Cloud remains the automatic fallback on any local failure (model missing, timeout, etc.).
+                </p>
+              </details>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Model &amp; routing</h2>
+                <p class="jc-footnote">Pick a local model, then choose which analyses it handles.
+                  Anything unchecked stays on cloud.</p>
+              </div>
+
+              <div id="ollamaConfig" class="ollama-config" hidden>
+                <label>
+                  <span>Model</span>
+                  <select id="localModelSelect" class="jc-select"></select>
+                </label>
+
+                <label class="toggle-row">
+                  <input id="localEnabled" type="checkbox" />
+                  <span>Enable local model routing</span>
+                </label>
+
+                <div class="local-features">
+                  <span class="jc-eyebrow">Route these features locally when possible</span>
+                  <div class="pref-grid">
+                    <label class="pref-check"><input type="checkbox" id="localFeatFit" /> <span>Fit analysis</span></label>
+                    <label class="pref-check"><input type="checkbox" id="localFeatComp" /> <span>Compensation</span></label>
+                    <label class="pref-check"><input type="checkbox" id="localFeatBrief" /> <span>Question Prep</span></label>
+                    <label class="pref-check"><input type="checkbox" id="localFeatLetter" /> <span>Cover letter</span></label>
+                    <label class="pref-check"><input type="checkbox" id="localFeatResume" /> <span>Tailored resume</span></label>
+                  </div>
+                  <p class="jc-footnote">Recommended: Fit + Question Prep local (routine tasks).
+                    Comp / Cover letter / Resume stay cloud for quality.</p>
+                </div>
+
+                <div class="jc-btn-row">
+                  <button id="saveLocalModel" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                  <span id="localModelStatus" class="jc-footnote"></span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- ============================================================
+               GROUP · AUTOMATION (provider-agnostic)
+               ============================================================ -->
+          <div class="settings-group" id="ai-auto" data-group="auto">
+            <div class="settings-group__head">
+              <h3 class="settings-group__title">Automation</h3>
+              <span class="settings-group__hint">Rules that trigger an analysis without your click. Uses whichever provider you've routed.</span>
+            </div>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Auto-analyze on LinkedIn "high match"</h2>
+                <p class="jc-footnote">When LinkedIn Premium marks a posting as a "high match", Jawbs
+                  can run fit analysis automatically. Fires once per jawb per session.</p>
+              </div>
+              <label class="toggle-row">
+                <input id="autoAnalyzeHighMatch" type="checkbox" />
+                <span>Enable auto-analysis on high match</span>
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveAutoAnalyze" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="autoAnalyzeStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             TAB 3 · SYSTEM — diagnostics, usage, data
+             ================================================================ -->
+        <div class="tab-panel" data-panel="system" role="tabpanel" aria-labelledby="tab-system" hidden>
+          <nav class="settings-subnav" aria-label="System sections">
+            <a href="#sys-diagnostic" class="settings-subnav__chip" data-subnav>Diagnostic</a>
+            <a href="#sys-usage"      class="settings-subnav__chip" data-subnav>Usage &amp; cost</a>
+            <a href="#sys-log"        class="settings-subnav__chip" data-subnav>Activity log</a>
+            <a href="#sys-backup"     class="settings-subnav__chip" data-subnav>Backup</a>
+            <a href="#sys-tour"       class="settings-subnav__chip" data-subnav>Tour</a>
+            <a href="#sys-tips"       class="settings-subnav__chip" data-subnav>Tip prompts</a>
+            <a href="#sys-support"    class="settings-subnav__chip" data-subnav>Support</a>
+          </nav>
+
+          <p class="tab-intro">
+            Verify connectivity, review lifetime token spend, and back up your <span class="jc-brand">Jawboard</span>.
+          </p>
+
+          <section class="options-section" id="sys-tour">
+            <div class="section-head">
+              <h2>Welcome tour</h2>
+              <p class="jc-footnote">Re-open the onboarding page you saw at install. Useful if you skipped it
+                or want to re-check the setup steps.</p>
+            </div>
+            <div class="jc-btn-row">
+              <button id="openWelcome" class="jc-btn" data-variant="primary" data-size="sm" type="button">Show welcome tour</button>
+            </div>
+          </section>
+
+          <!-- Tip prompts — user-facing toggle for the "Tip Captain"
+               nudge that appears at the top of the Jawbar once a few
+               milestones are hit. Off silences both the tip nudge
+               and its share-fallback follow-up. -->
+          <section class="options-section" id="sys-tips">
+            <div class="section-head">
+              <h2>Tip prompts</h2>
+              <p class="jc-footnote">
+                Occasional yellow banner at the top of the <span class="jc-brand">Jawbar</span>
+                asking if you'd like to tip the captain. Only appears
+                after you've gotten real value (10+ archived jawbs,
+                5+ applied, an interview logged, or a week of use)
+                and at most once every 30 days after dismiss.
+              </p>
+            </div>
+            <label class="settings-toggle" for="tipPromptsToggle">
+              <input id="tipPromptsToggle" type="checkbox" />
+              <span class="settings-toggle__label">Show tip prompts in the Jawbar</span>
+            </label>
+            <div class="jc-btn-row" style="margin-top: var(--jc-3)">
+              <button id="tipForceShow" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Force the tip prompt to appear the next time the Jawbar loads, bypassing the usual milestone eligibility check.">Show tip prompt on next load</button>
+              <button id="tipResetState" class="jc-btn" data-variant="ghost" data-size="sm" type="button" title="Clear the dismissed / shared / tipped timestamps so the next eligible check re-shows the CTA.">Reset dismiss state</button>
+              <span id="tipStateStatus" class="jc-footnote"></span>
+            </div>
+          </section>
+
+          <!-- Support — questions, bug reports, and feature ideas
+               land in a real inbox the maker reads himself. Not a
+               triaged support desk. -->
+          <section class="options-section" id="sys-support">
+            <div class="section-head">
+              <h2>Support</h2>
+              <p class="jc-footnote">Questions, bug reports, or feature ideas? Send them to the maker directly.</p>
+            </div>
+            <p style="margin: 0; font-size: var(--jc-text-sm);">
+              <a href="mailto:jawbsthebrowserextension@gmail.com?subject=Jawbs%20feedback"
+                 style="color: var(--jc-accent); text-decoration: none; font-weight: 600;">
+                jawbsthebrowserextension@gmail.com
+              </a>
+            </p>
+          </section>
+
+          <section class="options-section" id="sys-diagnostic">
+            <div class="section-head">
+              <h2>Connection diagnostic</h2>
+              <p class="jc-footnote">Trivial request to <code>api.anthropic.com</code>. If it fails in Brave,
+                drop Shields for the extension or add an exception for the host.</p>
+            </div>
+            <div class="jc-btn-row">
+              <button id="diagnostic" class="jc-btn" data-variant="primary" data-size="sm" type="button">Run diagnostic</button>
+            </div>
+            <pre id="diagnosticOutput" class="jc-diag" style="padding: var(--jc-3); min-height: 60px; white-space: pre-wrap"></pre>
+          </section>
+
+          <section class="options-section" id="sys-usage">
+            <div class="section-head">
+              <h2>Usage &amp; cost</h2>
+              <p class="jc-footnote">Lifetime token counts and rough dollar estimate. Verify against the
+                Anthropic console for precise billing.</p>
+            </div>
+            <pre id="usageOutput" class="jc-diag" style="padding: var(--jc-3); min-height: 60px; white-space: pre-wrap"></pre>
+          </section>
+
+          <section class="options-section" id="sys-log">
+            <div class="section-head">
+              <h2>Activity log</h2>
+              <p class="jc-footnote">Local ring buffer of the last 500 actions the extension has taken — analyses, captures, syncs, enrichments. Never leaves your machine.</p>
+            </div>
+            <div class="jc-btn-row">
+              <button id="refreshActivity" class="jc-btn" data-variant="primary" data-size="sm" type="button">Refresh</button>
+              <button id="clearActivity" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Clear</button>
+              <select id="activityFilter" class="jc-select" style="max-width:200px">
+                <option value="">All types</option>
+                <option value="analyze-fit">Fit analysis</option>
+                <option value="analyze-comp">Compensation</option>
+                <option value="build-brief">Question Prep</option>
+                <option value="generate-letter">Cover letter</option>
+                <option value="generate-resume">Tailored resume</option>
+                <option value="ask-llm">Ask LLM</option>
+                <option value="warmth-enrich">Warmth enrichment</option>
+                <option value="linkedin-save">LinkedIn Save</option>
+                <option value="linkedin-apply">LinkedIn Apply</option>
+                <option value="sync-tracker">Tracker sync (per-page)</option>
+                <option value="sync-linkedin">LinkedIn full sync</option>
+                <option value="enrich-job">Enrichment</option>
+              </select>
+              <span id="activityCount" class="jc-footnote"></span>
+            </div>
+            <div id="activityList" class="activity-list"></div>
+          </section>
+
+          <section class="options-section" id="sys-backup">
+            <div class="section-head">
+              <h2><span class="jc-brand">Jawboard</span> backup</h2>
+              <p class="jc-footnote"><code>chrome.storage.local</code> can be wiped by a profile reset or
+                extension uninstall. Export regularly.</p>
+            </div>
+            <div class="jc-btn-row">
+              <button id="exportBackup" class="jc-btn" data-variant="primary" data-size="sm" type="button">Export JSON</button>
+              <label for="importBackup" class="jc-btn" data-size="sm">Import JSON</label>
+              <input id="importBackup" type="file" accept="application/json" hidden />
+              <span id="backupStatus" class="jc-footnote"></span>
+            </div>
+          </section>
+        </div>
+
+      </main>
+    </div>
+
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

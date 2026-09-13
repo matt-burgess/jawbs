@@ -1,0 +1,128 @@
+{
+  "manifest_version": 3,
+  "name": "Jawbs",
+  "version": "0.9.0",
+  "description": "Personal-use LinkedIn job briefings and permanent job archive.",
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "sidePanel",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://www.linkedin.com/*",
+    "https://www.google.com/search*",
+    "https://google.com/search*",
+    "http://localhost:11434/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.linkedin.com/jobs/*",
+        "https://www.linkedin.com/jobs-tracker/*",
+        "https://www.linkedin.com/my-items/*"
+      ],
+      "js": ["content/scrape.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["content/fin.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.google.com/search*",
+        "https://google.com/search*"
+      ],
+      "js": ["content/google-jobs.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.greenhouse.io/*",
+        "https://boards.greenhouse.io/*",
+        "https://*.lever.co/*",
+        "https://jobs.lever.co/*",
+        "https://*.ashbyhq.com/*",
+        "https://jobs.ashbyhq.com/*",
+        "https://*.myworkdayjobs.com/*",
+        "https://*.workday.com/*",
+        "https://*.taleo.net/*",
+        "https://*.icims.com/*",
+        "https://*.bamboohr.com/*",
+        "https://*.workable.com/*",
+        "https://apply.workable.com/*",
+        "https://*.smartrecruiters.com/*",
+        "https://jobs.smartrecruiters.com/*",
+        "https://*.jobvite.com/*",
+        "https://*.recruitee.com/*",
+        "https://*.breezy.hr/*",
+        "https://www.linkedin.com/jobs/collections/*"
+      ],
+      "js": ["content/externalFill.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/selectors.js",
+        "assets/icon-48.png", "assets/icon-128.png",
+        "assets/jawboard.png", "assets/shark-fin-swim.png",
+        "assets/shark-great-white.png", "assets/shark-tiger.png",
+        "assets/shark-bull.png", "assets/shark-mako.png",
+        "assets/shark-nurse.png", "assets/shark-pygmy.png"
+      ],
+      "matches": ["https://www.linkedin.com/*"]
+    },
+    {
+      "resources": ["assets/icon-48.png"],
+      "matches": ["https://www.google.com/*", "https://google.com/*"]
+    },
+    {
+      "resources": ["lib/linkedInFill.js"],
+      "matches": [
+        "https://*.greenhouse.io/*",
+        "https://*.lever.co/*",
+        "https://*.ashbyhq.com/*",
+        "https://*.myworkdayjobs.com/*",
+        "https://*.workday.com/*",
+        "https://*.taleo.net/*",
+        "https://*.icims.com/*",
+        "https://*.bamboohr.com/*",
+        "https://*.workable.com/*",
+        "https://*.smartrecruiters.com/*",
+        "https://*.jobvite.com/*",
+        "https://*.recruitee.com/*",
+        "https://*.breezy.hr/*"
+      ]
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel/panel.html"
+  },
+  "action": {
+    "default_title": "Open Jawbs",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "32": "assets/icon-32.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  }
+}

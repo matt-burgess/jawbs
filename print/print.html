@@ -1,0 +1,21 @@
+<!doctype html>
+<html data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Print — Jawbs</title>
+    <link rel="stylesheet" href="../styles/job-copilot.css" />
+    <link rel="stylesheet" href="print.css" />
+  </head>
+  <body>
+    <div class="toolbar no-print">
+      <span class="jc__wordmark">
+        <img class="jc__brand-logo" src="../assets/icon-48.png" alt="" />
+      </span>
+      <span id="filename" class="jc-footnote"></span>
+      <button id="printBtn" class="jc-btn" data-variant="primary" data-size="sm" type="button">Print / Save as PDF</button>
+      <span class="hint">Choose "Save as PDF" in the print dialog. ATS-friendly: real text, single column, no color.</span>
+    </div>
+    <main id="doc"></main>
+    <script src="print.js"></script>
+  </body>
+</html>

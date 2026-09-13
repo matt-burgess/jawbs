@@ -1,0 +1,671 @@
+html, body { height: 100%; margin: 0; background: var(--jc-bg); }
+body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body) var(--jc-font); }
+[hidden] { display: none !important; }
+
+.jc-toolbar {
+  padding: var(--jc-3) var(--jc-5);
+  /* Three-column grid so the middle title stays visually centered
+     regardless of how wide the left crumb or right actions grow.
+     Left and right cols share equal 1fr so they push toward the
+     edges; middle col shrinks to content and sits dead-center. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--jc-3);
+  /* Orange color inherited from base .jc-toolbar rule. */
+  border-bottom: 1px solid var(--jc-border);
+  position: sticky; top: 0; z-index: 5;
+}
+.toolbar-left { display: flex; align-items: center; gap: var(--jc-3); justify-self: start; }
+.toolbar-actions { display: flex; align-items: center; gap: var(--jc-2); justify-self: end; }
+/* Middle slot — title + company on one line, centered, ellipsized
+   if the viewport is too narrow to fit the full string. */
+.toolbar-title {
+  display: flex; align-items: baseline; gap: 8px;
+  min-width: 0;
+  color: var(--jc-text);
+  font: 600 var(--jc-text-sm)/1 var(--jc-font);
+  letter-spacing: -.005em;
+  text-align: center;
+}
+.toolbar-title__title,
+.toolbar-title__company {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.toolbar-title__title { max-width: 40ch; }
+.toolbar-title__company { max-width: 24ch; font-weight: 500; opacity: .92; }
+.toolbar-title__sep { opacity: .6; }
+/* When either piece is missing, hide the separator (JS toggles via
+   :empty adjacency-friendly rendering — we just null the sep when
+   both are populated is not needed; simpler: hide sep if either
+   sibling is empty). */
+.toolbar-title__title:empty ~ .toolbar-title__sep,
+.toolbar-title__sep:has(+ .toolbar-title__company:empty) { display: none; }
+.toolbar-title__title:empty,
+.toolbar-title__company:empty { display: none; }
+
+.crumb-link {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--jaw-red);
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.crumb-link:hover { color: var(--jaw-red-hover); }
+.crumb-link .jc-brand { color: inherit; }
+
+/* Voyage log — horizontal chain of stages for this jawb. Past stages
+   show a small gold flag, the current stage a boat/fin marker, future
+   stages a dashed circle. Matches mockup 1b's "The hunt" strip. */
+.voyage-log {
+  max-width: 900px; margin: var(--jc-4) auto;
+  padding: var(--jc-4) var(--jc-5);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+}
+.voyage-log__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+}
+.voyage-log__title {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--jc-text);
+}
+.voyage-log__age {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+}
+.voyage-log__stages {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; align-items: flex-start; gap: 0;
+}
+.voyage-stage {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.voyage-stage__row {
+  display: flex; align-items: center; height: 22px;
+}
+.voyage-stage__mark {
+  flex: none; width: 24px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.voyage-stage__bar {
+  flex: 1; height: 2px; background: var(--jc-border);
+}
+.voyage-stage:last-child .voyage-stage__bar { background: transparent; }
+.voyage-stage__label {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--jc-text-3);
+}
+.voyage-stage__date {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+}
+
+/* Past stages carry the chum-barrel PNG — bait already dropped. */
+.voyage-stage[data-state="past"] .voyage-stage__mark {
+  background: url('../assets/chum-barrel.png') center / 22px 22px no-repeat;
+}
+.voyage-stage[data-state="past"] .voyage-stage__bar { background: var(--jaw-highlight); }
+.voyage-stage[data-state="past"] .voyage-stage__label { color: var(--jc-text); }
+/* Current stage — the red shark fin from the Jawbar palette, breaking
+   the surface. Sized a touch larger than the barrels so the "you are
+   here" mark leads visually. */
+.voyage-stage[data-state="now"] .voyage-stage__mark {
+  width: 30px; height: 30px;
+  background: url('../assets/shark-fin-red.png') center / 26px 26px no-repeat;
+}
+.voyage-stage[data-state="now"] .voyage-stage__label { color: var(--jaw-red); }
+.voyage-stage[data-state="now"] .voyage-stage__bar { background: var(--jc-border); }
+/* Future stage — dashed circle, still open water */
+.voyage-stage[data-state="next"] .voyage-stage__mark::before {
+  content: "";
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px dashed var(--jc-accent-line);
+  box-sizing: border-box;
+  display: block;
+}
+.voyage-stage[data-state="next"] .voyage-stage__bar { background: transparent; }
+
+/* Score-dominant hero. Big number on the left, everything else stacks to
+   the right of it. Sticks to the top of the page so the primary actions
+   stay visible as the user scrolls into rounds / notes. */
+.recall-hero--v2 {
+  max-width: 900px; margin: 0 auto;
+  padding: var(--jc-6) var(--jc-5) var(--jc-5);
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--jc-5);
+  align-items: center;
+}
+.recall-hero__score {
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--jc-4);
+  border-radius: var(--jc-radius);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-left: 4px solid var(--jc-border-strong);
+}
+.recall-hero__score[data-tier='pos']     { border-left-color: var(--jc-pos); }
+.recall-hero__score[data-tier='caution'] { border-left-color: var(--jc-caution); }
+.recall-hero__score[data-tier='neg']     { border-left-color: var(--jc-neg); }
+.recall-hero__score[data-tier='pos']     .recall-hero__score-num { color: var(--jc-pos); }
+.recall-hero__score[data-tier='caution'] .recall-hero__score-num { color: var(--jc-caution); }
+.recall-hero__score[data-tier='neg']     .recall-hero__score-num { color: var(--jc-neg); }
+.recall-hero__score-num {
+  font: 700 44px/0.9 var(--jc-font-mono);
+  color: var(--jc-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.recall-hero__score-den {
+  font: 500 var(--jc-text-xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+  margin-top: 2px;
+}
+.recall-hero__score-lbl {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+  letter-spacing: .16em; text-transform: uppercase;
+  margin-top: 8px;
+}
+.recall-hero__body { display: flex; flex-direction: column; gap: var(--jc-2); min-width: 0; }
+.recall-hero__body h1 {
+  margin: 0;
+  font: 600 var(--jc-text-xl)/var(--jc-leading-tight) var(--jc-font);
+  letter-spacing: -.015em;
+}
+.recall-hero__badges {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.recall-hero__actions {
+  display: flex; gap: var(--jc-2); flex-wrap: wrap; align-items: center;
+  margin-top: var(--jc-2);
+}
+/* "Change status:" prefix — makes the row of status transition
+   buttons read as a labeled control group rather than three
+   unrelated actions. */
+.change-status-label {
+  font: 600 var(--jc-text-xs)/1 var(--jc-font);
+  color: var(--jc-text-2);
+  margin-right: 2px;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 8px; border-radius: 3px;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .08em; text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.hero-badge[data-tone='pos']     { background: var(--jc-pos-weak);     color: var(--jc-pos);     border-color: var(--jc-pos-line); }
+.hero-badge[data-tone='caution'] { background: var(--jc-caution-weak); color: var(--jc-caution); border-color: var(--jc-caution-line); }
+.hero-badge[data-tone='neg']     { background: var(--jc-neg-weak);     color: var(--jc-neg);     border-color: var(--jc-neg-line); }
+.hero-badge[data-tone='info']    { background: var(--jc-info-weak);    color: var(--jc-info);    border-color: var(--jc-info-line); }
+.hero-badge[data-tone='neutral'] { background: var(--jc-surface-3);    color: var(--jc-text-2);  border-color: var(--jc-border-strong); }
+.hero-badge--muted { background: transparent; color: var(--jc-text-3); border-color: transparent; }
+
+/* What's next callout — above-the-fold, tone-colored bar. */
+.whats-next {
+  max-width: 900px; margin: 0 auto var(--jc-4);
+  padding: 12px 16px;
+  border-radius: var(--jc-radius);
+  display: flex; align-items: center; gap: 12px;
+  font-size: var(--jc-text-sm);
+}
+.whats-next[data-tone='info']   { background: var(--jc-info-weak);    border-left: 3px solid var(--jc-info); }
+.whats-next[data-tone='warn']   { background: var(--jc-caution-weak); border-left: 3px solid var(--jc-caution); }
+.whats-next[data-tone='urgent'] { background: var(--jc-neg-weak);     border-left: 3px solid var(--jc-neg); }
+.whats-next__label {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .12em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 3px;
+  background: rgba(255,255,255,0.4);
+  color: var(--jc-text);
+}
+.whats-next__msg { flex: 1; color: var(--jc-text); }
+
+.recall-body {
+  max-width: 900px; margin: 0 auto;
+  padding: 0 var(--jc-6) var(--jc-10);
+  display: flex; flex-direction: column; gap: var(--jc-6);
+}
+/* Two-column layout — fit + comp side-by-side on wider viewports.
+   Collapses to stacked below ~680px. */
+.recall-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--jc-4);
+}
+@media (max-width: 680px) {
+  .recall-two-col { grid-template-columns: 1fr; }
+  .recall-hero--v2 { grid-template-columns: 1fr; }
+}
+section { display: flex; flex-direction: column; gap: var(--jc-3); }
+
+/* One accent color for all section eyebrows — the old per-nth-child
+   rainbow was visually chaotic. Weight/size carries the hierarchy. */
+section > .jc-eyebrow, .section-head-row .jc-eyebrow {
+  font-size: var(--jc-text-xs);
+  color: var(--jc-text-2);
+}
+
+.recall-box {
+  padding: var(--jc-4);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  background: var(--jc-surface-1);
+  font-size: var(--jc-text-sm);
+  color: var(--jc-text-2);
+  display: flex; flex-direction: column; gap: var(--jc-2);
+}
+.recall-box:empty { display: none; }
+
+/* Fit / Comp readout internals */
+.label {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--jc-text-3);
+  margin-top: 6px;
+}
+.fit-bullets { padding-left: 18px; margin: 0; }
+.fit-bullets li { padding: 3px 0; color: var(--jc-text); font-size: var(--jc-text-sm); }
+.fit-bullets--pos li::marker { color: var(--jc-pos); }
+.fit-bullets--neg li::marker { color: var(--jc-neg); }
+
+.outreach-block {
+  margin-top: var(--jc-2);
+  padding: 10px 12px;
+  background: var(--jc-accent-weak);
+  border-left: 3px solid var(--jc-accent);
+  border-radius: 3px;
+}
+.outreach-block__contact { font-weight: 700; color: var(--jc-text); font-size: var(--jc-text-sm); margin-top: 4px; }
+.outreach-block__why     { font-size: var(--jc-text-xs); color: var(--jc-text-2); margin-top: 4px; line-height: 1.4; }
+.outreach-block__strat   { font-size: var(--jc-text-xs); color: var(--jc-text-3); margin-top: 4px; line-height: 1.4; font-style: italic; }
+
+.comp-range { display: flex; align-items: baseline; gap: 8px; }
+.comp-range__num {
+  font: 700 22px/1 var(--jc-font-mono);
+  color: var(--jc-text);
+  font-variant-numeric: tabular-nums;
+}
+.comp-range__lbl {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--jc-text-3);
+}
+
+/* Empty-state CTA inside a recall-box — makes it clear what to do next
+   instead of just muttering "no analysis on record." */
+.empty-cta {
+  padding: 8px 10px;
+  border-radius: 3px;
+  background: var(--jc-surface-2);
+  color: var(--jc-text-2);
+  font-size: var(--jc-text-sm);
+  line-height: 1.4;
+}
+.recall-box .jc-btn { align-self: flex-start; }
+
+.log-contact { display: flex; gap: var(--jc-2); margin-bottom: var(--jc-3); }
+.log-contact .jc-input { flex: 1; }
+
+.timeline {
+  list-style: none; padding: 0; margin: 0;
+  border-left: 2px solid var(--jc-border);
+  padding-left: var(--jc-4);
+}
+.timeline li {
+  padding: 6px 0; font-size: var(--jc-text-sm);
+  display: flex; gap: var(--jc-2); flex-wrap: wrap; color: var(--jc-text-2);
+}
+.tl-date { font: 400 var(--jc-text-3xs)/1 var(--jc-font-mono); color: var(--jc-text-3); }
+.tl-type {
+  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  padding: 2px 6px; border-radius: 3px;
+  background: var(--jc-surface-3); color: var(--jc-text-2);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.tl-note { flex: 1; }
+
+.panel-person { padding: 4px 0; color: var(--jc-text); font-size: var(--jc-text-sm); }
+.panel-person .jc-footnote { display: block; margin-top: 2px; }
+.panel-person--rec {
+  background: color-mix(in srgb, var(--jc-accent) 8%, transparent);
+  border-left: 3px solid var(--jc-accent);
+  padding-left: 8px;
+  border-radius: 3px;
+  margin: 2px 0;
+}
+.person-link {
+  font-weight: 700;
+  color: var(--jc-accent);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--jc-accent);
+}
+.person-link:hover { color: var(--jc-accent-hover, var(--jc-info)); border-bottom-style: solid; }
+
+details summary {
+  padding: 4px 0;
+}
+.desc-body {
+  margin-top: var(--jc-2); padding: var(--jc-3);
+  background: var(--jc-diag-surface); border: 1px solid var(--jc-diag-line);
+  border-radius: var(--jc-radius-sm);
+  font-family: var(--jc-font-mono); font-size: var(--jc-text-2xs);
+  color: var(--jc-text-2); line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 500px; overflow-y: auto;
+}
+
+.prep-output {
+  margin-top: var(--jc-2); padding: var(--jc-4);
+  background: var(--jc-surface-1); border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  font: 400 var(--jc-text-sm)/var(--jc-leading-body) var(--jc-font);
+  color: var(--jc-text); white-space: pre-wrap;
+  min-height: 40px;
+}
+
+/* Notes */
+#notes { min-height: 100px; }
+
+/* Interview rounds */
+.section-head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--jc-2); }
+.rounds-list { display: flex; flex-direction: column; gap: var(--jc-3); }
+
+/* Job links row — "Open live posting" + "Link to Job on Corp Site"
+   above the Interview rounds section. Explicit row direction because
+   the base `section` rule sets column and would otherwise cause the
+   .jc-btn children to stretch full-width. Collapses when empty. */
+.job-links {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: center;
+  gap: var(--jc-2);
+}
+.job-links:empty { display: none; }
+
+/* .recall-panel — every top-level section in the Recall body gets this
+   bordered surface treatment so the page reads as a stack of discrete
+   working areas rather than free-floating content. Same visual
+   vocabulary as .recall-box (the older per-readout wrapper). */
+.recall-panel {
+  padding: var(--jc-4);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  background: var(--jc-surface-1);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+}
+/* When a legacy .recall-box sits inside a .recall-panel, the panel is
+   now supplying the border/padding/background so the inner box drops
+   its own to avoid a doubled frame. The layout/typography rules
+   (font-size, color, flex layout) from .recall-box are preserved. */
+.recall-panel > .recall-box {
+  padding: 0; border: 0; background: transparent;
+}
+/* Rounds are now <details> — collapsed by default, expand to edit + prep */
+.round-card {
+  border: 1px solid var(--jc-border);
+  border-left: 3px solid var(--jc-caution);
+  border-radius: var(--jc-radius);
+  background: var(--jc-surface-1);
+  overflow: hidden;
+}
+.round-card:has(.round-prep) { border-left-color: var(--jc-pos); }
+.round-card > summary {
+  padding: var(--jc-3) var(--jc-4);
+  cursor: pointer;
+  display: flex; align-items: center; gap: var(--jc-3);
+  list-style: none;
+}
+.round-card > summary::-webkit-details-marker { display: none; }
+.round-card > summary:hover { background: var(--jc-surface-2); }
+
+.round-summary__bits {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: var(--jc-2); flex-wrap: wrap;
+  font-size: var(--jc-text-sm);
+  color: var(--jc-text);
+}
+.round-summary__bits span { display: inline-flex; align-items: center; }
+.round-summary__bits span + span::before { content: '·'; margin-right: 8px; color: var(--jc-text-3); }
+.round-summary__date { font-family: var(--jc-font-mono); color: var(--jc-text-2); }
+.round-summary__date.muted { color: var(--jc-text-3); font-style: italic; }
+.round-summary__topic { color: var(--jc-text-2); font-style: italic; }
+
+.round-prep-badge {
+  flex: none;
+  padding: 3px 8px; border-radius: var(--jc-radius-sm);
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .06em; text-transform: uppercase;
+  border: 1px solid;
+}
+.round-prep-badge[data-status='ready'] { background: var(--jc-pos-weak); color: var(--jc-pos); border-color: var(--jc-pos-line); }
+.round-prep-badge[data-status='none']  { background: var(--jc-surface-3); color: var(--jc-text-3); border-color: var(--jc-border-strong); }
+
+.round-summary__chev {
+  flex: none; color: var(--jc-text-3); font-size: 12px;
+  transition: transform var(--jc-dur) var(--jc-ease);
+}
+.round-card[open] .round-summary__chev { transform: rotate(90deg); }
+
+/* Expanded content — the existing grid/actions/prep blocks */
+.round-card > .round-card__grid,
+.round-card > .round-card__actions,
+.round-card > .round-prep,
+.round-card > .jc-footnote {
+  padding: 0 var(--jc-4);
+}
+.round-card > .round-card__grid { padding-top: var(--jc-3); }
+.round-card > .round-card__actions { padding-bottom: var(--jc-3); padding-top: var(--jc-3); }
+.round-card > .round-prep { margin: 0 var(--jc-4) var(--jc-3); padding: var(--jc-3); }
+.round-card > .jc-footnote { padding-bottom: var(--jc-3); }
+.round-card__grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--jc-2);
+}
+.round-card__grid label { display: flex; flex-direction: column; gap: 3px; }
+.round-card__grid label span {
+  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--jc-text-3);
+}
+.round-card__grid label.full { grid-column: 1 / -1; }
+.round-card__meta { display: flex; align-items: center; gap: var(--jc-2); font-size: var(--jc-text-xs); color: var(--jc-text-3); }
+.round-card__actions { display: flex; gap: var(--jc-2); flex-wrap: wrap; }
+
+.round-prep {
+  padding: var(--jc-3);
+  background: var(--jc-surface-2);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+}
+
+/* Tab strip across the top of the prep block. During a call the user
+   picks a section, sees just that content. Active tab uses the accent
+   underline; count badge in parens after the label. Horizontal scroll
+   on narrow layouts so no tab hides. */
+.prep-tabs {
+  display: flex; flex-wrap: wrap; gap: 2px;
+  border-bottom: 1px solid var(--jc-border);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+.prep-tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 6px 10px;
+  border-radius: var(--jc-radius-sm) var(--jc-radius-sm) 0 0;
+  font: 600 var(--jc-text-xs)/1 var(--jc-font);
+  color: var(--jc-text-2);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -5px;
+}
+.prep-tab:hover { color: var(--jc-text); background: var(--jc-surface-1); }
+.prep-tab[data-active='true'] {
+  color: var(--jc-accent);
+  border-bottom-color: var(--jc-accent);
+  background: var(--jc-surface-1);
+}
+.prep-tab__count {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+}
+.prep-tab[data-active='true'] .prep-tab__count { color: var(--jc-accent); }
+
+/* Pane host — swaps its inner content when the active tab changes.
+   Each pane provides its own layout via .prep-pane--<kind>. */
+.prep-pane-host { display: flex; flex-direction: column; gap: var(--jc-2); }
+.prep-pane { display: flex; flex-direction: column; gap: 4px; }
+.prep-pane--prose p {
+  margin: 0;
+  font-size: var(--jc-text-sm);
+  line-height: var(--jc-leading-body);
+  color: var(--jc-text);
+}
+
+/* Toolbar above collapsible-item panes — "Expand all" / "Collapse
+   all" so the user can flip between overview and full-context without
+   clicking every row. Link-style, tucked to the right. */
+.prep-toolbar {
+  display: flex; justify-content: flex-end; gap: var(--jc-3);
+  font-size: var(--jc-text-2xs);
+}
+.prep-linkbtn {
+  appearance: none; background: transparent; border: 0;
+  padding: 0; cursor: pointer;
+  color: var(--jc-text-3);
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font);
+}
+.prep-linkbtn:hover { color: var(--jc-accent); text-decoration: underline; }
+
+/* One collapsible item — a Q or Story. Summary is the click target;
+   answer/beats live in the body below. Native <details> so keyboard,
+   screen readers, and browser search-in-page all just work. */
+.prep-item {
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-1);
+  padding: 0;
+}
+.prep-item + .prep-item { margin-top: 4px; }
+.prep-item[open] { background: var(--jc-surface-1); border-color: var(--jc-accent-line, var(--jc-border-strong)); }
+.prep-item__q {
+  padding: 8px 10px;
+  cursor: pointer;
+  font: 600 var(--jc-text-sm)/1.35 var(--jc-font);
+  color: var(--jc-text);
+  list-style: none;
+  display: flex; align-items: baseline; gap: 6px;
+}
+/* Hide the default triangle; we render our own so it stays consistent
+   across browsers and can tint with the active state. */
+.prep-item__q::-webkit-details-marker { display: none; }
+.prep-item__q::before {
+  content: '▸';
+  color: var(--jc-text-3);
+  font-size: 0.85em;
+  transition: transform var(--jc-dur-fast) var(--jc-ease);
+  transform: rotate(0deg);
+  flex: none;
+}
+.prep-item[open] .prep-item__q::before { transform: rotate(90deg); }
+.prep-item__body {
+  padding: 4px 10px 10px 22px;
+  display: flex; flex-direction: column; gap: 4px;
+  border-top: 1px dashed var(--jc-border);
+  margin-top: 4px;
+}
+.prep-item__label {
+  font: 600 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--jc-text-3);
+  padding-top: 4px;
+}
+.prep-item__answer {
+  font-size: var(--jc-text-sm);
+  color: var(--jc-text-2);
+  line-height: var(--jc-leading-body);
+}
+
+/* Story summary — the two-line "label + anchor" preview shown before
+   expansion. Stacks vertically when there's room; the anchor reads
+   in accent-pos so it stays scannable. */
+.prep-story__label { font-weight: 600; color: var(--jc-text); }
+.prep-story__anchor {
+  font: 400 var(--jc-text-xs)/1.2 var(--jc-font);
+  color: var(--jc-pos);
+  margin-left: 6px;
+}
+.prep-story__beats {
+  display: flex; flex-direction: column; gap: 2px;
+  padding-left: var(--jc-3); margin: 0;
+}
+.prep-story__beats li {
+  font-size: var(--jc-text-xs);
+  color: var(--jc-text-2);
+  list-style: '— ';
+}
+
+/* Watchouts — bulleted caution list. No expand/collapse needed;
+   these are short enough to be scanned in place. */
+.prep-watchouts { padding-left: var(--jc-4); margin: 0; color: var(--jc-caution); }
+.prep-watchouts li {
+  font-size: var(--jc-text-sm);
+  line-height: var(--jc-leading-body);
+  padding: 2px 0;
+}
+
+/* Follow-up email block — sits below the prep tabs when the user has
+   generated a post-interview draft. Subject line reads as a header;
+   body preserves whitespace so paragraph breaks in the draft render
+   correctly in the panel. */
+.round-followup {
+  margin-top: var(--jc-3);
+  padding: var(--jc-3);
+  border: 1px solid var(--jc-accent-line, var(--jc-border-strong));
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-1);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.round-followup__subject {
+  font: 600 var(--jc-text-sm)/1.35 var(--jc-font);
+  color: var(--jc-text);
+}
+.round-followup__label {
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--jc-text-3);
+}
+.round-followup__body {
+  white-space: pre-wrap;
+  font-size: var(--jc-text-sm);
+  line-height: var(--jc-leading-body);
+  color: var(--jc-text);
+  padding: 6px 8px;
+  background: var(--jc-surface-2);
+  border-radius: var(--jc-radius-sm);
+}
+.round-followup__actions {
+  display: flex; align-items: center; gap: var(--jc-3);
+}
+
+/* Documents section detail bodies */
+.recall-box details { border: 1px solid var(--jc-border); border-radius: var(--jc-radius-sm); padding: var(--jc-2) var(--jc-3); background: var(--jc-surface-2); }
+.recall-box details + details { margin-top: 6px; }
+.doc-body {
+  margin-top: 8px; padding: var(--jc-2) var(--jc-3);
+  background: var(--jc-surface-1); border-radius: var(--jc-radius-sm);
+  font-size: var(--jc-text-xs); line-height: var(--jc-leading-body);
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 500px; overflow-y: auto;
+  color: var(--jc-text-2);
+}

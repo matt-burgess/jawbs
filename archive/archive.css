@@ -1,0 +1,1186 @@
+html, body { height: 100%; margin: 0; background: var(--jc-bg); }
+body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body) var(--jc-font); }
+[hidden] { display: none !important; }
+
+/* -----------------------------------------------------------------
+   Board card — one bordered surface wrapping pipeline, controls,
+   table, and footer summary. Mockup's "report card" treatment. Sits
+   inside var(--jc-5) horizontal breathing room from the page edges
+   and carries the extension's standard elevation.
+   ----------------------------------------------------------------- */
+.jc-jb-board {
+  margin: var(--jc-3) var(--jc-5) var(--jc-5);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px -30px rgba(11, 51, 88, .28), var(--jc-shadow);
+  overflow: hidden;
+  /* Own the vertical rhythm of everything nested inside — the child
+     panels' bottom-borders and top-borders provide the section
+     separators, not margins. */
+}
+.jc-jb-board .controls,
+.jc-jb-board .table-wrap {
+  border-radius: 0;
+  box-shadow: none;
+}
+/* First and last visible sections lose their bottom-border collision
+   with the board's own rounded corners. */
+.jc-jb-board > :last-child { border-bottom: 0; }
+
+/* Footer summary strip inside the board — row count on the left,
+   stale-jobs nudge on the right when any exist. Muted mono chip so
+   it reads as metadata, not a headline. */
+.jc-jb-board__foot {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: var(--jc-3);
+  padding: 12px var(--jc-6);
+  background: var(--jc-surface-3);
+  font: 400 var(--jc-text-xs)/1 var(--jc-font-mono);
+  letter-spacing: .04em;
+  color: var(--jc-text-3);
+  border-top: 1px solid var(--jc-border);
+}
+.jc-jb-board__summary { display: inline-flex; align-items: center; gap: 6px; }
+.jc-jb-board__stale {
+  color: var(--jc-neg);
+  font-weight: 600;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+
+/* -----------------------------------------------------------------
+   Pipeline strip — colored horizontal bar showing counts per stage,
+   sitting between the toolbar and search row. Segments are flex:N
+   where N = job count for that stage, so the bar's total length is
+   proportional to the total board size and each segment shows its
+   share visually. Each segment is a button — clicking filters the
+   table to that status.
+   ----------------------------------------------------------------- */
+.jc-jb-pipeline {
+  display: flex; align-items: flex-end; gap: 8px;
+  padding: 16px var(--jc-6) 16px;
+  background: var(--jaw-teal-strip);
+}
+/* Each segment stacks: big count, small mono label, proportional bar.
+   Width tracks its share of total via inline `flex: N` set in
+   archive.js so bars stay visually proportional. min-width keeps
+   narrow segments clickable; overflow:hidden + ellipsis on the label
+   clips cleanly when a segment is too narrow for its full text. */
+.jc-jb-pipeline__seg {
+  min-width: 72px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 0 10px 0 0;
+  background: transparent; border: 0; cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+/* Count leads — big tabular numeral, primary scan target. */
+.jc-jb-pipeline__count {
+  font: 700 24px/1 var(--jc-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  letter-spacing: -.02em;
+}
+/* Label sits under the count in the mono eyebrow style. */
+.jc-jb-pipeline__label {
+  font: 700 var(--jc-text-3xs)/1.1 var(--jc-font-mono);
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--jaw-sand);
+  display: block;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jc-jb-pipeline__bar {
+  height: 6px; width: 100%; border-radius: 3px;
+  background: var(--_bar, rgba(255,255,255,.4));
+  transition: transform .18s ease;
+}
+.jc-jb-pipeline__seg:hover .jc-jb-pipeline__bar { transform: scaleY(1.4); }
+.jc-jb-pipeline__seg:focus-visible {
+  outline: 2px solid var(--jc-accent-2);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Segment colors — tied to the status semantics (accent for saved,
+   caution for in-progress, olive for applied, blue for interviewing,
+   muted for archived, red for not-moving-forward). */
+.jc-jb-pipeline__seg[data-stage="saved"]                   { --_bar: #C7DCEF; }
+.jc-jb-pipeline__seg[data-stage="inProgressDraft"]         { --_bar: #F7DD8A; }
+.jc-jb-pipeline__seg[data-stage="inProgressClickedApply"]  { --_bar: #EFB700; }
+.jc-jb-pipeline__seg[data-stage="applied"]                 { --_bar: #C5D093; }
+.jc-jb-pipeline__seg[data-stage="interviewing"]            { --_bar: #7EB4E4; }
+.jc-jb-pipeline__seg[data-stage="archived"]                { --_bar: #7D9490; }
+.jc-jb-pipeline__seg[data-stage="notMovingForward"]        { --_bar: #E9BFB9; }
+
+/* Compact "JT" button in row actions — LinkedIn icon + "JT" label
+   packed tight so the row action cell stays narrow. */
+.jc-jawb-tracker-btn {
+  gap: 4px;
+  padding: 4px 6px;
+  font: 600 11px/1 var(--jc-font, system-ui, sans-serif);
+}
+.jc-jawb-tracker-btn__label {
+  letter-spacing: .04em;
+}
+
+.jc-toolbar {
+  padding: 12px var(--jc-6);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--jc-3);
+  /* Cream + red brand-line supplied by base rule in job-copilot.css.
+     Local overrides here only tune spacing. */
+}
+.toolbar-left { display: flex; align-items: center; gap: var(--jc-3); }
+.toolbar-actions { display: flex; align-items: center; gap: var(--jc-2); flex-wrap: wrap; }
+
+.jc-toolbar .jc__wordmark { display: inline-flex; align-items: baseline; gap: 14px; }
+/* Big Jawboard brand on the archive header. Sized larger than the
+   sidepanel logo to sit alongside the XL Anton wordmark. */
+.jc-toolbar .jc__brand-logo {
+  width: 40px; height: 40px;
+  align-self: center;
+}
+/* Vertical divider between the wordmark and the "N jawbs in your boat"
+   count. Cream-line for cohesion with the header background. */
+.toolbar-sep {
+  display: inline-block;
+  width: 1px; height: 26px;
+  background: var(--jaw-cream-line);
+  align-self: center;
+}
+.toolbar-count {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em;
+  color: var(--jc-text-2);
+}
+.toolbar-count::after { content: ""; }
+
+.controls {
+  display: flex; gap: var(--jc-3); align-items: center;
+  padding: var(--jc-4) var(--jc-6);
+  background: var(--jc-surface-1);
+  border-bottom: 1px solid var(--jc-border);
+  max-width: 100vw; box-sizing: border-box;
+}
+/* Search input dominates the row. `min-width: 0` lets the flex child
+   shrink below its intrinsic width so it can never overflow the row,
+   even with the placeholder text at full length. */
+.controls__search {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  display: flex; align-items: center;
+}
+.controls__search-icon {
+  position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px; opacity: .6;
+  pointer-events: none;
+}
+.controls__search-input {
+  flex: 1 1 auto;
+  min-width: 0; width: 100%;
+  min-height: 48px;
+  padding-left: 44px;
+  font-size: var(--jc-text-sm);
+  border-width: 2px;
+  box-shadow: inset 0 1px 0 rgba(0,0,0,0.02);
+}
+.controls__search-input:focus {
+  border-color: var(--jc-accent);
+  box-shadow: 0 0 0 3px var(--jc-accent-weak);
+}
+/* Status filter is narrow — just enough to show the current status text
+   without truncation. Fixed-shrink so it never eats the search box. */
+.controls .jc-select {
+  flex: 0 0 auto;
+  width: 170px; max-width: 30vw;
+  min-height: 48px;
+}
+/* Strength cell — the shark portrait leads (the whole species-tier
+   system is designed around visual recognition), with the score
+   underneath and the tier label at the bottom. Tier tints on the
+   border/background so the top of the grid reads at a glance:
+   Great White = accent (strongest), Pygmy = muted (weakest). */
+/* Strength cell — two-row layout mirroring the Jawbar's meta strip.
+   Row 1 is the big strength number + shark portrait; row 2 is the
+   Fit · Strength · Comp mini-gauge trio. Plain-text, no card
+   container — the tier color tints the big number so a glance still
+   conveys tier without any box or badge. */
+.strength-cell {
+  display: inline-flex; flex-direction: column; align-items: flex-start;
+  gap: 4px;
+  min-width: 120px;
+  line-height: 1.1;
+}
+.strength-cell__row {
+  display: inline-flex; align-items: center;
+}
+.strength-cell__row--head {
+  gap: 8px;
+}
+.strength-cell__row--gauges {
+  gap: 10px;
+}
+.strength-cell__shark {
+  display: block;
+  width: 69px; height: 42px;
+  object-fit: contain;
+}
+.strength-cell__score {
+  font: 800 22px/1 var(--jc-font);
+  font-variant-numeric: tabular-nums;
+  color: var(--jc-text);
+}
+.strength-cell[data-tier="great-white"] .strength-cell__score { color: var(--jc-accent); }
+.strength-cell[data-tier="tiger"]       .strength-cell__score { color: var(--jc-pos); }
+.strength-cell[data-tier="bull"]        .strength-cell__score { color: var(--jc-pos); }
+.strength-cell[data-tier="mako"]        .strength-cell__score { color: var(--jc-caution); }
+.strength-cell[data-tier="nurse"]       .strength-cell__score { color: var(--jc-text-3); }
+.strength-cell[data-tier="pygmy"]       .strength-cell__score { color: var(--jc-text-3); }
+
+/* Mini-gauge column — SVG on top, tiny mono label beneath. Sizing
+   scoped to the Jawboard row so multiple rows scan consistently. */
+.strength-mini {
+  display: inline-flex; flex-direction: column; align-items: center;
+  gap: 2px;
+  cursor: help;
+}
+.strength-mini__svg { display: block; }
+.strength-mini__label {
+  font: 700 8px/1 var(--jc-font-mono);
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--jc-text-3);
+}
+
+/* Source pill retired — the capture source (LinkedIn / Google Jobs)
+   now surfaces only via the row's hover title. The company link
+   beneath the job title has taken its visual slot. */
+
+/* "Show Archived" opt-in — LinkedIn Archived jawbs are hidden by
+   default so the day-to-day list stays focused. Compact inline
+   toggle to the right of the status dropdown. */
+.controls__toggle {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 var(--jc-2);
+  font: 500 var(--jc-text-xs)/1 var(--jc-font);
+  color: var(--jc-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+.controls__toggle input { cursor: pointer; }
+
+#exportReminder[hidden], #enrichProgress[hidden] { display: none !important; }
+
+.table-wrap { padding: var(--jc-4) var(--jc-6) var(--jc-8); }
+
+/* Import / export live at the bottom of the page rather than the toolbar
+   so day-to-day scanning of the grid isn't cluttered by admin actions. */
+.jawboard-footer {
+  display: flex; gap: var(--jc-2); align-items: center; flex-wrap: wrap;
+  padding: var(--jc-4) var(--jc-6);
+  border-top: 1px solid var(--jc-border);
+  background: var(--jc-surface-1);
+}
+table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  overflow: hidden;
+}
+thead th {
+  padding: 12px var(--jc-4);
+  background: var(--jc-surface-3);
+  cursor: pointer;
+  user-select: none;
+  font: 700 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .14em;
+  color: var(--jc-text-3);
+  border-bottom: 1px solid var(--jc-border);
+  text-align: left;
+  transition: color var(--jc-dur-fast) var(--jc-ease);
+  white-space: nowrap;
+}
+thead th:hover { color: var(--jc-accent); }
+/* Show sort direction on the currently-sorted column via ::after
+   glyph rather than a separate DOM node — keeps the JS simple. */
+thead th[aria-sort="ascending"]::after  { content: ' ↑'; color: var(--jc-accent); }
+thead th[aria-sort="descending"]::after { content: ' ↓'; color: var(--jc-accent); }
+thead th[aria-sort="ascending"],
+thead th[aria-sort="descending"] { color: var(--jc-accent); }
+
+tbody td {
+  padding: 16px var(--jc-4);
+  border-bottom: 1px solid #ECECEA;
+  font-size: var(--jc-text-sm);
+  color: var(--jc-text-2);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+/* Title cell — bigger + darker + medium weight so the role reads as
+   the dominant piece of each row. Company name sits beneath as a
+   Google-search link (its own visual layer). The dedicated Company
+   column was retired since this stacked treatment carries the same
+   info more efficiently. */
+tbody td.col-title {
+  color: #14293D;
+  font: 600 15px/1.25 var(--jc-font);
+  min-width: 0;
+}
+tbody td.col-title .col-title__wrap {
+  display: flex; flex-direction: column; gap: 3px;
+  min-width: 0;
+}
+tbody td.col-title .col-title__row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px;
+}
+/* Only the title text is the openRecall hit-target — the company
+   link owns its own click. Underline appears on hover so the
+   affordance is discoverable. */
+.col-title__text.clickable { cursor: pointer; color: #14293D; }
+.col-title__text.clickable:hover { text-decoration: underline; }
+/* Company link — mono muted body text with the accent color reserved
+   for hover so the row still scans clean at rest. */
+.col-title__company {
+  font: 500 var(--jc-text-xs)/1.2 var(--jc-font-mono);
+  letter-spacing: .04em;
+  color: var(--jc-text-3);
+  text-decoration: none;
+  cursor: pointer;
+}
+.col-title__company:hover {
+  color: var(--jc-accent);
+  text-decoration: underline;
+}
+.col-title__company--empty {
+  cursor: default;
+  opacity: .6;
+}
+.col-title__company--empty:hover {
+  color: var(--jc-text-3);
+  text-decoration: none;
+}
+/* Captured date — mono muted so it reads as metadata not headline. */
+tbody td.col-captured {
+  font: 400 var(--jc-text-xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+  white-space: nowrap;
+}
+
+/* Actions cluster — nested under the title/company inside the title
+   cell (the standalone Actions column was retired). The wrapper stays
+   compact so it reads as a per-row control strip attached to the
+   row's identity. */
+.col-actions {
+  margin-top: 6px;
+  white-space: nowrap;
+}
+.col-actions__row {
+  display: inline-flex; align-items: stretch; gap: 2px;
+  justify-content: flex-start;
+  padding: 2px;
+  background: var(--jc-surface-3);
+  border: 1px solid var(--jc-border);
+  border-radius: 8px;
+}
+/* Every child renders as a compact bordered ghost cell so the group
+   reads as a segmented control. Overrides the transparent-fill on
+   .jc-icon-btn (default) — we want each button to have a hit area
+   with a subtle background that highlights on hover. */
+.col-actions__row > * {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 26px;
+  padding: 0 8px;
+  background: var(--jc-surface-1);
+  border: 0;
+  border-radius: 6px;
+  color: var(--jc-text-2);
+  cursor: pointer;
+  font: 600 11px/1 var(--jc-font-mono);
+  letter-spacing: .06em;
+  text-decoration: none;
+  transition: background var(--jc-dur-fast) var(--jc-ease),
+              color var(--jc-dur-fast) var(--jc-ease);
+}
+.col-actions__row > *:hover {
+  background: var(--jc-accent-weak);
+  color: var(--jc-accent);
+}
+.col-actions__row > *[disabled] { opacity: .4; cursor: not-allowed; }
+/* Delete gets the danger tone on hover to signal destructiveness. */
+.col-actions__row > .jc-icon-btn--danger:hover {
+  background: var(--jc-neg-weak);
+  color: var(--jc-neg);
+}
+.col-actions__enrich {
+  display: block; margin-top: 6px;
+  font: 400 var(--jc-text-xs)/1 var(--jc-font-mono);
+  color: var(--jc-caution);
+  text-align: left;
+}
+tbody tr {
+  transition: background var(--jc-dur-fast) var(--jc-ease);
+  /* Left tier rail — painted via box-shadow (inset) on the first td
+     so it doesn't grow the row width. Color is scoped per data-tier
+     below; default falls back to muted border. */
+  --_rail: var(--jc-border);
+}
+tbody tr:nth-child(odd) { background: var(--jc-surface-1); }
+tbody tr:nth-child(even) { background: var(--jc-bg); }
+tbody tr:hover { background: var(--jc-surface-2); }
+tbody tr > td:first-child {
+  box-shadow: inset 5px 0 0 0 var(--_rail);
+}
+/* Tier rail palette — great-white (gold) through pygmy (deep red).
+   Matches the shark halo palette so the tier reads at a glance. */
+tbody tr[data-tier="great-white"] { --_rail: #EFB700; }
+tbody tr[data-tier="tiger"]       { --_rail: #5C7016; }
+tbody tr[data-tier="bull"]        { --_rail: #B4A017; }
+tbody tr[data-tier="mako"]        { --_rail: #B46E12; }
+tbody tr[data-tier="nurse"]       { --_rail: #B4392E; }
+tbody tr[data-tier="pygmy"]       { --_rail: #7A1D18; }
+
+tbody td:first-child { color: var(--jc-text); font-weight: 600; }
+
+td.clickable { cursor: pointer; color: var(--jc-accent); }
+td.clickable:hover { text-decoration: underline; }
+a { color: var(--jc-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a.danger { color: var(--jc-neg); }
+
+/* -----------------------------------------------------------------
+   Row cell typography — plain-text, no badges. Every column reads as
+   data (numbers, dates, counts), with typographic weight/color doing
+   all the tier signaling. The tier rail on the row's left edge plus
+   the shark portrait in the Strength cell carry the visual layer that
+   the old fit-cell / people-cell badges used to provide.
+   ----------------------------------------------------------------- */
+.col-empty {
+  color: var(--jc-text-3); opacity: .6;
+  font-family: var(--jc-font-mono);
+}
+/* Comp Lo / Comp Hi cells — mono, tabular numerals, tight. Comp Hi
+   picks up the olive-green pos tone so a strong ceiling reads at a
+   glance. */
+.col-comp-cell { text-align: right; white-space: nowrap; }
+.col-comp-num {
+  font: 500 var(--jc-text-sm)/1 var(--jc-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--jc-text);
+}
+.col-comp-num--hi {
+  color: var(--jc-pos);
+  font-weight: 700;
+}
+/* People cell — one line per degree bucket so multi-level rows read
+   as a tidy stack ("1st × 2" over "2nd × 3") rather than one long
+   comma-separated string. Centered horizontally + vertically so a
+   one-line row and a two-line row still feel visually balanced with
+   the rest of the row's content. Hover title still surfaces the
+   full named list. */
+.col-people-wrap { text-align: center; vertical-align: middle; }
+.col-people {
+  display: inline-flex; flex-direction: column; gap: 2px;
+  align-items: center;
+  font: 500 var(--jc-text-xs)/1.3 var(--jc-font-mono);
+  color: var(--jc-text-2);
+  cursor: help;
+}
+.col-people__line { white-space: nowrap; }
+/* Interview column — plain date. Upcoming rounds get the accent
+   color; past rounds sit in muted mono metadata style. */
+.col-interview {
+  font: 500 var(--jc-text-xs)/1 var(--jc-font-mono);
+  white-space: nowrap;
+}
+.col-interview--upcoming { color: var(--jc-accent); font-weight: 700; }
+.col-interview--past     { color: var(--jc-text-3); }
+
+/* Old .strength-cell__subs / .strength-cell__sub rules were retired
+   when the strength cell moved to the two-row layout with mini
+   gauges. .strength-mini owns that render now. */
+
+/* ---------- Saved searches ----------
+   Compact collapsible list above the analytics gauges. Each row = one
+   saved search. Deliberately plain surface (not boat-gauge styled). */
+.saved-searches {
+  padding: var(--jc-4) var(--jc-6) 0;
+  display: block;
+}
+.saved-searches[hidden] { display: none; }
+.saved-searches__head {
+  display: flex; align-items: center; gap: var(--jc-2);
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 0;
+  user-select: none;
+}
+.saved-searches__head::-webkit-details-marker { display: none; }
+.saved-searches__chev {
+  flex: none;
+  font-size: 10px; color: var(--jc-text-3);
+  transition: transform var(--jc-dur) var(--jc-ease);
+}
+.saved-searches[open] .saved-searches__chev { transform: rotate(90deg); color: var(--jc-text-2); }
+.saved-searches__title {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--jc-text-2);
+}
+.saved-searches__list {
+  list-style: none; padding: 0; margin: var(--jc-2) 0 0;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-1);
+  overflow: hidden;
+}
+.saved-search {
+  display: flex; align-items: center; gap: var(--jc-3);
+  padding: var(--jc-3) var(--jc-4);
+  border-bottom: 1px solid var(--jc-border);
+}
+.saved-search:last-child { border-bottom: none; }
+.saved-search__main {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.saved-search__name {
+  font-weight: 600; font-size: var(--jc-text-sm);
+  color: var(--jc-accent);
+  text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.saved-search__name:hover { text-decoration: underline; }
+.saved-search__chips {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.saved-search__chip {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 3px;
+  background: var(--jc-surface-3); color: var(--jc-text-2);
+}
+.saved-search__meta {
+  font: 400 var(--jc-text-xs)/1 var(--jc-font);
+  color: var(--jc-text-3);
+}
+.saved-search__actions {
+  display: flex; gap: var(--jc-2); flex: none;
+}
+
+/* ---------- Analytics dashboard — boat-gauge look & feel ----------
+   Each card is styled as a wheelhouse instrument: brass bezel around a
+   dark navy face, cream/amber text, mono uppercase labels. CSS vars are
+   overridden inside .dash-card so the SVG chart innards (which already
+   read var(--jc-text) etc.) inherit the instrument-face palette
+   automatically, no JS changes required. */
+.dashboard {
+  display: grid;
+  /* 3-4 charts per row at typical widths, dropping to 2 or 1 on narrow
+     viewports. `minmax(0, 1fr)` prevents wide SVG content from blowing
+     the column min-width; charts inside use width: 100% so they scale. */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--jc-5);
+  padding: var(--jc-5) var(--jc-6);
+  /* Weathered teak deck underneath the instruments */
+  background:
+    repeating-linear-gradient(90deg, #3f2a17 0px, #3f2a17 2px, #422e1a 2px, #422e1a 30px),
+    linear-gradient(180deg, #4a3320 0%, #2c1d0f 100%);
+}
+.dash-card {
+  padding: var(--jc-5);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+  /* All charts render at the same footprint. min-height keeps the row
+     baseline consistent; content taller than this expands the card. */
+  min-height: 260px;
+  min-width: 0;
+}
+/* Wide-hint from the registry is deliberately a no-op now — every chart
+   renders at the same 1-column footprint so the deck reads as a uniform
+   instrument panel. Left as a class hook for future one-off layouts. */
+.dash-card--wide { grid-column: auto; }
+
+/* Jawboard-only override: force exactly 4 columns so the user's chosen
+   top-4 always fits on one row regardless of viewport width. */
+.dashboard--jawboard {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+/* On narrow screens where 4 columns become unreadable, drop to 2. */
+@media (max-width: 900px) {
+  .dashboard--jawboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Analytics header — configure + Jawbridge link, tied to the dashboard. */
+.dashboard-header__title {
+  flex: 1;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--jc-text-2);
+}
+
+/* Jawbridge Preview — collapsible <details> around the top-4 chart row.
+   The <summary> becomes the header bar. Chevron rotates open. */
+.jawbridge-preview { display: block; }
+.jawbridge-preview[hidden] { display: none; }
+.jawbridge-preview__head {
+  display: flex; align-items: center; gap: var(--jc-3);
+  padding: var(--jc-4) var(--jc-6);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.jawbridge-preview__head::-webkit-details-marker { display: none; }
+.jawbridge-preview__chev {
+  flex: none;
+  font-size: 12px; color: var(--jc-text-3);
+  transition: transform var(--jc-dur) var(--jc-ease);
+}
+.jawbridge-preview[open] .jawbridge-preview__chev { transform: rotate(90deg); color: var(--jc-text-2); }
+
+/* Grid-actions bar — Thresh + Enrich buttons directly above the job grid,
+   the "get to work on the archive" strip. */
+.grid-actions {
+  display: flex; align-items: center; gap: var(--jc-2); flex-wrap: wrap;
+  padding: var(--jc-3) var(--jc-6) 0;
+}
+
+/* Reconcile-with-LinkedIn review panel. Full-width card that appears
+   after the walker completes, showing missing-from-LinkedIn rows and
+   status-mismatch rows in two grouped stacks. Per-row <select>
+   captures user choice; bulk buttons snap every row in a group. */
+.reconcile-panel {
+  padding: var(--jc-4);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  background: var(--jc-surface-1);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+}
+.reconcile-panel__head {
+  display: flex; align-items: baseline; gap: var(--jc-3);
+}
+.reconcile-panel__title {
+  font: 700 var(--jc-text-md)/1.2 var(--jc-font);
+  color: var(--jc-text);
+}
+.reconcile-group {
+  display: flex; flex-direction: column; gap: var(--jc-2);
+  padding-top: var(--jc-2);
+  border-top: 1px solid var(--jc-border);
+}
+.reconcile-group__h {
+  margin: 0;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--jc-text-3);
+}
+.reconcile-group__bulk {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.reconcile-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(180px, 1fr);
+  align-items: center; gap: var(--jc-3);
+  padding: 8px 10px;
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-2);
+}
+.reconcile-row + .reconcile-row { margin-top: 4px; }
+.reconcile-row__meta { display: flex; flex-direction: column; min-width: 0; }
+.reconcile-row__title {
+  font: 600 var(--jc-text-sm)/1.2 var(--jc-font);
+  color: var(--jc-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.reconcile-row__co {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.reconcile-row__states {
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: var(--jc-text-xs);
+}
+.reconcile-row__choice {
+  min-height: 32px;
+}
+.reconcile-panel__foot {
+  display: flex; align-items: center; gap: var(--jc-3);
+  padding-top: var(--jc-2);
+  border-top: 1px solid var(--jc-border);
+}
+
+/* Running indicator — sits between the panel head and the audit
+   table while the walker is executing. Meant to be *unmistakably* a
+   live process (spinner, accent-tinted card, live-updating timer) so
+   the user doesn't assume the process froze during a slow walk. */
+.reconcile-running {
+  display: flex; align-items: center; gap: var(--jc-3);
+  padding: var(--jc-3) var(--jc-4);
+  border: 1px solid var(--jc-accent);
+  border-radius: var(--jc-radius);
+  background: var(--jc-accent-weak);
+  color: var(--jc-text);
+}
+.reconcile-running__spinner {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--jc-accent);
+  border-top-color: transparent;
+  animation: reconcile-spin 900ms linear infinite;
+}
+@keyframes reconcile-spin { to { transform: rotate(360deg); } }
+.reconcile-running__body { flex: 1 1 auto; min-width: 0; }
+.reconcile-running__title {
+  font: 700 var(--jc-text-md)/1.2 var(--jc-font);
+  color: var(--jc-text);
+}
+.reconcile-running__sub { margin-top: 2px; }
+.reconcile-running__timer {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: flex-end;
+  padding-left: var(--jc-3);
+  border-left: 1px solid var(--jc-accent);
+}
+.reconcile-running__timer-value {
+  font: 700 var(--jc-text-lg)/1 var(--jc-font-mono);
+  color: var(--jc-text);
+  font-variant-numeric: tabular-nums;
+}
+.reconcile-running__timer-label {
+  font: 600 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--jc-text-3);
+  margin-top: 2px;
+}
+
+/* Walker-vs-LinkedIn audit table — one row per stage, comparing the
+   number of jobs the walker captured against LinkedIn's own tab-bar
+   count. Non-zero deltas get a caution row so the user can see
+   immediately that some stage is under- or over-counted. */
+.reconcile-audit {
+  padding-top: var(--jc-2);
+  border-top: 1px solid var(--jc-border);
+}
+.reconcile-audit__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--jc-text-xs);
+  margin-top: 6px;
+}
+.reconcile-audit__table th,
+.reconcile-audit__table td {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--jc-border);
+}
+.reconcile-audit__table th {
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--jc-text-3);
+}
+.reconcile-audit__table tr[data-tone='caution'] td {
+  color: var(--jc-caution);
+  background: var(--jc-caution-weak);
+}
+.dash-card {
+
+  /* Dark navy instrument face with a soft radial vignette */
+  background:
+    radial-gradient(ellipse at 50% 30%, #1e2d3c 0%, #0c141c 90%);
+  border-radius: 14px;
+
+  /* Brass bezel ring: layered box-shadows fake concentric rings without SVG */
+  box-shadow:
+    /* Outer brass */
+    0 0 0 3px #c8a04a,
+    /* Darker inner shim */
+    0 0 0 5px #7a5f2a,
+    /* Inner black separator so the face reads as recessed */
+    0 0 0 6px #0c141c,
+    /* Rivets shadow — outer drop for depth on the deck */
+    0 6px 14px rgba(0, 0, 0, 0.55),
+    /* Glass-face highlight along the top edge */
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    /* Inner darkening at the edges for depth */
+    inset 0 0 40px rgba(0, 0, 0, 0.55);
+
+  color: #e8dcb1; /* cream label ink */
+
+  /* Overrides that flow into the chart SVGs and legends */
+  --jc-text:           #e8dcb1;
+  --jc-text-2:         #d4b876;
+  --jc-text-3:         #94825a;
+  --jc-border:         #3a2e18;
+  --jc-border-strong:  #6b5324;
+  --jc-surface-1:      transparent;
+  --jc-surface-2:      #182635;
+  --jc-surface-3:      #24303f;
+  --jc-accent:         #f4c56f;
+  --jc-accent-weak:    #f4c56f22;
+  --jc-accent-line:    #7a5f2a;
+  --jc-pos:            #6dd68a;
+  --jc-pos-weak:       #6dd68a22;
+  --jc-pos-line:       #2f6a3d;
+  --jc-caution:        #f5a54f;
+  --jc-caution-weak:   #f5a54f22;
+  --jc-caution-line:   #7a5228;
+  --jc-neg:            #ff6b6b;
+  --jc-neg-weak:       #ff6b6b22;
+  --jc-neg-line:       #7a2c2c;
+  --jc-info:           #6ec6f0;
+  --jc-info-weak:      #6ec6f022;
+  --jc-info-line:      #2c5a75;
+}
+/* Gauge label — engraved-brass eyebrow */
+.dash-card .jc-eyebrow {
+  color: #f4c56f;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #6b5324;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6);
+}
+.chart {
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--jc-2);
+  flex: 1; justify-content: center;
+}
+.chart svg { display: block; max-width: 100%; height: auto; }
+
+/* Chart-picker modal — opened by the "Configure charts" toolbar button.
+   Backdrop is full-screen; modal is centered; user picks exactly 4 boxes. */
+.chart-picker-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--jc-4);
+}
+.chart-picker {
+  max-width: 520px; width: 100%;
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  padding: var(--jc-5);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+}
+.chart-picker__head h3 { margin: 0 0 6px 0; font: 700 18px/1.2 var(--jc-font); }
+.chart-picker__head p { margin: 0; }
+.chart-picker__rows {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 320px; overflow-y: auto;
+  padding: var(--jc-2) 0;
+  border-top: 1px solid var(--jc-border);
+  border-bottom: 1px solid var(--jc-border);
+}
+.chart-picker__row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 6px; border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--jc-text-sm);
+}
+.chart-picker__row:hover { background: var(--jc-surface-2); }
+.chart-picker__row input:disabled + span,
+.chart-picker__row:has(input:disabled) { color: var(--jc-text-3); opacity: .6; }
+.chart-picker__status {
+  font: 600 var(--jc-text-xs)/1 var(--jc-font-mono);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.chart-picker__actions { display: flex; gap: var(--jc-2); justify-content: flex-end; }
+
+/* Compact legend under a two-line time-series chart. Swatch + label + count
+   inline, mono type for tabular alignment. */
+.two-line-legend {
+  display: flex; gap: var(--jc-3); flex-wrap: wrap;
+  justify-content: center;
+  font: 500 var(--jc-text-2xs)/1.2 var(--jc-font-mono);
+  color: var(--jc-text-2);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.two-line-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.legend-swatch {
+  display: inline-block; width: 10px; height: 3px; border-radius: 2px;
+}
+
+/* Shared callout under a chart — colored bar with a summary insight. */
+.chart-callout {
+  margin-top: var(--jc-2);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font: 500 var(--jc-text-xs)/1.4 var(--jc-font);
+  border-left: 3px solid;
+  color: var(--jc-text);
+}
+.chart-callout[data-tone='pos']     { background: rgba(109, 214, 138, 0.15); border-color: #6dd68a; }
+.chart-callout[data-tone='caution'] { background: rgba(245, 165, 79, 0.15);  border-color: #f5a54f; }
+.chart-callout[data-tone='neg']     { background: rgba(255, 107, 107, 0.15); border-color: #ff6b6b; }
+.chart-callout strong { color: #f4c56f; }
+
+/* ---- Chart 1 · Strike Rate Funnel ---- */
+.funnel { display: flex; flex-direction: column; gap: var(--jc-3); }
+.funnel-row { display: flex; flex-direction: column; gap: 4px; }
+.funnel-row__head {
+  display: flex; align-items: baseline; gap: var(--jc-2);
+  font: 600 var(--jc-text-xs)/1 var(--jc-font-mono);
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.funnel-row__lbl { color: var(--jc-text); font-weight: 700; min-width: 100px; }
+.funnel-row__count {
+  font-size: 18px; color: var(--jc-text);
+  font-variant-numeric: tabular-nums; font-weight: 700;
+}
+.funnel-row__delta {
+  margin-left: auto;
+  font-size: 10px; letter-spacing: .08em;
+}
+.funnel-row__delta[data-tone='pos']     { color: #6dd68a; }
+.funnel-row__delta[data-tone='neg']     { color: #ff6b6b; }
+.funnel-row__delta[data-tone='neutral'] { color: var(--jc-text-3); }
+.funnel-row__bar-wrap {
+  height: 22px; border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+  overflow: hidden;
+}
+.funnel-row__bar {
+  height: 100%; border-radius: 3px;
+  transition: width 300ms ease;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2);
+}
+.funnel-row__conv {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+  letter-spacing: .1em; text-transform: uppercase;
+  text-align: right;
+}
+.funnel-row__conv span { color: #f4c56f; font-weight: 700; font-size: 12px; }
+
+/* ---- Chart 4 · Interview Voyage Log ---- */
+.voyage { display: flex; flex-direction: column; gap: 8px; }
+.voyage-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--jc-3);
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(148, 130, 90, 0.2);
+}
+.voyage-row:last-child { border-bottom: none; }
+.voyage-row__company {
+  font: 600 var(--jc-text-xs)/1.2 var(--jc-font);
+  color: var(--jc-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.voyage-row__lane {
+  display: flex; align-items: center; gap: 4px;
+  flex-wrap: wrap;
+}
+.voyage__dot {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 7px; border-radius: 999px;
+  font: 700 11px/1 var(--jc-font-mono);
+  border: 1px solid;
+}
+.voyage__dot-lbl {
+  font-size: 9px; letter-spacing: .08em; text-transform: uppercase; font-weight: 500;
+}
+.voyage__dot[data-tone='pos']     { background: rgba(109,214,138,.12); color:#6dd68a; border-color:#2f6a3d; }
+.voyage__dot[data-tone='neg']     { background: rgba(255,107,107,.12); color:#ff6b6b; border-color:#7a2c2c; }
+.voyage__dot[data-tone='info']    { background: rgba(110,198,240,.12); color:#6ec6f0; border-color:#2c5a75; }
+.voyage__dot[data-tone='neutral'] { background: rgba(244,197,111,.10); color:#f4c56f; border-color:#7a5f2a; }
+.voyage__connector {
+  display: inline-block; width: 10px; height: 1px;
+  background: rgba(148, 130, 90, 0.35);
+}
+.voyage-mortality {
+  margin-top: var(--jc-3);
+  padding-top: var(--jc-2);
+  border-top: 1px solid rgba(148, 130, 90, 0.3);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.voyage-mortality__title {
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-2);
+  letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.voyage-mortality__row {
+  display: grid;
+  grid-template-columns: 90px 1fr 30px;
+  gap: 8px; align-items: center;
+  font: 500 var(--jc-text-xs)/1 var(--jc-font-mono);
+}
+.voyage-mortality__lbl { color: var(--jc-text-2); text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+.voyage-mortality__bar-wrap { height: 8px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
+.voyage-mortality__bar { height: 100%; background: #ff6b6b; }
+.voyage-mortality__count { color: var(--jc-text); font-weight: 700; text-align: right; }
+
+/* ---- Chart 3 · Lines in the Water ---- */
+.aging { display: flex; flex-direction: column; gap: 5px; }
+.aging-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 1fr 40px;
+  gap: 8px; align-items: center;
+  padding: 4px 0;
+  font: 500 var(--jc-text-xs)/1.2 var(--jc-font-mono);
+}
+.aging-row__label {
+  color: var(--jc-text);
+  font-family: var(--jc-font);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.aging-row__status {
+  font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--jc-text-3);
+}
+.aging-row__bar-wrap {
+  height: 8px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden;
+}
+.aging-row__bar { height: 100%; border-radius: 2px; }
+.aging-row__days {
+  font-weight: 700; text-align: right; color: var(--jc-text);
+  font-variant-numeric: tabular-nums;
+}
+.aging-row[data-tone='pos']     .aging-row__bar { background: #6dd68a; }
+.aging-row[data-tone='caution'] .aging-row__bar { background: #f5a54f; }
+.aging-row[data-tone='neg']     .aging-row__bar { background: #ff6b6b; }
+.aging-row[data-tone='pos']     .aging-row__days { color: #6dd68a; }
+.aging-row[data-tone='caution'] .aging-row__days { color: #f5a54f; }
+.aging-row[data-tone='neg']     .aging-row__days { color: #ff6b6b; }
+
+/* Most-Cast Titles — horizontal bar per role title, count on the right. */
+.titles-chart { display: flex; flex-direction: column; gap: 5px; }
+.titles-row {
+  display: grid;
+  grid-template-columns: 1fr 60px 30px;
+  gap: 8px; align-items: center;
+  padding: 3px 0;
+  font: 500 var(--jc-text-xs)/1.2 var(--jc-font);
+}
+.titles-row__label {
+  color: var(--jc-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-transform: capitalize;
+}
+.titles-row__bar-wrap {
+  height: 10px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden;
+}
+.titles-row__bar { height: 100%; background: #f4c56f; border-radius: 2px; }
+.titles-row__count {
+  font-family: var(--jc-font-mono); font-weight: 700;
+  color: var(--jc-text); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Drill-through affordances — chart items that link somewhere. Same hover
+   feedback across every chart so users learn "hover = clickable" once. */
+.funnel-row--link, .titles-row--link, .voyage-row__company--link, .legend-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 100ms ease, transform 100ms ease;
+}
+.funnel-row--link:hover, .titles-row--link:hover, .legend-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(2px);
+}
+.voyage-row__company--link {
+  color: var(--jc-accent, #f4c56f);
+  border-bottom: 1px dotted currentColor;
+}
+.voyage-row__company--link:hover { color: #f4c56f; border-bottom-style: solid; }
+.legend-link { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
+/* SVG trophy dots — cursor already handled inline, no extra style needed. */
+.chart-empty {
+  display: flex; align-items: center; justify-content: center;
+  flex: 1; color: var(--jc-text-3);
+  font: 400 var(--jc-text-xs)/1.4 var(--jc-font-mono);
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: var(--jc-4) 0;
+}
+.chart-caption {
+  font: 400 var(--jc-text-2xs)/1.4 var(--jc-font-mono);
+  color: var(--jc-text-2); text-align: center;
+  letter-spacing: .1em; text-transform: uppercase;
+}
+.chart-legend {
+  list-style: none; padding: 0; margin: 0;
+  font: 500 var(--jc-text-xs)/1.4 var(--jc-font-mono);
+  display: flex; flex-direction: column; gap: 5px;
+  color: var(--jc-text-2);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.chart-legend li { display: flex; align-items: center; gap: 8px; }
+.chart-legend .legend-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex: none;
+  box-shadow: 0 0 4px currentColor, inset 0 0 1px rgba(0,0,0,0.4);
+}
+.chart-legend .legend-label { flex: 1; }
+.chart-legend .legend-value {
+  font-weight: 700; color: var(--jc-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sticky bulk-action bar — appears at the top when rows are selected. */
+.bulk-bar {
+  position: sticky; top: 0; z-index: 8;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--jc-3);
+  padding: var(--jc-3) var(--jc-6);
+  background: var(--jc-accent);
+  color: var(--jc-accent-ink);
+  border-bottom: 1px solid var(--jc-accent-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: bulk-slide-in 200ms cubic-bezier(.2,.7,.3,1);
+}
+@keyframes bulk-slide-in { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .bulk-bar { animation: none; } }
+.bulk-bar__count {
+  font: 600 var(--jc-text-sm)/1 var(--jc-font-mono);
+  letter-spacing: .05em;
+}
+.bulk-bar__actions { display: flex; align-items: center; gap: var(--jc-2); }
+.bulk-bar .jc-btn[data-variant='danger'] {
+  --_bg: var(--jc-accent-ink); --_fg: #FFFFFF; --_bd: var(--jc-accent-ink);
+}
+.bulk-bar .jc-btn[data-variant='danger']:hover { --_bg: #000; }
+.bulk-bar .jc-btn[data-variant='ghost'] {
+  --_bg: transparent; --_fg: var(--jc-accent-ink); --_bd: var(--jc-accent-ink);
+}
+.bulk-bar .jc-btn[data-variant='ghost']:hover { --_bg: var(--jc-accent-hover); }
+
+.col-select { width: 32px; padding-right: 0 !important; text-align: center; }
+.col-select input[type='checkbox'] {
+  width: 16px; height: 16px;
+  accent-color: var(--jc-accent);
+  cursor: pointer;
+  vertical-align: middle;
+}
+tbody tr:has(.row-select:checked) { background: var(--jc-accent-weak); }
+
+/* Status column — plain-text mono uppercase, no pill background. Text
+   color still tracks the status semantics so the tone reads at a
+   glance without the badge/box treatment. */
+.status-badge {
+  display: inline-block;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--jc-text-2);
+}
+.status-analyzed    { color: var(--jc-text-3); }
+.status-saved       { color: var(--jc-accent); }
+.status-applied     { color: var(--jc-pos); }
+.status-screening   { color: var(--jc-caution); }
+.status-interviewing{ color: var(--jc-accent); font-weight: 800; }
+.status-offer       { color: var(--jc-pos); font-weight: 800; }
+.status-closed      { color: var(--jc-text-3); opacity: 0.8; }
+.status-passed      { color: var(--jc-neg); }
+
+.jc-empty { max-width: 600px; margin: var(--jc-8) auto; }

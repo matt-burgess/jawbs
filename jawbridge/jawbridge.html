@@ -1,0 +1,39 @@
+<!doctype html>
+<html data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Jawbs &middot; Jawbridge</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&display=swap" />
+    <link rel="stylesheet" href="../styles/job-copilot.css" />
+    <link rel="stylesheet" href="../archive/archive.css" />
+    <link rel="stylesheet" href="jawbridge.css" />
+  </head>
+  <body>
+    <div class="jc-page">
+      <header class="jc-toolbar">
+        <div class="toolbar-left">
+          <a href="../archive/archive.html" class="crumb-link">&larr; <span class="jc-brand">Jawboard</span></a>
+          <span class="jc__wordmark">
+            <img class="jc__brand-logo" src="../assets/jawbridge.png" alt="" />
+            <span class="jc-brand">Jawbridge</span>
+          </span>
+          <span id="bridgeCount" class="jc-footnote"></span>
+        </div>
+        <div class="toolbar-actions">
+          <span id="bridgeStatus" class="jc-footnote"></span>
+        </div>
+      </header>
+
+      <section id="bridgeDashboard" class="dashboard"></section>
+
+      <p id="bridgeEmpty" class="jc-empty" style="margin: var(--jc-5)" hidden>
+        <span class="jc-empty__title">Nothing to chart yet</span>
+        <span>Save a few jawbs to the <span class="jc-brand">Jawboard</span> and the instruments come alive.</span>
+      </p>
+    </div>
+
+    <script src="jawbridge.js" type="module"></script>
+  </body>
+</html>

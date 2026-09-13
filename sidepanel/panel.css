@@ -1,0 +1,1310 @@
+/* ============================================================
+   Sidepanel overrides on top of styles/job-copilot.css
+   Focus of this pass: more whitespace, color-per-category cards,
+   larger verdict, clearer visual grouping.
+   ============================================================ */
+
+html, body { height: 100%; margin: 0; }
+body { background: var(--jc-bg); }
+
+/* HTML `hidden` vs design-system explicit `display: flex` — restore hidden */
+[hidden] { display: none !important; }
+
+/* Sidepanel wordmark spacing — small margin between the last letter
+   of "Jawbar" and the gold count chip so they don't kiss. */
+.jc__wordmark { min-width: 0; }
+.jc__wordmark .jc-brand { color: var(--jaw-red); }
+
+/* Header buttons on the cream chrome switch to a dark-ink outline so
+   they don't blast the eye like white-on-cream would. */
+.jc__header .jc-btn { color: var(--jc-text); border-color: var(--jaw-cream-line); background: transparent; }
+.jc__header .jc-btn:hover { color: var(--jaw-red); border-color: var(--jaw-red); }
+/* Header pill buttons — Jawboard + Jawbridge in the top bar. Same
+   shape, cream chrome, icon + Anton wordmark, dark-navy ink so the
+   red .jc-brand color doesn't fight the cream header. */
+.jc__header .jc-header-linkbtn {
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+}
+.jc__header .jc-header-linkbtn .jc-brand {
+  color: var(--jc-text);
+  font-size: 15px;
+  line-height: 1;
+}
+.jc-header-linkbtn__icon {
+  width: 16px; height: 16px;
+  object-fit: contain;
+  flex: none;
+  display: block;
+}
+
+.jc {
+  width: 100%;
+  min-width: 0;
+  border-left: none;
+  height: 100vh;
+}
+
+/* Body: sections stack tightly with no extra vertical space between them. */
+.jc__body {
+  gap: 0;
+  padding: var(--jc-4) var(--jc-4) var(--jc-8);
+}
+
+/* Top-level tab strip — mockup 1c/1d shows the 4 tabs as full-width
+   equal columns on a warm grey band, active tab lifted to white with
+   the accent underline. Sticky so it stays reachable while scrolling
+   long tab panes. */
+.jc-tabs {
+  display: flex; gap: 0;
+  background: var(--jc-surface-3);
+  border-bottom: 1px solid var(--jc-border-strong);
+  margin: 0 calc(-1 * var(--jc-4)) var(--jc-3);
+  padding: 0;
+  position: sticky; top: 0;
+  z-index: 2;
+}
+.jc-tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 13px 8px;
+  border-bottom: 2px solid transparent;
+  flex: 1; min-width: 0;
+  font: 700 10px/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--jc-text-3);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.jc-tab:hover { color: var(--jc-text); background: rgba(255,255,255,.5); }
+.jc-tab[data-active='true'] {
+  color: var(--jc-text);
+  background: var(--jc-bg);
+  border-bottom-color: var(--jc-accent);
+}
+/* Circle badge on tab labels — count of relevant items (upcoming
+   interviews, saved searches). Filled disc so it reads as a real
+   indicator; tint follows the active-tab state. */
+.jc-tab__badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px;
+  background: var(--jc-surface-3);
+  color: var(--jc-text-2);
+  font: 700 var(--jc-text-3xs)/1 var(--jc-font-mono);
+}
+.jc-tab[data-active='true'] .jc-tab__badge {
+  background: var(--jc-accent);
+  color: #fff;
+}
+
+/* Tab pane wrappers — hidden until their tab is active. */
+.jc-tab-pane { display: flex; flex-direction: column; gap: var(--jc-4); }
+.jc-tab-pane[hidden] { display: none; }
+.jc-tab-pane__group { display: flex; flex-direction: column; gap: var(--jc-2); }
+.jc-tab-pane__h {
+  margin: 0;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--jc-text-3);
+}
+
+/* Interview list — one row per scheduled/recent round. Date on the
+   left, round type + company on the right; anchor opens Recall in a
+   new tab. */
+.jc-interviews-list {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--jc-border); border-radius: var(--jc-radius-sm);
+  overflow: hidden;
+}
+.jc-interviews-list:empty { display: none; }
+.jc-interview-item {
+  display: flex; align-items: baseline; gap: var(--jc-3);
+  padding: 8px 10px;
+  text-decoration: none;
+  color: var(--jc-text);
+  border-bottom: 1px solid var(--jc-border);
+}
+.jc-interview-item:last-child { border-bottom: 0; }
+.jc-interview-item:hover { background: var(--jc-surface-2); }
+.jc-interview-item__date {
+  flex: none;
+  font: 600 var(--jc-text-xs)/1.3 var(--jc-font);
+  color: var(--jc-accent);
+  min-width: 190px;
+}
+.jc-interview-item__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jc-interview-item__type { font-weight: 600; font-size: var(--jc-text-sm); }
+.jc-interview-item__co { color: var(--jc-text-2); font-size: var(--jc-text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Recent tab list — up to 20 recently viewed jawbs, more spacious
+   than the compact footer strip. Fit-score badge leads, then
+   title + company inline, LinkedIn icon, and when-viewed on the
+   right. Whole row wraps in a bordered pill for scannability. */
+.jc-recent-tab-list {
+  list-style: none;
+  padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.jc-recent-tab__row {
+  display: flex; align-items: center; gap: var(--jc-2);
+  padding: 6px 10px;
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-1);
+}
+.jc-recent-tab__row:hover { background: var(--jc-surface-2); }
+.jc-recent-tab__link {
+  flex: 1; min-width: 0;
+  display: flex; align-items: baseline; gap: 6px;
+  text-decoration: none;
+  color: var(--jc-accent);
+  font-size: var(--jc-text-sm);
+  overflow: hidden;
+}
+.jc-recent-tab__link:hover { text-decoration: underline; }
+.jc-recent-tab__title {
+  font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
+.jc-recent-tab__co {
+  color: var(--jc-text-3);
+  font-weight: 400;
+  font-size: var(--jc-text-xs);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex-shrink: 1;
+}
+.jc-recent-tab__when {
+  flex: none;
+  font: 400 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+}
+/* Reuse the footer strip's fit-badge tone system so tab + footer
+   look consistent. */
+.jc-recent-tab__fit {
+  flex: none;
+  min-width: 32px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font: 600 var(--jc-text-2xs)/1.4 var(--jc-font-mono);
+  text-align: center;
+  color: var(--jc-text-3);
+  background: var(--jc-surface-2);
+  border: 1px solid var(--jc-border);
+}
+.jc-recent-tab__fit[data-tone='pos']     { color: var(--jc-pos);     background: var(--jc-pos-weak);     border-color: var(--jc-pos-line); }
+.jc-recent-tab__fit[data-tone='caution'] { color: var(--jc-caution); background: var(--jc-caution-weak); border-color: var(--jc-caution-line); }
+.jc-recent-tab__fit[data-tone='neg']     { color: var(--jc-neg);     background: var(--jc-neg-weak);     border-color: var(--jc-neg-line); }
+
+/* Saved-searches tab list — full list of saved LinkedIn searches. */
+.jc-searches-list {
+  list-style: none;
+  padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.jc-searches-list li {
+  padding: 6px 10px;
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-1);
+}
+.jc-searches-list a {
+  color: var(--jc-accent);
+  text-decoration: none;
+  font-size: var(--jc-text-sm);
+}
+.jc-searches-list a:hover { text-decoration: underline; }
+.jc-searches-list li {
+  display: flex; align-items: baseline; gap: var(--jc-2);
+  flex-wrap: wrap;
+}
+.jc-search-when {
+  margin-left: auto;
+  font: 400 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+}
+
+/* Stale-saved-searches nudge — callout at the top of the Searches
+   tab when any saved search hasn't been checked in 24h+. Caution
+   tint so it stands apart from the neutral saved/recent lists. */
+.jc-stale-nudge {
+  padding: var(--jc-3);
+  border: 1px solid var(--jc-caution-line);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-caution-weak);
+  display: flex; flex-direction: column; gap: var(--jc-2);
+}
+.jc-stale-nudge__head {
+  display: flex; align-items: baseline; gap: var(--jc-2);
+  justify-content: space-between;
+}
+.jc-stale-nudge__title {
+  font: 700 var(--jc-text-xs)/1.2 var(--jc-font);
+  color: var(--jc-caution);
+}
+.jc-stale-row {
+  border-color: var(--jc-caution-line) !important;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* Inline "Clear" link button used in the Recent (unsaved) group
+   header. Reuses the general .jc-linkbtn styling from Recall's prep
+   panes. Redeclared here as a fallback so the Searches tab doesn't
+   need to import Recall's stylesheet. */
+.jc-tab-pane .jc-linkbtn {
+  appearance: none; background: transparent; border: 0;
+  padding: 0 4px; cursor: pointer;
+  color: var(--jc-text-3);
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font);
+}
+.jc-tab-pane .jc-linkbtn:hover { color: var(--jc-accent); text-decoration: underline; }
+.jc-tab-pane__h { display: flex; align-items: baseline; gap: var(--jc-2); }
+
+/* Tip / share nudge — appears above the pinned usage footer once the
+   user has racked up milestones (see evaluateTipNudge in panel.js).
+   Gold band + captain thumb keeps it warm-not-loud. Dismiss X in the
+   corner swaps the same slot into the share fallback rather than
+   hiding outright. */
+.jc-tip-nudge {
+  flex: none;
+  background: linear-gradient(180deg, #FDF6E0 0%, #FBEAB6 100%);
+  border-bottom: 1px solid var(--jc-caution-line);
+  color: #473300;
+  padding: 10px 12px;
+  font: 500 var(--jc-text-xs)/1.4 var(--jc-font);
+}
+.jc-tip-nudge[hidden] { display: none; }
+.jc-tip-nudge__body {
+  display: flex; align-items: center; gap: 10px;
+}
+.jc-tip-nudge__jar {
+  width: 56px; height: 56px;
+  object-fit: contain;
+  flex: none;
+}
+.jc-tip-nudge__copy {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.jc-tip-nudge__title {
+  font: 700 var(--jc-text-sm)/1.1 var(--jc-font);
+  color: #473300;
+}
+.jc-tip-nudge__title .jc-brand { color: var(--jaw-red); font-size: 15px; }
+.jc-tip-nudge__heart {
+  color: var(--jaw-red);
+  font-style: normal;
+  font-size: 14px;
+  vertical-align: -1px;
+}
+.jc-tip-nudge__msg {
+  font-size: var(--jc-text-xs);
+  color: #5C4300;
+}
+.jc-tip-nudge__actions {
+  display: flex; gap: 6px; flex: none;
+  align-items: center;
+}
+.jc-tip-nudge__cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 12px;
+  background: var(--jaw-highlight);
+  color: var(--jaw-navy-footer);
+  border: 0;
+  border-radius: 6px;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .08em; text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.jc-tip-nudge__cta:hover { background: #FFCD1F; }
+.jc-tip-nudge__share-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  padding: 0;
+  background: #fff;
+  border: 1px solid var(--jc-caution-line);
+  border-radius: 6px;
+  color: var(--jc-text-2);
+  cursor: pointer;
+}
+.jc-tip-nudge__share-btn:hover {
+  border-color: var(--jaw-red);
+  color: var(--jaw-red);
+}
+.jc-tip-nudge__share-btn svg { width: 14px; height: 14px; display: block; }
+.jc-tip-nudge__x {
+  flex: none;
+  color: var(--jc-text-3);
+  padding: 0 4px;
+  font: 700 16px/1 var(--jc-font);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.jc-tip-nudge__x:hover { color: var(--jaw-red); }
+
+/* Footer pinned to the bottom of the sidebar. `.jc` is a flex column
+   (header/body/footer) and `.jc__body` has flex: 1, so this stays put while
+   the body scrolls independently. */
+.jc__footer {
+  flex: none;
+  padding: 10px var(--jc-4);
+  background: var(--jaw-navy-footer);
+  border-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--jc-2);
+}
+
+/* Search context — pinned to the top of the Jawbar body when the active
+   LinkedIn tab is a /jobs/search/* page. Same actions the on-page pill
+   offers, so nothing hovers over LinkedIn while the Jawbar is open. */
+/* Compact single-line save-this-search bar under the top header.
+   Shows on both LinkedIn /jobs/search and Google Jobs udm=8 URLs,
+   staying visible regardless of active tab. Sized as one row so it
+   doesn't crowd the page-length body below it. */
+.jc-search-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px var(--jc-4);
+  background: var(--jc-accent-weak);
+  border-bottom: 1px solid var(--jc-accent-line);
+  font-size: var(--jc-text-xs);
+  color: var(--jc-text);
+  min-height: 30px;
+}
+.jc-search-bar__label {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--jc-accent);
+  flex: none;
+}
+.jc-search-bar__title {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--jc-text);
+  font-weight: 500;
+}
+.jc-search-bar__save {
+  flex: none;
+  color: var(--jc-accent);
+  border: 1px solid var(--jc-accent-line);
+}
+.jc-search-bar__save:hover {
+  background: var(--jc-accent);
+  color: #fff;
+}
+.jc-search-bar__status {
+  flex: none;
+  color: var(--jc-text-3);
+}
+
+/* Recent-jobs strip — 5 most recently viewed jobs as text links, each
+   labeled with title + last-viewed date. Sits above the cost/usage strip. */
+.jc-recent-jobs {
+  padding: 4px var(--jc-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.jc-recent-jobs__title {
+  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--jc-text-3);
+}
+.jc-recent-jobs__list {
+  list-style: none;
+  padding: 0; margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.jc-recent-jobs__list li {
+  display: flex; align-items: baseline; gap: var(--jc-2);
+  min-width: 0;
+}
+.jc-recent-jobs__list a {
+  flex: 1;
+  color: var(--jc-accent);
+  text-decoration: none;
+  font-size: var(--jc-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jc-recent-jobs__list a:hover { text-decoration: underline; color: var(--jc-accent-hover); }
+/* Title + company inside the anchor. Each capped at 20 chars in JS
+   with a trailing ellipsis; the company reads muted so the title
+   still leads visually. Separator dot fades when there's no company. */
+.jc-recent-jobs__jobtitle { color: var(--jc-accent); }
+.jc-recent-jobs__jobco    { color: var(--jc-text-3); font-weight: 400; }
+.jc-recent-jobs__jobsep   { color: var(--jc-text-3); margin: 0 2px; }
+.jc-recent-jobs__when {
+  flex: none;
+  font: 400 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+}
+/* Fit score badge — leading indicator of how promising this recent job was.
+   TBD (no data) reads muted; scored badges take the pos/caution/neg tone
+   so a strong hit visually pops without user scanning the number. */
+.jc-recent-jobs__fit {
+  flex: none;
+  min-width: 32px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font: 600 var(--jc-text-3xs)/1.4 var(--jc-font-mono);
+  text-align: center;
+  color: var(--jc-text-3);
+  background: var(--jc-surface-2);
+  border: 1px solid var(--jc-border);
+}
+.jc-recent-jobs__fit[data-tone='pos']     { color: var(--jc-pos);     background: var(--jc-pos-weak);     border-color: var(--jc-pos-line); }
+.jc-recent-jobs__fit[data-tone='caution'] { color: var(--jc-caution); background: var(--jc-caution-weak); border-color: var(--jc-caution-line); }
+.jc-recent-jobs__fit[data-tone='neg']     { color: var(--jc-neg);     background: var(--jc-neg-weak);     border-color: var(--jc-neg-line); }
+
+/* Usage/cost strip lives inside the dark navy footer — mockup 1c/1d's
+   bottom bar. Metrics render as tabular-mono white; the sparkline
+   pulses along the right edge. */
+.usage-strip {
+  flex: none;
+  display: flex; align-items: center; gap: 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.usage-metrics {
+  display: flex; gap: 18px; flex: none;
+}
+.usage-metric {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-width: 42px;
+}
+.usage-metric:first-child .usage-metric__val { color: #fff; }
+.usage-metric__val {
+  font: 700 var(--jc-text-sm)/1 var(--jc-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--jaw-navy-ink);
+}
+.usage-metric__lbl {
+  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  color: #8AA5BD;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+}
+.usage-chart {
+  flex: 1;
+  height: 22px;
+  min-width: 0;
+  margin-left: auto;
+}
+.usage-chart svg { display: block; }
+
+/* ------------------------------------------------------------
+   VERDICT BLOCK — the anchor of the sidebar
+   ------------------------------------------------------------ */
+.jc__verdict {
+  padding: var(--jc-4);
+  gap: var(--jc-3);
+  background: var(--jc-bg);
+  border-bottom: 1px solid var(--jc-border);
+}
+
+/* Deep-water spotlight — mockup 1c's teal strength card. Reserved
+   for the moment a job has a computed strength score. Applied to
+   .jc-jobcard via data-spotlight="on" (JS toggle) so the same DOM
+   supports pre-analysis (white) and post-analysis (teal) states. */
+.jc-jobcard[data-spotlight="on"] {
+  background:
+    radial-gradient(70% 140% at 10% 10%, rgba(210,240,235,.12) 0%, rgba(210,240,235,0) 60%),
+    radial-gradient(45% 120% at 72% 95%, rgba(0,50,55,.28) 0%, rgba(0,50,55,0) 65%),
+    linear-gradient(100deg, var(--jaw-teal-deep) 0%, var(--jaw-teal-mid) 38%, #1F5154 62%, #2A6669 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 24px 60px -30px rgba(11,51,88,.42);
+}
+.jc-jobcard[data-spotlight="on"] .jc-job-title,
+.jc-jobcard[data-spotlight="on"] .jc-jobcard__summary { color: #fff; }
+.jc-jobcard[data-spotlight="on"] .jc-job-eyebrow { color: var(--jaw-sand); }
+.jc-jobcard[data-spotlight="on"] .jc-jobcard__summary { border-top-color: rgba(255,255,255,.16); }
+.jc-jobcard[data-spotlight="on"] .jc-meta-strip { background: rgba(255,255,255,.06); }
+.jc-jobcard[data-spotlight="on"] .jc-meta-strip__label { color: var(--jaw-sand); }
+.jc__verdict > div:first-child + div { display: flex; flex-direction: column; gap: var(--jc-2); }
+
+/* Job title gets full width — no competing icons/badge on the same row.
+   Status badge + delete icon live in the header row above the title;
+   the title itself sits on its own line so it can wrap freely. */
+.jc-job-title { width: 100%; margin: 4px 0 2px; }
+/* Company name sits below the title as an eyebrow — smaller, semi-bold,
+   softer color. Hidden when empty so we don't reserve vertical space
+   for jobs that haven't been scraped yet. */
+.jc-job-eyebrow {
+  display: block;
+  font: 600 var(--jc-text-xs)/1.2 var(--jc-font);
+  color: var(--jc-text-2);
+  margin: 0 0 var(--jc-2);
+}
+.jc-job-eyebrow:empty { display: none; }
+
+/* Job-header card — "report-first" layout. One bordered surface
+   grouping company / title / quick-actions / meta-strip / summary
+   so the whole thing reads as a single object rather than five
+   loose rows. Depth cue (radius + drop shadow) matches the
+   Jawboard's .jc-jb-board card so both surfaces feel like part of
+   the same design system. */
+.jc-jobcard {
+  padding: var(--jc-4);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px -30px rgba(11, 51, 88, .18), var(--jc-shadow-sm);
+  display: flex; flex-direction: column; gap: var(--jc-2);
+  margin-bottom: var(--jc-3);
+}
+/* Quick-actions row under the title — three text links styled as
+   subtle affordances, not competing buttons. Mockup shows them as
+   plain colored text so the score below is where the eye lands. */
+.jc-jobcard__actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--jc-3);
+  font: 600 var(--jc-text-xs)/1 var(--jc-font);
+}
+/* The four job-header actions (Details / Corp Site / Job Tracker /
+   Delete) are grouped in a .jc-btn-row and use the design-system
+   .jc-btn styling directly. Override the ghost variant's transparent
+   border for this group so the buttons read as tappable at rest. */
+.jc-jobcard__actions .jc-btn-row .jc-btn[data-variant="ghost"] {
+  --_bd: var(--jc-border);
+}
+.jc-jobcard__actions .jc-btn-row .jc-btn[data-variant="ghost"]:hover {
+  --_bd: var(--jc-accent-line);
+}
+/* Keep the row on a single line — the delete icon can no longer wrap
+   to its own row when the sidebar narrows. Buttons stay flex:none so
+   labels never truncate. */
+.jc-jobcard__actions .jc-btn-row {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.jc-jobcard__actions .jc-btn-row > * { flex: none; }
+/* Tighten icon-to-label spacing inside each nav button so the leading
+   glyph reads as part of the same word, not a floating decoration. */
+.jc-jobcard__actions .jc-btn { gap: 3px; }
+.jc-jobcard__actions .jc-details-arrow { margin-right: 0; }
+.jc-jobcard__actions .jc-li-icon { margin-left: 0; }
+/* Delete button gets pushed to the right side of the row so the
+   destructive action is separated from the navigation actions. */
+.jc-jobcard__delete { margin-left: auto; }
+
+/* Header row — company on the left, mini hunt strip + delete icon on
+   the right. Matches the mockup's "top-right chrome" layout. */
+.jc-jobcard__header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--jc-2);
+}
+
+/* Mini hunt — 3-stage window on the Captured → Offer journey. Lives
+   on its own full-width row at the top of the job card. Marker
+   vocabulary matches the recall voyage log: chum barrel = past, red
+   fin = now, dashed circle = next; connecting bar goes gold between
+   past stages and grey elsewhere. */
+.mini-hunt {
+  list-style: none; padding: 8px 4px 12px; margin: 0 0 var(--jc-2);
+  display: flex; align-items: flex-start;
+  border-bottom: 1px solid var(--jc-border);
+}
+.mini-hunt[hidden] { display: none; }
+.mini-hunt__step {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  /* Anchor for the connector line drawn to the next step. */
+  position: relative;
+}
+.mini-hunt__mark {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  position: relative;
+}
+/* Connector line spanning the horizontal gap between this step's mark
+   and the next step's mark. Positioned on the step (not the mark) so
+   its width is driven by the step's flex sizing, not the mark's fixed
+   28px width. Sits vertically centered on the 28px base mark; the
+   32px "now" mark stays visually centered because the step is centered
+   too. */
+.mini-hunt__step::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: calc(50% + 18px);
+  right: calc(-50% + 18px);
+  height: 2px;
+  background: var(--jc-border);
+  pointer-events: none;
+}
+.mini-hunt__step:last-child::after { display: none; }
+.mini-hunt__label {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--jc-text-3);
+  text-align: center;
+  white-space: nowrap;
+}
+/* Past stage — chum barrel dropped */
+.mini-hunt__step[data-state="past"] .mini-hunt__mark {
+  background: url('../assets/chum-barrel.png') center / 24px 24px no-repeat;
+}
+.mini-hunt__step[data-state="past"]::after { background: var(--jaw-highlight); }
+.mini-hunt__step[data-state="past"] .mini-hunt__label { color: var(--jc-text-2); }
+/* Current stage — red shark fin, breaking the surface */
+.mini-hunt__step[data-state="now"] .mini-hunt__mark {
+  width: 32px; height: 32px;
+  background: url('../assets/shark-fin-red.png') center / 28px 28px no-repeat;
+}
+.mini-hunt__step[data-state="now"] .mini-hunt__label { color: var(--jaw-red); }
+/* Future stage — dashed circle, open water */
+.mini-hunt__step[data-state="next"] .mini-hunt__mark::before {
+  content: "";
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px dashed var(--jc-accent-line);
+  box-sizing: border-box;
+  display: block;
+}
+.jc-jobcard__header-actions {
+  display: flex; align-items: center; gap: 6px;
+  flex: none;
+  /* margin-left: auto pins the actions to the right even when the
+     .jc-job-eyebrow is hidden (empty) — space-between would put a
+     lone child at the start of the row instead. */
+  margin-left: auto;
+}
+
+/* Meta strip — shark tier + Fit / Strength / Comp circular gauges in
+   a single grey pill under the title. Items are rendered as vertical
+   columns (icon or gauge on top, label centered beneath) spread
+   evenly across the strip. Coloring is driven by [data-band] on the
+   gauge SVG so the JS just picks weak/fair/strong per score.
+
+   Band palette (mockup colors, held as scoped tokens so the rest of
+   the design system's semantic tokens don't get repurposed):
+     weak   — coral   #D85A30 / track #FAECE7 / text #993C1D
+     fair   — amber   #BA7517 / track #FAEEDA / text #854F0B
+     strong — teal    #1D9E75 / track #E1F5EE / text #085041
+*/
+.jc-meta-strip {
+  display: flex; align-items: center; gap: var(--jc-3);
+  padding: 12px 10px 10px;
+  background: var(--jc-surface-2, #f5f4f0);
+  border-radius: 8px;
+  margin-top: var(--jc-2);
+}
+/* Big strength score — hero moment on the left of the meta strip.
+   Score number reads at a glance; the /100 STRENGTH label sits
+   underneath in mono. Band coloring (weak/fair/strong) tints the
+   number so tone is legible without a badge. */
+.jc-meta-strip__strength {
+  display: inline-flex; flex-direction: column;
+  align-items: flex-start; gap: 2px;
+  flex: none;
+  padding-right: var(--jc-2);
+  border-right: 1px solid var(--jc-border);
+}
+.jc-meta-strip__strength-num {
+  font: 700 40px/.85 var(--jc-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  color: var(--jc-text);
+}
+.jc-meta-strip__strength[data-band="strong"] .jc-meta-strip__strength-num { color: var(--jc-pos); }
+.jc-meta-strip__strength[data-band="fair"]   .jc-meta-strip__strength-num { color: var(--jc-caution); }
+.jc-meta-strip__strength[data-band="weak"]   .jc-meta-strip__strength-num { color: var(--jc-neg); }
+.jc-meta-strip__strength-lbl {
+  font: 700 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--jc-text-3);
+}
+.jc-meta-strip__item {
+  display: inline-flex; flex-direction: column;
+  align-items: center; gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.jc-meta-strip__label {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font);
+  color: var(--jc-text-3);
+  text-align: center;
+}
+/* Shark tier icon — the PNG carries all the tier signal (species,
+   silhouette). Rendered without a colored halo so the illustration
+   sits directly on the meta strip. */
+.jc-meta-strip__shark-icon {
+  width: 30px; height: 30px;
+  background: transparent;
+  border-radius: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.jc-meta-strip__shark-icon img {
+  width: 28px; height: 28px;
+  object-fit: contain;
+}
+
+.jc-gauge {
+  display: block;
+}
+.jc-gauge__text {
+  font: 500 11px/1 var(--jc-font);
+}
+.jc-gauge[data-band="weak"]   { --_stroke: #D85A30; --_track: #FAECE7; --_text: #993C1D; }
+.jc-gauge[data-band="fair"]   { --_stroke: #BA7517; --_track: #FAEEDA; --_text: #854F0B; }
+.jc-gauge[data-band="strong"] { --_stroke: #1D9E75; --_track: #E1F5EE; --_text: #085041; }
+.jc-gauge__track { stroke: var(--_track); }
+.jc-gauge__fill  {
+  stroke: var(--_stroke);
+  transition: stroke-dasharray var(--jc-dur) var(--jc-ease);
+}
+.jc-gauge__text  { fill: var(--_text); }
+
+/* Source note under the meta strip — tells the user where the comp
+   number came from (posted range / company research / benchmark).
+   Small and muted so it reads as provenance metadata, not a headline. */
+.jc-meta-strip__source {
+  font: 400 var(--jc-text-xs)/1.4 var(--jc-font);
+  color: var(--jc-text-3);
+  margin: 4px 2px 0 2px;
+}
+.jc-meta-strip__source strong {
+  font-weight: 600;
+  color: var(--jc-text-2);
+}
+
+/* Status badge now lives in the header row (top-right), not below the
+   score. .jc-jobcard__meta was the old wrapper — kept as a no-op
+   selector in case another surface still expects it, but the new
+   layout has no matching DOM node. */
+
+/* One-line fit summary — populated from the fit result. Hidden
+   entirely when no analysis has run yet. */
+.jc-jobcard__summary {
+  margin: 0;
+  padding-top: var(--jc-2);
+  border-top: 1px solid var(--jc-border);
+  font: 500 var(--jc-text-sm)/1.5 var(--jc-font);
+  color: var(--jc-text-2);
+}
+.jc-jobcard__summary[hidden] { display: none; }
+
+/* Meta row: company · location · workplace on the left; open-full-view,
+   delete, and archive-status badge tucked on the right. Frees the title. */
+.jc-meta-row {
+  display: flex; align-items: center;
+  gap: var(--jc-2);
+  margin-top: var(--jc-1);
+}
+.jc-meta-row .jc-job-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 4px;
+}
+.jc-meta-row .jc-btn { flex: none; }
+.jc-job-meta__company { font-weight: 600; color: var(--jc-text); }
+.jc-job-meta__rest { color: var(--jc-text-2); }
+/* Compact ⌞⌝ / trash icon buttons that live inline with the company name. */
+.jc-meta-icon {
+  /* Subtle 1px border reads these as tappable — icon-only glyphs are
+     easy to miss without a container hint. Border strengthens on hover. */
+  padding: 2px 6px;
+  line-height: 1;
+  min-height: 22px;
+  font: 700 13px/1 var(--jc-font-mono);
+  letter-spacing: -1px;
+  color: var(--jc-text-3);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+}
+.jc-meta-icon:hover {
+  color: var(--jc-accent);
+  border-color: var(--jc-accent-line);
+  background: var(--jc-accent-weak);
+}
+/* Text link that sits inline with the company name — smaller than a
+   normal button so it doesn't dominate the meta row, but still tappable. */
+.jc-careers-search {
+  padding: 2px 8px;
+  font: 500 var(--jc-text-2xs)/1.2 var(--jc-font);
+  letter-spacing: .02em;
+  text-decoration: none;
+  color: var(--jc-text-2);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-2);
+  min-height: 22px;
+  display: inline-flex; align-items: center;
+}
+.jc-careers-search:hover {
+  color: var(--jc-accent);
+  border-color: var(--jc-accent-line);
+  background: var(--jc-accent-weak);
+}
+.jc-meta-row .status-badge {
+  flex: none;
+  display: inline-flex; align-items: center;
+  padding: 3px 8px; border-radius: var(--jc-radius-sm);
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .06em; text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.status-badge[data-status='analyzed']                 { background: var(--jc-surface-3); color: var(--jc-text-3); border-color: var(--jc-border-strong); }
+.status-badge[data-status='saved']                    { background: var(--jc-accent-weak); color: var(--jc-accent); border-color: var(--jc-accent-line); }
+.status-badge[data-status='inProgressDraft']          { background: var(--jc-caution-weak); color: var(--jc-caution); border-color: var(--jc-caution-line); }
+.status-badge[data-status='inProgressClickedApply']   { background: var(--jc-caution-weak); color: var(--jc-caution); border-color: var(--jc-caution-line); font-weight: 600; }
+/* Applied moves to olive-green (pos) — the mockup treats "you did the
+   work" as a positive completion. Interviewing swaps to the mid-blue
+   accent so it reads distinctly from applied while still feeling
+   affirmative. */
+.status-badge[data-status='applied']                  { background: var(--jc-pos-weak); color: var(--jc-pos); border-color: var(--jc-pos-line); }
+.status-badge[data-status='interviewing']             { background: var(--jc-accent-weak); color: var(--jc-accent); border-color: var(--jc-accent-line); font-weight: 700; }
+.status-badge[data-status='archived']                 { background: var(--jc-surface-3); color: var(--jc-text-3); opacity: 0.8; }
+.status-badge[data-status='notMovingForward']         { background: var(--jc-neg-weak); color: var(--jc-neg); border-color: var(--jc-neg-line); }
+
+.jc-job-title { font-size: var(--jc-text-lg); }
+
+/* Score block: the big number + /100 sit on the top row; the status
+   badge (if present) sits directly under them. `align-content: flex-end`
+   keeps everything anchored to the bottom of the block. */
+.jc-score {
+  display: flex; flex-wrap: wrap;
+  gap: 4px var(--jc-3); align-items: baseline;
+}
+.jc-score__num {
+  font-size: 52px; /* bigger than default 44 */
+  line-height: 0.8;
+}
+.jc-score .status-badge {
+  flex-basis: 100%;
+  display: inline-flex; align-items: center;
+  align-self: flex-start;
+  padding: 3px 8px; border-radius: var(--jc-radius-sm);
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .06em; text-transform: uppercase;
+  border: 1px solid transparent;
+  width: fit-content;
+  margin-top: 4px;
+}
+
+.jc-verdict-badges {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--jc-2);
+}
+
+/* Recommended-follow strip — 1–3 high-priority people to follow on
+   LinkedIn for this posting. Sits between the verdict badges and the
+   analysis cards; auto-hidden when nobody is worth surfacing. */
+.jc-recommend-follows {
+  margin-top: var(--jc-2);
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--jc-accent) 6%, transparent);
+  border-left: 3px solid var(--jc-accent);
+}
+.jc-recommend-follow-row {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  padding: 3px 0;
+  font-size: var(--jc-text-sm);
+}
+.jc-recommend-follow-row .person-link {
+  font-weight: 700;
+  color: var(--jc-accent);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--jc-accent);
+}
+
+/* Comp anchor chip — mono numeric, sits next to the fit score to give the
+   full "should I apply / for how much?" answer at a glance. */
+.comp-anchor-badge {
+  font: 600 var(--jc-text-xs)/1 var(--jc-font-mono) !important;
+  padding: 4px 10px !important;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+/* "JD" chip — tiny sub-badge inside the salary chip when the number
+   came from the job description. Solid-color pill so it reads as a
+   credential rather than an inline word. */
+.comp-anchor-badge__jd {
+  display: inline-flex; align-items: center;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: currentColor;
+  color: transparent;
+  position: relative;
+  font: 700 9px/1.2 var(--jc-font-mono);
+  letter-spacing: .1em;
+}
+.comp-anchor-badge__jd::before {
+  content: 'JD';
+  color: var(--jc-surface-1);
+  position: absolute; inset: 1px 5px;
+}
+
+/* Remote-mismatch badge — extra prominent because it's the whole point of
+   the fake-remote detection */
+.remote-mismatch-badge {
+  font-weight: 700 !important;
+  padding: 4px 10px !important;
+  animation: pulse-mismatch 2s ease-in-out infinite;
+}
+@keyframes pulse-mismatch { 50% { opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) { .remote-mismatch-badge { animation: none; } }
+
+/* ------------------------------------------------------------
+   ACTION BAR — Cast/Bait control-panel rows.
+   Lives inside .jc-jobcard now (below the Details/Corp Site/Job
+   Tracker/Delete row) so we strip the standalone card chrome —
+   border, background, radius, side padding — and only keep vertical
+   rhythm plus a hairline top rule to separate from the nav actions.
+   ------------------------------------------------------------ */
+.jc-action-bar {
+  display: flex; flex-direction: column;
+  gap: 8px;
+  padding: var(--jc-2) 0 0;
+  margin-top: var(--jc-2);
+  border-top: 1px solid var(--jc-border);
+}
+
+/* Cast/Bait primary button — static solid color. Earlier iterations tried
+   a left→right gradient scan to draw the eye, but users read the motion as
+   "click accepted, work in progress" and mistrusted it. Solid it is. */
+.action-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.action-row__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 78px;
+  flex: none;
+}
+.action-row__title {
+  font: 700 var(--jc-text-xs)/1 var(--jc-font);
+  color: var(--jc-accent);
+  letter-spacing: .02em;
+}
+.action-row__sub {
+  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.jc-action-bar .jc-btn {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: var(--jc-text-2xs);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.jc-action-bar .jc-btn[data-cached='true'] {
+  border-color: var(--jc-pos-line);
+  color: var(--jc-pos);
+  background: var(--jc-pos-weak);
+}
+.jc-action-bar .jc-btn[data-cached='true']::before {
+  content: '✓ '; opacity: 0.8;
+}
+.jc-action-bar .jc-btn[data-running='true'] {
+  opacity: 0.6; pointer-events: none;
+}
+
+/* ------------------------------------------------------------
+   GROUPS — logical section wrappers with clear headers
+   ------------------------------------------------------------ */
+.jc-group {
+  display: flex; flex-direction: column;
+  gap: 6px;
+}
+.jc-group-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--jc-2);
+  padding: 0 2px var(--jc-1);
+}
+.jc-eyebrow--accent { color: var(--jc-accent); }
+.jc-doc-group {
+  display: flex; flex-direction: column;
+  gap: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* ------------------------------------------------------------
+   CARDS — color-coded per category with left-edge accent
+   ------------------------------------------------------------ */
+.jc-card {
+  overflow: hidden;
+  transition: border-color var(--jc-dur) var(--jc-ease);
+}
+.jc-card__head {
+  padding: 10px 12px;
+  min-height: 40px;
+  gap: 10px;
+}
+.jc-card__head:hover { background: var(--jc-surface-2); }
+.jc-card__body {
+  padding: var(--jc-2) var(--jc-4) var(--jc-4);
+  gap: var(--jc-4);
+}
+
+/* Sidebar cards use a left color rule that reflects state: green for
+   done ("cast"), muted grey for undone. That gives a scannable
+   progress read down the stack — the mockup's report-first layout
+   depends on being able to see "what's done" at a glance. */
+.jc-card--tone { border-left-width: 3px; border-left-style: solid; border-left-color: var(--jc-border); }
+.jc-card--tone[data-status='done'] { border-left-color: var(--jc-pos); }
+
+/* Status icon at the left of every collapsible card head. Undone shows the
+   chum-barrel PNG — a visual signal that this section is "line not yet
+   cast." Done flips to a green ✓ pseudo. JS toggles data-status. */
+.jc-card--tone > .jc-card__head::before {
+  content: '';
+  flex: none;
+  display: inline-block;
+  width: 22px; height: 22px;
+  background-image: url('../assets/chum-barrel.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.jc-card--tone[data-status='done'] > .jc-card__head::before {
+  content: '✓';
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font: 700 11px/1 var(--jc-font);
+  background: var(--jc-pos-weak);
+  color: var(--jc-pos);
+  border: 1px solid var(--jc-pos-line);
+  background-image: none;
+}
+
+/* Open cards get a subtle background boost so it's obvious what's expanded */
+.jc-card[data-open='true'] { background: var(--jc-surface-1); border-color: var(--jc-border-strong); }
+.jc-card[data-open='true'] > .jc-card__head { background: var(--jc-surface-2); border-bottom: 1px solid var(--jc-border); }
+
+.jc-card__head .jc-card__glance .jc-footnote { font-size: var(--jc-text-2xs); }
+.jc-card__chev {
+  transition: transform var(--jc-dur) var(--jc-ease);
+  font-size: 10px;
+}
+.jc-card[data-open='true'] .jc-card__chev { transform: rotate(90deg); color: var(--jc-text-2); }
+
+/* ------------------------------------------------------------
+   FIT OUTPUT — lead anchor block
+   ------------------------------------------------------------ */
+.jc-fit-lead {
+  padding: var(--jc-4);
+  border-radius: var(--jc-radius);
+  background: var(--jc-pos-weak);
+  border: 1px solid var(--jc-pos-line);
+  display: flex; flex-direction: column; gap: var(--jc-2);
+}
+.jc-fit-lead .jc-eyebrow { color: var(--jc-pos); margin-bottom: 0; }
+
+.jc-verdict-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jc-2);
+  padding: 5px 12px;
+  border-radius: var(--jc-radius-sm);
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  border: 1px solid;
+}
+.jc-verdict-inline[data-tone='pos']     { color: var(--jc-pos);     background: var(--jc-pos-weak);     border-color: var(--jc-pos-line); }
+.jc-verdict-inline[data-tone='caution'] { color: var(--jc-caution); background: var(--jc-caution-weak); border-color: var(--jc-caution-line); }
+.jc-verdict-inline[data-tone='neg']     { color: var(--jc-neg);     background: var(--jc-neg-weak);     border-color: var(--jc-neg-line); }
+
+/* ------------------------------------------------------------
+   DOCUMENTS SECTION
+   ------------------------------------------------------------ */
+.jc-artifact {
+  padding: var(--jc-4);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-left: 3px solid var(--jc-accent);
+  border-radius: var(--jc-radius);
+}
+.jc-artifact__actions { flex-wrap: wrap; }
+
+/* Freeform Ask card — vertical stack (title, textarea, actions) instead of
+   the horizontal layout used by document artifacts. Puts the input inside
+   the bordered container so the whole ask feels like one integrated unit. */
+.jc-ask-card {
+  padding: var(--jc-4);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-left: 3px solid var(--jc-accent);
+  border-radius: var(--jc-radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--jc-3);
+}
+.jc-ask-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.jc-ask-card__actions {
+  display: flex;
+  gap: var(--jc-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.jc-ask-card__actions #askSend { margin-left: auto; }
+.jc-ask-card .jc-textarea { width: 100%; box-sizing: border-box; }
+
+.jc-doc-body {
+  margin-top: var(--jc-2);
+  padding: var(--jc-4);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  font: 400 var(--jc-text-sm)/var(--jc-leading-body) var(--jc-font);
+  color: var(--jc-text);
+  white-space: pre-wrap;
+  max-height: 500px; overflow-y: auto;
+}
+.jc-doc-body[contenteditable='true']:focus { outline: 2px solid var(--jc-accent); outline-offset: 2px; }
+
+/* Inline copy affordance rendered directly under the letter body — where the
+   user's eye lands when they've finished reading and want to paste it. */
+.jc-copy-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: var(--jc-2);
+  padding: 6px 10px;
+  font: 500 var(--jc-text-xs)/1 var(--jc-font);
+  color: var(--jc-accent);
+  text-decoration: none;
+  border: 1px dashed var(--jc-accent);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-accent-weak);
+  transition: background var(--jc-dur-fast) var(--jc-ease), color var(--jc-dur-fast) var(--jc-ease);
+  align-self: flex-start;
+}
+.jc-copy-link:hover { background: var(--jc-accent); color: var(--jc-on-accent, #fff); }
+
+.jc-resume-role { font-weight: 600; margin-top: var(--jc-2); font-size: var(--jc-text-sm); color: var(--jc-text); }
+.jc-resume-role + ul { padding-left: var(--jc-4); margin: 6px 0 0; }
+.jc-resume-role + ul li { color: var(--jc-text-2); margin-bottom: 4px; font-size: var(--jc-text-sm); }
+.jc-bullet-tag {
+  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  padding: 2px 6px; margin-left: 6px; border-radius: 3px;
+  background: var(--jc-surface-3); color: var(--jc-text-3);
+  vertical-align: middle; text-transform: uppercase; letter-spacing: .06em;
+}
+.jc-bullet-tag[data-action='promoted']  { color: var(--jc-pos); background: var(--jc-pos-weak); border: 1px solid var(--jc-pos-line); }
+.jc-bullet-tag[data-action='rewritten'] { color: var(--jc-info); background: var(--jc-info-weak); border: 1px solid var(--jc-info-line); }
+
+/* ------------------------------------------------------------
+   COMPENSATION — hero metric + counter-offer
+   ------------------------------------------------------------ */
+.jc-comp-block { display: flex; flex-direction: column; gap: var(--jc-3); }
+.jc-comp-block .jc-metric { padding: 4px 0; }
+
+/* Offer details form */
+.offer-form { margin-top: var(--jc-3); }
+.offer-form > summary {
+  cursor: pointer;
+  padding: var(--jc-2) var(--jc-3);
+  background: var(--jc-surface-2);
+  border-radius: var(--jc-radius-sm);
+}
+.offer-form[open] > summary { margin-bottom: var(--jc-3); }
+.offer-fields { display: flex; flex-direction: column; gap: var(--jc-3); }
+.offer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--jc-2); }
+.offer-fields label { display: flex; flex-direction: column; gap: 4px; }
+.offer-fields label span {
+  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--jc-text-3);
+}
+.offer-fields .jc-input, .offer-fields .jc-textarea {
+  padding: 6px 8px; font-size: var(--jc-text-xs);
+}
+
+/* Counter-offer block — the visual reward for filling in offer data */
+.jc-counter {
+  padding: var(--jc-4);
+  border-radius: var(--jc-radius);
+  background: var(--jc-pos-weak);
+  border: 1px solid var(--jc-pos-line);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+}
+.jc-counter .jc-eyebrow { color: var(--jc-pos); margin-bottom: 0; }
+.jc-counter-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: var(--jc-2);
+  align-items: baseline;
+  padding: 8px 0;
+  border-top: 1px solid var(--jc-pos-line);
+}
+.jc-counter-row:first-of-type { border-top: none; padding-top: 4px; }
+.jc-counter-row__label { font-size: var(--jc-text-sm); color: var(--jc-text); font-weight: 500; }
+.jc-counter-row__from {
+  font-family: var(--jc-font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--jc-text-xs); color: var(--jc-text-3);
+}
+.jc-counter-row__to {
+  font-family: var(--jc-font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--jc-text-md); font-weight: 700; color: var(--jc-pos);
+}
+.jc-counter-row__reason {
+  grid-column: 1 / -1;
+  font-size: var(--jc-text-xs); color: var(--jc-text-2);
+  padding: 4px 0 0;
+  line-height: var(--jc-leading-snug);
+}
+.jc-counter-total {
+  padding-top: var(--jc-3);
+  margin-top: var(--jc-1);
+  border-top: 2px solid var(--jc-pos);
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.jc-counter-total span:first-child { color: var(--jc-text); font-weight: 500; }
+.jc-counter-total span:last-child {
+  font: 700 var(--jc-text-lg)/1 var(--jc-font-mono);
+  color: var(--jc-pos); font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   PROGRESS BAR + SPINNERS
+   ------------------------------------------------------------ */
+#progressBar {
+  flex: none;
+  position: relative;
+  z-index: 6;
+  height: 3px;
+}
+.jc-btn[data-running='true'] {
+  opacity: 0.7;
+  cursor: wait !important;
+}
+.jc-btn[data-running='true']::after {
+  content: '';
+  display: inline-block;
+  width: 8px; height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  animation: jc-spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes jc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .jc-btn[data-running='true']::after { animation: none; }
+}

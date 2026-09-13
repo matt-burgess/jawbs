@@ -1,0 +1,548 @@
+<!doctype html>
+<html data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Jawbs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="../styles/job-copilot.css" />
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <div class="jc" id="root">
+      <header class="jc__header">
+        <span class="jc__wordmark">
+          <img class="jc__brand-logo" src="../assets/jawb-logo.png" alt="" aria-hidden="true" />
+          <span class="jc-brand jc-brand--lg">Jawbar</span>
+          <span id="archiveCount" class="jc-count-badge">0</span>
+        </span>
+        <div class="jc__header-actions">
+          <!-- Kept in the DOM (hidden) — panel.js has click delegates
+               from the empty-state cards and the Jawbs tab's "Open
+               Jawboard" button that fire these buttons' click events. -->
+          <button id="openArchive" class="jc-btn jc-header-linkbtn" data-size="sm" type="button" title="Open the Jawboard" hidden>
+            <img src="../assets/jawboard.png" alt="" class="jc-header-linkbtn__icon" width="16" height="16">
+            <span class="jc-brand">Jawboard</span>
+          </button>
+          <button id="openJawbridge" class="jc-btn jc-header-linkbtn" data-size="sm" type="button" title="Open the Jawbridge" hidden>
+            <img src="../assets/jawbridge.png" alt="" class="jc-header-linkbtn__icon" width="16" height="16">
+            <span class="jc-brand">Jawbridge</span>
+          </button>
+          <button id="openOptions" class="jc-btn" data-size="sm" data-icon-only type="button" aria-label="Settings" title="Settings">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1A2 2 0 1 1 3.4 17l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H2a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1A2 2 0 1 1 6 3.4l.1.1a1.6 1.6 0 0 0 1.8.3H8a1.6 1.6 0 0 0 1-1.5V2a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1A2 2 0 1 1 20.6 6l-.1.1a1.6 1.6 0 0 0-.3 1.8V8a1.6 1.6 0 0 0 1.5 1H22a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Save this search — one-line bar under the header, visible on
+           any tab. Auto-shows when the active tab is a LinkedIn or
+           Google Jobs search results URL with meaningful filters. -->
+      <div id="searchContext" class="jc-search-bar" hidden>
+        <span class="jc-search-bar__label">Save this search —</span>
+        <span id="searchContextSummary" class="jc-search-bar__title"></span>
+        <button id="saveThisSearch" type="button"
+                class="jc-icon-btn jc-search-bar__save"
+                aria-label="Save this search" title="Save this search">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5v14"/><path d="M5 12h14"/>
+          </svg>
+        </button>
+        <span id="saveThisSearchStatus" class="jc-search-bar__status jc-footnote"></span>
+      </div>
+
+      <div class="jc-progress" id="progressBar" hidden>
+        <div class="jc-progress__bar" aria-hidden="true"></div>
+        <div class="jc-progress__msg" id="progressMessage"></div>
+      </div>
+
+      <!-- Tip / share nudge — pinned at the top of the sidebar, right
+           below the header/progress row. Two modes:
+             data-mode="tip"   — Please Tip Your Captain CTA
+             data-mode="share" — share-to-social fallback after dismiss
+           evaluateTipNudge() gates visibility on user milestones. -->
+      <aside id="tipNudge" class="jc-tip-nudge" hidden></aside>
+
+      <div class="jc__body" id="body" data-active-tab="current">
+        <!-- Top-level tabs. "Jawb" is the default — shows the current
+             LinkedIn jawb's verdict / analyses / empty state.
+             "Interviews" lists upcoming + recently-completed rounds
+             across every archived jawb. "Recent" is the last 20
+             unique jawbs the user viewed. "Searches" is the saved
+             LinkedIn searches list. Always available regardless of
+             what tab is loaded on the page. -->
+        <nav class="jc-tabs" id="jcTabs" role="tablist">
+          <!-- The Jawb tab label flips to "Overview" when no single job
+               is loaded (empty state). JS updates data-label to keep
+               the two states in one place. -->
+          <button type="button" class="jc-tab" data-tab="current" data-active="true" role="tab" aria-selected="true"><span id="tabLabelCurrent">Jawb</span></button>
+          <button type="button" class="jc-tab" data-tab="interviews" data-active="false" role="tab" aria-selected="false">Interviews<span id="tabBadgeInterviews" class="jc-tab__badge" hidden>0</span></button>
+          <button type="button" class="jc-tab" data-tab="recent" data-active="false" role="tab" aria-selected="false">Jawbs</button>
+          <button type="button" class="jc-tab" data-tab="searches" data-active="false" role="tab" aria-selected="false">Searches<span id="tabBadgeSearches" class="jc-tab__badge">0</span></button>
+        </nav>
+
+        <!-- Interviews tab — populated on activation. -->
+        <section id="tabInterviews" class="jc-tab-pane" data-tab-only="interviews" hidden>
+          <div class="jc-tab-pane__group">
+            <h3 class="jc-tab-pane__h">Upcoming</h3>
+            <div id="interviewsUpcoming" class="jc-interviews-list"></div>
+          </div>
+          <div class="jc-tab-pane__group">
+            <h3 class="jc-tab-pane__h">Recently completed</h3>
+            <div id="interviewsPast" class="jc-interviews-list"></div>
+          </div>
+        </section>
+
+        <!-- Jawbs tab — last 20 unique jawbs viewed, plus a button
+             into the full Jawboard archive at the top. -->
+        <section id="tabRecent" class="jc-tab-pane" data-tab-only="recent" hidden>
+          <div class="jc-tab-pane__group">
+            <button id="tabRecentOpenJawboard" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Open the Jawboard — every archived jawb, filters, and analytics.">
+              <img src="../assets/jawboard-white.png" alt="" width="18" height="18" style="display:block">
+              <span>Open <span class="jc-brand">Jawboard</span></span>
+            </button>
+          </div>
+          <div id="recentEmpty" class="jc-footnote" hidden>No recently viewed jawbs yet.</div>
+          <ul id="recentList" class="jc-recent-tab-list"></ul>
+        </section>
+
+        <!-- Searches tab — three stacked sections:
+             (1) Stale-saved nudge — any saved search not checked in 24h+.
+             (2) Saved searches — user-curated list.
+             (3) Recent (unsaved) — auto-tracked history of the last 20
+                 /jobs/search URLs the user has visited that aren't
+                 already saved. -->
+        <section id="tabSearches" class="jc-tab-pane" data-tab-only="searches" hidden>
+          <div id="staleNudge" class="jc-stale-nudge" hidden>
+            <div class="jc-stale-nudge__head">
+              <span class="jc-stale-nudge__title">⏰ Saved searches you haven't checked</span>
+              <span id="staleNudgeCount" class="jc-footnote"></span>
+            </div>
+            <ul id="staleNudgeList" class="jc-searches-list"></ul>
+          </div>
+
+          <div class="jc-tab-pane__group">
+            <h3 class="jc-tab-pane__h">Saved</h3>
+            <div id="searchesEmpty" class="jc-footnote" hidden>No saved searches yet. Save one from the on-page pill on any LinkedIn /jobs/search page.</div>
+            <ul id="searchesList" class="jc-searches-list"></ul>
+          </div>
+
+          <div class="jc-tab-pane__group">
+            <h3 class="jc-tab-pane__h">
+              Recent (unsaved)
+              <button id="clearRecentSearches" class="jc-linkbtn" type="button" style="margin-left:auto">Clear</button>
+            </h3>
+            <div id="recentSearchesEmpty" class="jc-footnote" hidden>No recent unsaved searches yet.</div>
+            <ul id="recentSearchesList" class="jc-searches-list"></ul>
+          </div>
+        </section>
+
+        <!-- Save this search — moved above #body so it stays visible on
+             any tab. See #searchContext higher up in this file. -->
+        <!-- Sticky verdict (rendered when analyzed) -->
+        <div class="jc__verdict" id="verdictBlock" hidden>
+          <!-- Cast/Bait action bar moved into the jobcard control-panel
+               row below so all buttons live in one region. -->
+          <!-- Job header card — mockup 1a's report-first layout.
+               Order (top → bottom): mini hunt, strength strip, title,
+               company, control-panel button rows. Grouped into one
+               bordered card so it reads as a single object. -->
+          <div class="jc-jobcard">
+            <!-- Mini hunt strip — 3 canonical stages centered on the
+                 current status. Lives on its own row at the top of
+                 the card so the barrel/fin/dashed markers and their
+                 labels have full card width to breathe. -->
+            <ol id="miniHunt" class="mini-hunt" hidden></ol>
+            <!-- Strength strip: sits directly under the hunt so the
+                 big number + shark tier + gauges land as the second
+                 read after the hunt progress. Hidden until a fit
+                 result exists (that's what unlocks the composite). -->
+            <div class="jc-meta-strip" id="metaStrip" hidden>
+              <!-- Big strength score — the composite fit/comp/network
+                   number, promoted from the meta gauge trio to a hero
+                   moment on the left. Shark tier icon sits next to it
+                   as the visual anchor. -->
+              <span class="jc-meta-strip__strength" id="metaStrength" title="Strength = fit 50% · comp 30% · connections 20%">
+                <span class="jc-meta-strip__strength-num" id="metaStrengthNum">—</span>
+              </span>
+              <span class="jc-meta-strip__item" id="metaShark" title="">
+                <span class="jc-meta-strip__shark-icon" id="metaSharkIcon">
+                  <img id="metaSharkImg" src="" alt="" width="20" height="20" />
+                </span>
+                <span class="jc-meta-strip__label" id="metaSharkLabel">—</span>
+              </span>
+              <span class="jc-meta-strip__item" title="Fit score — LLM's holistic match against your profile">
+                <svg class="jc-gauge" id="fitGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Fit score">
+                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
+                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="fitGaugeFill" stroke-dasharray="0 75.4"></circle>
+                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="fitGaugeText">—</text>
+                </svg>
+                <span class="jc-meta-strip__label">Fit</span>
+              </span>
+              <span class="jc-meta-strip__item" title="Connections — actionable people in your network for this role">
+                <svg class="jc-gauge" id="connectionsGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Connections score">
+                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
+                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="connectionsGaugeFill" stroke-dasharray="0 75.4"></circle>
+                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="connectionsGaugeText">—</text>
+                </svg>
+                <span class="jc-meta-strip__label">Connections</span>
+              </span>
+              <span class="jc-meta-strip__item" id="compGaugeGroup" title="Posted / analyzed comp range vs your target salary" hidden>
+                <svg class="jc-gauge" id="compGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Comp vs target">
+                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
+                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="compGaugeFill" stroke-dasharray="0 75.4"></circle>
+                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="compGaugeText">—</text>
+                </svg>
+                <span class="jc-meta-strip__label">Comp</span>
+              </span>
+            </div>
+            <!-- Title reads first; company drops below as the eyebrow
+                 so the role name is the dominant scan target. -->
+            <h2 class="jc-job-title" id="jobTitle"></h2>
+            <span id="jobCompany" class="jc-job-eyebrow"></span>
+            <!-- Control panel — every button lives in one region.
+                 Row 1: Details / Corp Site / Job Tracker / Delete
+                 Row 2: Cast (Fit, Comp)
+                 Row 3: Bait (Cover letter, Resume, Prep brief) -->
+            <div class="jc-jobcard__actions">
+              <div class="jc-btn-row">
+                <button id="openFullView" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" type="button" aria-label="Open full page view for this jawb" title="Open the full page view for this jawb — interview rounds, timeline, comp, offer form, and everything else that doesn't fit in the Jawbar."><span class="jc-details-arrow" aria-hidden="true">←</span>Details</button>
+                <a id="companyCareersSearch" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" title="Google search for '[Company] Careers - [Jawb Title]' — often lands directly on the same role on the company's own careers site.">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path>
+                  </svg>
+                  <span>Corp Site</span>
+                </a>
+                <!-- Find on LinkedIn's own job tracker — opens the
+                     tracker at the stage matching this job's status,
+                     walks the pages to find the row, and flashes a
+                     highlight around it. Disabled until a job with a
+                     tracker-eligible status is loaded. -->
+                <button id="findOnTracker" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" type="button" aria-label="Find this jawb on LinkedIn's job tracker" title="Open LinkedIn's job tracker and highlight this row." hidden>
+                  <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
+                  <span>Job Tracker</span>
+                </button>
+                <!-- Delete lives at the tail of the action row now,
+                     rendered as an icon-only danger button — the red
+                     trash glyph carries the destructive intent on its
+                     own. -->
+                <button id="deleteJob" class="jc-btn jc-jobcard__delete" data-variant="danger" data-size="sm" data-icon-only type="button" aria-label="Delete this jawb" title="Delete all stored information about this position from the Jawboard (analyses, chats, timeline, notes). This cannot be undone." hidden>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 6h18"/><path d="M19 6l-1.2 13.2A2 2 0 0 1 15.8 21H8.2a2 2 0 0 1-2-1.8L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </div>
+              <span id="jobMetaRest" class="jc-job-meta__rest"></span>
+            </div>
+            <!-- Cast + Bait action bar — analysis and generation
+                 shortcuts, immediately below the navigation row so
+                 every button reads as part of one control panel. -->
+            <div class="jc-action-bar" id="actionBar">
+              <div class="action-row">
+                <span class="action-row__label">
+                  <span class="action-row__title">Cast</span>
+                  <span class="action-row__sub">Analysis</span>
+                </span>
+                <button class="jc-btn" data-size="sm" data-action="fit" type="button">Fit</button>
+                <button class="jc-btn" data-size="sm" data-action="comp" type="button">Comp</button>
+              </div>
+              <div class="action-row">
+                <span class="action-row__label">
+                  <span class="action-row__title">Bait</span>
+                  <span class="action-row__sub">Generation</span>
+                </span>
+                <button class="jc-btn" data-size="sm" data-action="letter" type="button" title="Warm tone">Cover letter</button>
+                <button id="letterCopyTop" class="jc-btn" data-size="sm" data-variant="ghost" type="button" title="Copy the generated cover letter" hidden>📋 Copy</button>
+                <button class="jc-btn" data-size="sm" data-action="resume" type="button">Resume/CV</button>
+                <button id="resumeDownloadTop" class="jc-btn" data-size="sm" data-variant="ghost" type="button" title="Download the tailored resume as Markdown" hidden>↓ Download</button>
+                <button class="jc-btn" data-size="sm" data-action="prep" type="button">Prep brief</button>
+              </div>
+            </div>
+            <!-- Comp source note + one-line fit summary retired — the
+                 comp analysis card carries the source label, and the
+                 fit card carries the same alignment/gap sentence. The
+                 sidebar header stayed clogged with two paragraphs of
+                 body-copy that repeated what's already below. Kept the
+                 hidden placeholders so the render code can no-op on
+                 them without null guards. -->
+            <p class="jc-meta-strip__source" id="compSourceNote" hidden aria-hidden="true"></p>
+            <p id="jobFitSummary" class="jc-jobcard__summary" hidden aria-hidden="true"></p>
+          </div>
+          <div class="jc-verdict-badges" id="verdictBadges"></div>
+        </div>
+
+        <!-- Notices (degraded, missing key, error) -->
+        <div id="noticeSlot"></div>
+
+        <!-- No job state -->
+        <div class="jc-empty" id="noJob">
+          <!-- Daily capture headline — sits above the Jawboard card so
+               "how much did I add today" reads at a glance before the
+               user drops into the archive. -->
+          <div class="jc-today-count jc-today-count--headline" id="jawboardTodayCount"></div>
+          <!-- Quick-launch cards so users can jump to Jawboard or Settings
+               without hunting for the small icons in the header. -->
+          <div class="jc-empty-actions">
+            <button id="emptyOpenJawboard" class="jc-empty-card" type="button">
+              <span class="jc-empty-card__icon" aria-hidden="true">
+                <img src="../assets/jawboard.png" alt="" class="jc-empty-card__jaws" width="36" height="36">
+              </span>
+              <span class="jc-empty-card__body">
+                <span class="jc-empty-card__title"><span class="jc-brand">Jawboard</span> (<span id="emptyJawboardCount">0</span> Jawbs)</span>
+                <span class="jc-empty-card__desc">Quick find all your saved jawbs. From here "thresh" them all, which is refreshing status from LinkedIn.</span>
+                <span class="jc-status-counts" id="jawboardStatusCounts" aria-live="polite"></span>
+                <!-- Last-thresh timestamp retired. -->
+                <span class="jc-last-thresh" id="lastThresh" hidden aria-hidden="true"></span>
+              </span>
+            </button>
+            <button id="emptyOpenJawbridge" class="jc-empty-card" type="button">
+              <span class="jc-empty-card__icon" aria-hidden="true">
+                <img src="../assets/settings-radar.png" alt="" class="jc-empty-card__jaws" width="36" height="36">
+              </span>
+              <span class="jc-empty-card__body">
+                <span class="jc-empty-card__title"><span class="jc-brand">Jawbridge</span></span>
+                <span class="jc-empty-card__desc">Every analytics chart on one screen — funnel, voyage log, aging, calibration, cadence, and more.</span>
+              </span>
+            </button>
+            <button class="jc-empty-card" data-empty-tab="you" type="button">
+              <span class="jc-empty-card__icon" aria-hidden="true">
+                <img src="../assets/settings-aviators.png" alt="" class="jc-empty-card__jaws" width="36" height="36">
+              </span>
+              <span class="jc-empty-card__body">
+                <span class="jc-empty-card__title">Your Settings</span>
+                <span class="jc-empty-card__desc">Profile, master resume, writing samples, work locations, compensation targets.</span>
+              </span>
+            </button>
+            <button class="jc-empty-card" data-empty-tab="ai" type="button">
+              <span class="jc-empty-card__icon" aria-hidden="true">
+                <img src="../assets/jawbridge.png" alt="" class="jc-empty-card__jaws" width="36" height="36">
+              </span>
+              <span class="jc-empty-card__body">
+                <span class="jc-empty-card__title">AI Settings</span>
+                <span class="jc-empty-card__desc">Cloud (Anthropic) &amp; local (Ollama) providers, per-feature routing, automation.</span>
+              </span>
+            </button>
+            <button class="jc-empty-card" data-empty-tab="system" type="button">
+              <span class="jc-empty-card__icon" aria-hidden="true">
+                <img src="../assets/settings-propeller.png" alt="" class="jc-empty-card__jaws" width="36" height="36">
+              </span>
+              <span class="jc-empty-card__body">
+                <span class="jc-empty-card__title">System Settings</span>
+                <span class="jc-empty-card__desc">Diagnostic, usage &amp; cost, activity log, <span class="jc-brand">Jawboard</span> backup / export / import.</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Analysis cards -->
+        <div id="analysisSection" class="jc-group" hidden>
+
+          <!-- Career fit -->
+          <div class="jc-card jc-card--tone" data-category="fit" id="fitCard" data-open="false">
+            <button class="jc-card__head" data-card="fit" type="button">
+              <span>Career fit</span>
+              <span class="jc-card__glance" id="fitGlance"><span class="jc-footnote">Not analyzed</span></span>
+              <span class="jc-card__chev">▸</span>
+            </button>
+            <div class="jc-card__body">
+              <div id="fitOutput"></div>
+              <div class="jc-btn-row">
+                <button id="analyzeFit" class="jc-btn" data-variant="primary" data-size="sm" type="button">Analyze</button>
+                <span id="fitMeta" class="jc-footnote"></span>
+              </div>
+              <div id="fitError" class="jc-notice" data-tone="neg" hidden></div>
+            </div>
+          </div>
+
+          <!-- Level signals -->
+          <div class="jc-card jc-card--tone" data-category="level" id="levelCard" data-open="false">
+            <button class="jc-card__head" data-card="level" type="button">
+              <span>Level signals</span>
+              <span class="jc-card__glance" id="levelGlance"><span class="jc-footnote">—</span></span>
+              <span class="jc-card__chev">▸</span>
+            </button>
+            <div class="jc-card__body">
+              <ul class="jc-list" id="levelList"></ul>
+            </div>
+          </div>
+
+
+          <!-- Red flags -->
+          <div class="jc-card jc-card--tone" data-category="flags" id="flagsCard" data-open="false">
+            <button class="jc-card__head" data-card="flags" type="button">
+              <span>Red flags</span>
+              <span class="jc-card__glance" id="flagsGlance"><span class="jc-footnote">—</span></span>
+              <span class="jc-card__chev">▸</span>
+            </button>
+            <div class="jc-card__body" id="flagsBody"></div>
+          </div>
+
+          <!-- Compensation -->
+          <div class="jc-card jc-card--tone" data-category="comp" id="compCard" data-open="false">
+            <button class="jc-card__head" data-card="comp" type="button">
+              <span>Compensation</span>
+              <span class="jc-card__glance" id="compGlance"><span class="jc-footnote">Not analyzed</span></span>
+              <span class="jc-card__chev">▸</span>
+            </button>
+            <div class="jc-card__body">
+              <div id="compOutput"></div>
+              <div class="jc-btn-row">
+                <button id="analyzeComp" class="jc-btn" data-size="sm" type="button">Analyze</button>
+                <span id="compMeta" class="jc-footnote"></span>
+              </div>
+
+              <details class="offer-form" id="offerForm">
+                <summary><span class="jc-eyebrow">Offer details (from interview / recruiter)</span></summary>
+                <div class="offer-fields">
+                  <div class="offer-grid">
+                    <label><span>Base salary (USD)</span><input id="offerBase" class="jc-input" type="number" min="0" step="1000" /></label>
+                    <label><span>Bonus target (%)</span><input id="offerBonusPercent" class="jc-input" type="number" min="0" max="100" step="1" /></label>
+                    <label><span>Bonus (USD, if not a %)</span><input id="offerBonusAmount" class="jc-input" type="number" min="0" step="1000" /></label>
+                    <label><span>Equity grant total (USD)</span><input id="offerEquityValue" class="jc-input" type="number" min="0" step="1000" /></label>
+                    <label><span>Equity type</span><input id="offerEquityType" class="jc-input" type="text" placeholder="RSU / options / ISO" /></label>
+                    <label><span>Vesting schedule</span><input id="offerEquityVesting" class="jc-input" type="text" placeholder="4yr, 1yr cliff, monthly after" /></label>
+                    <label><span>Sign-on bonus (USD)</span><input id="offerSignOn" class="jc-input" type="number" min="0" step="1000" /></label>
+                  </div>
+                  <label><span>Other notes</span><textarea id="offerNotes" class="jc-textarea" placeholder="Benefits, PTO, remote-work clause, offer expiration, etc."></textarea></label>
+                  <div class="jc-btn-row">
+                    <button id="saveOffer" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save &amp; re-analyze</button>
+                    <button id="clearOffer" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Clear</button>
+                    <span id="offerStatus" class="jc-footnote"></span>
+                  </div>
+                </div>
+              </details>
+
+              <div id="compError" class="jc-notice" data-tone="neg" hidden></div>
+            </div>
+          </div>
+
+          <!-- Question Prep — answers to the user's configured interview questions.
+               No inline question box; the list is configured in Settings →
+               You → Question Prep questions and Bait hands the whole list to the
+               model in one shot. -->
+          <div class="jc-card jc-card--tone" data-category="prep" id="prepCard" data-open="false">
+            <button class="jc-card__head" data-card="prep" type="button">
+              <span>Question Prep</span>
+              <span class="jc-card__glance" id="prepGlance"><span class="jc-footnote">Not baited</span></span>
+              <span class="jc-card__chev">▸</span>
+            </button>
+            <div class="jc-card__body">
+              <div id="briefOutput"></div>
+              <div class="jc-btn-row">
+                <button id="buildBrief" class="jc-btn" data-variant="primary" data-size="sm" type="button">Bait</button>
+                <span id="questionMeta" class="jc-footnote"></span>
+              </div>
+              <div id="briefError" class="jc-notice" data-tone="neg" hidden></div>
+            </div>
+          </div>
+
+          <!-- Documents. Resume/CV precedes Cover letter because that mirrors
+               the natural application order: tailor the resume first, then
+               write the letter that references it. -->
+          <div class="jc-doc-group">
+            <!-- Resume/CV -->
+            <div class="jc-card jc-card--tone" data-category="resume" id="resumeCard" data-open="false">
+              <button class="jc-card__head" data-card="resume" type="button">
+                <span>Resume/CV</span>
+                <span class="jc-card__glance" id="resumeMeta"><span class="jc-footnote">Not generated</span></span>
+                <span class="jc-card__chev">▸</span>
+              </button>
+              <div class="jc-card__body">
+                <div class="jc-btn-row">
+                  <button id="generateResume" class="jc-btn" data-variant="primary" data-size="sm" type="button">Generate</button>
+                  <button id="resumeCopy" class="jc-btn" data-size="sm" type="button" hidden>Copy</button>
+                  <button id="resumeDownload" class="jc-btn" data-variant="primary" data-size="sm" type="button" hidden>↓ Download</button>
+                  <button id="resumePdf" class="jc-btn" data-size="sm" type="button" hidden>PDF</button>
+                </div>
+                <div id="resumeOutput"></div>
+                <div id="resumeError" class="jc-notice" data-tone="neg" hidden></div>
+              </div>
+            </div>
+
+            <!-- Cover letter -->
+            <div class="jc-card jc-card--tone" data-category="letter" id="letterCard" data-open="false">
+              <button class="jc-card__head" data-card="letter" type="button">
+                <span>Cover letter</span>
+                <span class="jc-card__glance" id="letterMeta"><span class="jc-footnote">Not generated</span></span>
+                <span class="jc-card__chev">▸</span>
+              </button>
+              <div class="jc-card__body">
+                <div class="jc-btn-row">
+                  <button id="generateLetter" class="jc-btn" data-variant="primary" data-size="sm" type="button">Generate</button>
+                  <button id="letterCopy" class="jc-btn" data-size="sm" type="button" hidden>Copy</button>
+                  <button id="letterPdf" class="jc-btn" data-size="sm" type="button" hidden>PDF</button>
+                </div>
+                <div id="letterOutput"></div>
+                <div id="letterError" class="jc-notice" data-tone="neg" hidden></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat with AI — the escape hatch for anything the structured
+               analyses don't cover. Collapsed by default; glance shows how
+               many questions have been asked on this job. -->
+          <div class="jc-doc-group" id="askGroup">
+            <div class="jc-card jc-card--tone" data-category="ask" id="askCard" data-open="false">
+              <button class="jc-card__head" data-card="ask" type="button">
+                <span>Chat with AI</span>
+                <span class="jc-card__glance" id="askMeta"><span class="jc-footnote">No questions asked</span></span>
+                <span class="jc-card__chev">▸</span>
+              </button>
+              <div class="jc-card__body">
+                <textarea id="askInput" class="jc-textarea" rows="3" placeholder="e.g. What negotiation angles do I have here? What gaps in my resume should I proactively address for this role?"></textarea>
+                <div class="jc-btn-row" style="align-items:center;gap:var(--jc-2)">
+                  <select id="askProvider" class="jc-select" data-size="sm" title="Which model runs this ask">
+                    <option value="auto">Auto (routing)</option>
+                    <option value="local">Force local (Ollama)</option>
+                    <option value="cloud">Force cloud (Anthropic)</option>
+                  </select>
+                  <button id="askSend" class="jc-btn" data-variant="primary" data-size="sm" type="button" style="margin-left:auto">Ask</button>
+                </div>
+                <div id="askOutput"></div>
+                <div id="askError" class="jc-notice" data-tone="neg" hidden></div>
+                <details id="askHistoryWrap" style="margin-top: var(--jc-2)" hidden>
+                  <summary style="cursor:pointer; font-size:var(--jc-text-xs); color:var(--jc-text-2)">Past questions on this jawb (<span id="askHistoryCount">0</span>)</summary>
+                  <div id="askHistory"></div>
+                </details>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <p class="jc-footnote" id="statusText"></p>
+
+      </div>
+
+      <!-- Live usage/cost strip: today, month, lifetime, plus 14-day sparkline.
+           Pinned to the bottom of the Jawbar, always visible while the body scrolls. -->
+      <footer class="jc__footer">
+        <!-- Recent Jawbs + Jawb Searches footer strips removed — the
+             Recent and Searches tabs in the tab bar surface those
+             lists with more room. -->
+
+        <div class="usage-strip" id="usageStrip">
+          <div class="usage-metrics">
+            <div class="usage-metric" title="Cost accrued today across all analyses">
+              <span class="usage-metric__val" id="usageToday">$0.00</span>
+              <span class="usage-metric__lbl">today</span>
+            </div>
+            <div class="usage-metric" title="Trailing 30 days">
+              <span class="usage-metric__val" id="usageMonth">$0.00</span>
+              <span class="usage-metric__lbl">30d</span>
+            </div>
+            <div class="usage-metric" title="Lifetime spend since install">
+              <span class="usage-metric__val" id="usageLifetime">$0.00</span>
+              <span class="usage-metric__lbl">total</span>
+            </div>
+          </div>
+          <div class="usage-chart" id="usageChart" title="Daily spend for the last 14 days"></div>
+        </div>
+      </footer>
+    </div>
+    <script src="panel.js" type="module"></script>
+  </body>
+</html>

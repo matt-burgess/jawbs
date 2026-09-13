@@ -1,0 +1,222 @@
+<!doctype html>
+<html data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Jawbs &middot; Jawboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="../styles/job-copilot.css" />
+    <link rel="stylesheet" href="archive.css" />
+  </head>
+  <body>
+    <div class="jc-page">
+      <header class="jc-toolbar">
+        <div class="toolbar-left">
+          <span class="jc__wordmark">
+            <img class="jc__brand-logo" src="../assets/jawb-logo.png" alt="" aria-hidden="true" />
+            <span class="jc-brand jc-brand--xl">Jawboard</span>
+            <span class="toolbar-sep" aria-hidden="true"></span>
+            <span id="count" class="toolbar-count"></span>
+          </span>
+        </div>
+        <div class="toolbar-actions">
+          <!-- Sync CTA in the top-right, mockup 1a. Delegates its click
+               to the existing #reconcileLinkedIn button (kept in the
+               grid-actions bar) so all reconcile wiring stays in one
+               place. -->
+          <button id="syncLinkedInTop" class="jc-btn" data-variant="highlight" type="button" title="Sync with LinkedIn — walks every tracker stage and shows a diff you can resolve per-row.">
+            <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true">
+            <span>Sync with LinkedIn</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Grid-actions bar — Sync + delete-selected live directly above
+           the job table where the day-to-day actions on the archive
+           happen, rather than in the far-away top toolbar.
+           Enrich buttons are kept in the DOM (hidden) so their JS
+           handlers remain wired if we surface them behind a More… menu
+           later; per-job enrichment stays available in the sidepanel. -->
+      <div id="gridActions" class="grid-actions" hidden>
+        <!-- Kept in the DOM (hidden) so the archive.js click handler
+             stays wired — the top-toolbar #syncLinkedInTop button
+             delegates to this button's click event. -->
+        <button id="reconcileLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="primary" data-size="sm" type="button" title="Sync with LinkedIn" hidden>
+          <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
+          <span>Sync with LinkedIn</span>
+        </button>
+        <button id="enrichFit" class="jc-btn" data-size="sm" type="button" title="Analyze fit for every archived jawb missing a fit score" hidden>Enrich missing Fit</button>
+        <button id="enrichComp" class="jc-btn" data-size="sm" type="button" title="Analyze compensation for saved and applied jawbs missing a comp analysis" hidden>Enrich missing Comp</button>
+        <button id="deleteSelected" class="jc-btn jc-btn--icon-lead" data-variant="danger" data-size="sm" type="button" hidden aria-label="Delete selected jawbs" title="Delete selected jawbs">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 6h18"/><path d="M19 6l-1.2 13.2A2 2 0 0 1 15.8 21H8.2a2 2 0 0 1-2-1.8L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+          </svg>
+          <span>Delete (<span id="selectedCount">0</span>)</span>
+        </button>
+      </div>
+
+      <div id="bulkBar" class="bulk-bar" hidden>
+        <span class="bulk-bar__count"><span id="bulkCount">0</span> selected</span>
+        <div class="bulk-bar__actions">
+          <button id="bulkDelete" class="jc-btn jc-btn--icon-lead" data-variant="danger" data-size="sm" type="button" aria-label="Delete selected jawbs" title="Delete selected jawbs">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 6h18"/><path d="M19 6l-1.2 13.2A2 2 0 0 1 15.8 21H8.2a2 2 0 0 1-2-1.8L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+            </svg>
+            <span>Delete selected</span>
+          </button>
+          <button id="bulkDeselect" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Clear selection</button>
+        </div>
+      </div>
+
+      <!-- Sync progress + review panel. Only visible after the user
+           clicks Sync with LinkedIn. Progress line updates as the
+           walker moves through stages; then the review section renders
+           missing + mismatch rows for per-row resolution. -->
+      <div id="reconcilePanel" class="reconcile-panel" style="margin: var(--jc-3) var(--jc-5)" hidden>
+        <div class="reconcile-panel__head">
+          <span class="reconcile-panel__title">Sync with LinkedIn</span>
+          <span id="reconcileProgress" class="jc-footnote"></span>
+          <button id="reconcileClose" class="jc-btn" data-variant="ghost" data-size="sm" type="button" style="margin-left:auto">Close</button>
+        </div>
+        <!-- Running indicator — only visible while the walker is
+             executing. Gives the user an unmistakable "process is
+             live" cue and a live elapsed-time counter so a slow walk
+             (multiple pages × six stages) doesn't look frozen. -->
+        <div id="reconcileRunning" class="reconcile-running" hidden>
+          <span class="reconcile-running__spinner" aria-hidden="true"></span>
+          <div class="reconcile-running__body">
+            <div class="reconcile-running__title">Syncing with LinkedIn</div>
+            <div class="reconcile-running__sub jc-footnote">Watch the LinkedIn tab — the walker is clicking through every stage. Do not close it.</div>
+          </div>
+          <div class="reconcile-running__timer" aria-live="polite">
+            <span class="reconcile-running__timer-value" id="reconcileElapsed">0:00</span>
+            <span class="reconcile-running__timer-label">elapsed</span>
+          </div>
+        </div>
+        <div id="reconcileEmpty" class="jc-footnote" hidden>No drift detected — LinkedIn and Jawboard agree.</div>
+        <!-- Per-stage audit: LinkedIn's own tab-bar count vs what
+             the walker captured. Any non-zero delta means we didn't
+             read every job LinkedIn claims exists. -->
+        <div id="reconcileAudit" class="reconcile-audit" hidden>
+          <h3 class="reconcile-group__h">Walker vs LinkedIn count</h3>
+          <table id="reconcileAuditTable" class="reconcile-audit__table"></table>
+        </div>
+        <div id="reconcileMissingWrap" class="reconcile-group" hidden>
+          <h3 class="reconcile-group__h">Missing on LinkedIn <span id="reconcileMissingCount" class="jc-footnote"></span></h3>
+          <div class="reconcile-group__bulk">
+            <button class="jc-btn" data-size="sm" data-bulk="missing" data-choice="accept-linkedin" type="button">All: Mark Not Moving Forward</button>
+            <button class="jc-btn" data-size="sm" data-bulk="missing" data-choice="keep-local" type="button">All: Keep local</button>
+            <button class="jc-btn" data-variant="danger" data-size="sm" data-bulk="missing" data-choice="delete" type="button">All: Delete</button>
+          </div>
+          <div id="reconcileMissingList"></div>
+        </div>
+        <div id="reconcileMismatchWrap" class="reconcile-group" hidden>
+          <h3 class="reconcile-group__h">Status mismatch <span id="reconcileMismatchCount" class="jc-footnote"></span></h3>
+          <div class="reconcile-group__bulk">
+            <button class="jc-btn" data-size="sm" data-bulk="mismatch" data-choice="accept-linkedin" type="button">All: Accept LinkedIn</button>
+            <button class="jc-btn" data-size="sm" data-bulk="mismatch" data-choice="keep-local" type="button">All: Keep local</button>
+          </div>
+          <div id="reconcileMismatchList"></div>
+        </div>
+        <!-- Footer is hidden until the walk completes and a diff is
+             rendered — the "Apply resolutions" button being present
+             mid-walk was misleading (implied ready-to-commit state). -->
+        <div id="reconcileFoot" class="reconcile-panel__foot" hidden>
+          <button id="reconcileApply" class="jc-btn" data-variant="primary" data-size="sm" type="button">Apply resolutions</button>
+          <span id="reconcileApplyStatus" class="jc-footnote"></span>
+        </div>
+      </div>
+
+      <div id="exportReminder" class="jc-notice" data-tone="caution" style="margin: var(--jc-3) var(--jc-5)" hidden>
+        <div class="jc-notice__body"><span id="exportReminderText"></span></div>
+      </div>
+      <div id="enrichProgress" class="jc-notice" data-tone="info" style="margin: var(--jc-3) var(--jc-5)" hidden>
+        <div class="jc-notice__body" style="flex-direction:row;align-items:center;justify-content:space-between;gap:var(--jc-3)">
+          <span id="enrichText"></span>
+          <button id="enrichCancel" class="jc-btn" data-size="sm" type="button">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Board card — one bordered surface groups the pipeline strip,
+           search/filter controls, table, and footer summary so the
+           Jawboard reads as a single object rather than a stack of
+           loose sections. Matches the mockup's report-card treatment. -->
+      <div class="jc-jb-board">
+        <!-- Pipeline strip — colored segments per stage, count on each.
+             Widths are proportional to the count (JS-computed). Segments
+             are clickable and act as a shortcut to the corresponding
+             status filter. -->
+        <div class="jc-jb-pipeline" id="pipelineStrip" hidden></div>
+
+        <div class="controls">
+        <div class="controls__search">
+          <span class="controls__search-icon" aria-hidden="true">🔍</span>
+          <input id="search" class="jc-input controls__search-input" type="search" placeholder="Search title, company, description, notes, interviewers…  (press / to focus)" />
+        </div>
+        <select id="statusFilter" class="jc-select">
+          <option value="">All statuses</option>
+          <option value="analyzed">Analyzed (not on LinkedIn)</option>
+          <option value="saved">Saved</option>
+          <option value="inProgressDraft">In Progress - Draft</option>
+          <option value="inProgressClickedApply">In Progress - Clicked Apply</option>
+          <option value="applied">Applied</option>
+          <option value="interviewing">Interviewing</option>
+          <option value="archived">Archived</option>
+          <option value="notMovingForward">Not Moving Forward</option>
+        </select>
+        <select id="sourceFilter" class="jc-select" title="Filter by capture source (Waters)">
+          <option value="">All waters</option>
+          <option value="linkedin">LinkedIn</option>
+          <option value="google_jobs">Google Jobs</option>
+        </select>
+        <label class="controls__toggle" title="LinkedIn Archived jawbs are hidden by default. Tick to include them in the list.">
+          <input id="showArchived" type="checkbox" />
+          <span>Show Archived</span>
+        </label>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-select"><input id="selectAll" type="checkbox" title="Select / deselect all visible" /></th>
+              <th data-sort="title">Title</th>
+              <th data-sort="status">Status</th>
+              <th data-sort="strengthScore" title="Composite worth-pursuing score: fit 50% · comp 30% · connections 20%. Fit + Comp sub-scores render beneath the strength number in each row.">Strength</th>
+              <th data-sort="peopleCount" title="1st- and 2nd-degree contacts at the company, plus hiring team">People</th>
+              <th data-sort="capturedAt">Captured</th>
+              <th data-sort="interviewAt" title="Next scheduled interview (or most recent if all rounds are past)">Interview</th>
+              <th data-sort="compLow" title="Analyzed base-salary range — low end">Comp Lo</th>
+              <th data-sort="compHigh" title="Analyzed base-salary range — high end">Comp Hi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <p id="emptyState" class="jc-empty" style="margin: var(--jc-5)" hidden>
+          <span class="jc-empty__title">Nothing in the <span class="jc-brand">Jawboard</span> yet</span>
+          <span>Open a LinkedIn jawb posting or the jawbs-tracker page to start capturing.</span>
+        </p>
+
+        <!-- Footer summary strip inside the board card — count of what
+             the table currently shows plus a stale-jobs nudge when any
+             jawbs have gone quiet for 21+ days. -->
+        <div class="jc-jb-board__foot" id="boardFoot" hidden>
+          <span id="boardSummary" class="jc-jb-board__summary"></span>
+          <span id="boardStale" class="jc-jb-board__stale" hidden></span>
+        </div>
+      </div>
+
+      <footer class="jawboard-footer">
+        <button id="exportJson" class="jc-btn" data-size="sm" type="button">Export JSON</button>
+        <button id="exportCsv" class="jc-btn" data-size="sm" type="button">Export CSV</button>
+        <label for="importFile" class="jc-btn" data-size="sm">Import JSON</label>
+        <input id="importFile" type="file" accept="application/json" hidden />
+      </footer>
+    </div>
+
+    <script src="archive.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+html, body { height: 100%; margin: 0; background: var(--jc-bg); }
+body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body) var(--jc-font); }
+[hidden] { display: none !important; }
+
+.jc-toolbar {
+  padding: var(--jc-3) var(--jc-5);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--jc-3);
+  border-bottom: 1px solid var(--jc-border);
+}
+.toolbar-left { display: flex; align-items: center; gap: var(--jc-3); }
+.toolbar-actions { display: flex; align-items: center; gap: var(--jc-2); }
+
+.crumb-link {
+  font: 500 var(--jc-text-xs)/1 var(--jc-font);
+  color: #fff;
+  text-decoration: none;
+  opacity: .9;
+}
+.crumb-link:hover { color: #fff; opacity: 1; }

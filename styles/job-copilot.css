@@ -1,0 +1,1009 @@
+/* ============================================================
+   JOB THRESHER — design system stylesheet
+   Palette derived from the shark-fin logo: warm orange background,
+   teal fin, deep indigo bottom stripe. Purity-inspired spacing /
+   shadow / radii kept. Add data-theme="dark" for dark variant.
+   Class prefix --jc- kept for compatibility with existing markup.
+   ============================================================ */
+
+/* ---------- 1. TOKENS ---------- */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Jawboard palette — cream header with the red brand mark, deep-teal
+     strength cards, dark-navy usage footer, olive comp, gold callouts.
+     The --jaw-* tokens are the specific Jawboard mockup values used by
+     the chrome (header, footer, strength card, pipeline strip); the
+     --jc-* tokens carry the working palette every component already
+     reads from. */
+  --jaw-cream:        #F4F1E6;    /* header background */
+  --jaw-cream-line:   #D8D2BD;    /* header divider inside cream */
+  --jaw-red:          #CC0000;    /* brand red (shark + border + CTA) */
+  --jaw-red-hover:    #A30000;
+  --jaw-red-ink:      #F4F1E6;    /* type on red bg */
+  --jaw-teal-deep:    #235A5D;    /* strength / spotlight card base */
+  --jaw-teal-mid:     #2B6A6C;
+  --jaw-teal-strip:   #1A4A4C;    /* pipeline strip */
+  --jaw-navy-footer:  #14293D;    /* dark usage-cost footer */
+  --jaw-navy-ink:     #DFEAF5;
+  --jaw-sand:         #DFEAF5;    /* muted mono type on teal/navy */
+  --jaw-highlight:    #EFB700;    /* gold callouts on cream/teal */
+
+  --jc-bg:            #F2F2F0;
+  --jc-surface-1:     #FFFFFF;
+  --jc-surface-2:     #F7F7F5;
+  --jc-surface-3:     #EDEDEB;
+  --jc-surface-input: #FFFFFF;
+
+  --jc-border:        #DEDEDC;
+  --jc-border-strong: #D2D2D0;
+
+  --jc-text:          #14293D;
+  --jc-text-2:        #3C4144;
+  --jc-text-3:        #66696B;
+
+  /* Primary accent — mid-blue link/button color from the redesign.
+     Hover deepens to the navy the mockup uses for pressed states. */
+  --jc-accent:        #2986CC;
+  --jc-accent-hover:  #164E86;
+  --jc-accent-ink:    #FFFFFF;
+  --jc-accent-weak:   #E7F0F9;
+  --jc-accent-line:   #C7DCEF;
+
+  /* Secondary energy color — gold for CTA punch (Thresh, primary
+     actions). Sits against navy in the mockup's toolbar. */
+  --jc-accent-2:      #EFB700;
+  --jc-accent-2-hover:#FFCD1F;
+
+  /* Positive tone shifted to the mockup's olive green so comp $ figures
+     and "applied" states read consistently. */
+  --jc-pos:           #5C7016;
+  --jc-pos-weak:      #E8EFD2;
+  --jc-pos-line:      #C5D093;
+
+  /* Caution keeps the gold family so amber "circling" callouts and
+     reposted badges stay cohesive with CTA buttons. */
+  --jc-caution:       #7A5400;
+  --jc-caution-weak:  #FDF1CC;
+  --jc-caution-line:  #F7DD8A;
+
+  --jc-neg:           #CC0000;
+  --jc-neg-weak:      #FDEAEA;
+  --jc-neg-line:      #ECCCCC;
+
+  /* Info takes the blue-accent family for consistency with links and
+     interactive elements. */
+  --jc-info:          #2986CC;
+  --jc-info-weak:     #E7F0F9;
+  --jc-info-line:     #C7DCEF;
+
+  --jc-diag-text:     #5F6365;
+  --jc-diag-surface:  #F7F7F5;
+  --jc-diag-line:     #DEDEDC;
+
+  --jc-scrim:         rgba(11, 51, 88, .45);
+
+  /* Chakra-style layered shadows for elevation */
+  --jc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --jc-shadow:    0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --jc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --jc-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Signature gradient: mid blue → deep navy, matching the mockup's
+     Jawboard header bar. --jc-gradient-accent-warm pairs mid-blue with
+     gold for hero panels. */
+  --jc-gradient-accent:      linear-gradient(180deg, #1E79C0 0%, #0D4576 100%);
+  --jc-gradient-accent-warm: linear-gradient(135deg, #2986CC 0%, #EFB700 100%);
+  --jc-gradient-accent-soft: linear-gradient(135deg, rgba(41, 134, 204, 0.12) 0%, rgba(22, 78, 134, 0.06) 100%);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Dark surfaces lean the same indigo family as the light theme's text
+     color, so brand feels continuous across themes. */
+  --jc-bg:            #14103A;
+  --jc-surface-1:     #1D174E;
+  --jc-surface-2:     #2A2262;
+  --jc-surface-3:     #3D3577;
+  --jc-surface-input: #1D174E;
+
+  --jc-border:        #2A2262;
+  --jc-border-strong: #4A4290;
+
+  --jc-text:          #F7FAFC;
+  --jc-text-2:        #CBC8E0;
+  --jc-text-3:        #A0A0BF;
+
+  --jc-accent:        #4AAB9B;
+  --jc-accent-hover:  #62BFB0;
+  --jc-accent-ink:    #FFFFFF;
+  --jc-accent-weak:   rgba(74, 171, 155, 0.15);
+  --jc-accent-line:   rgba(74, 171, 155, 0.4);
+  --jc-accent-2:      #F5A040;
+  --jc-accent-2-hover:#F8B25E;
+
+  --jc-pos:           #68D391;
+  --jc-pos-weak:      rgba(104, 211, 145, 0.15);
+  --jc-pos-line:      rgba(104, 211, 145, 0.4);
+
+  --jc-caution:       #F5A040;
+  --jc-caution-weak:  rgba(245, 160, 64, 0.15);
+  --jc-caution-line:  rgba(245, 160, 64, 0.4);
+
+  --jc-neg:           #FC8181;
+  --jc-neg-weak:      rgba(252, 129, 129, 0.15);
+  --jc-neg-line:      rgba(252, 129, 129, 0.4);
+
+  --jc-info:          #B4A7F5;
+  --jc-info-weak:     rgba(180, 167, 245, 0.15);
+  --jc-info-line:     rgba(180, 167, 245, 0.4);
+
+  --jc-diag-text:     #A0A0BF;
+  --jc-diag-surface:  #1D174E;
+  --jc-diag-line:     #2A2262;
+
+  --jc-scrim:         rgba(0,0,0,.6);
+
+  --jc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --jc-shadow:    0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --jc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+  --jc-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+
+  --jc-gradient-accent: linear-gradient(135deg, #4AAB9B 0%, #2E7D8E 100%);
+  --jc-gradient-accent-warm: linear-gradient(135deg, #4AAB9B 0%, #F5A040 100%);
+  --jc-gradient-accent-soft: linear-gradient(135deg, rgba(74, 171, 155, 0.2) 0%, rgba(46, 125, 142, 0.1) 100%);
+}
+
+:root {
+  /* type — Archivo is the primary UI font (loaded per page). Anton is
+     the Jawboard wordmark; it's the ONLY place --jc-font-brand is used,
+     and every occurrence of the literal word "Jawboard" opts in via
+     <span class="jc-brand">Jawboard</span>. JetBrains Mono is the
+     monospace for eyebrows, chip labels, and the usage footer. */
+  --jc-font: "Archivo", "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system,
+             "Segoe UI", Helvetica, Arial, sans-serif;
+  --jc-font-brand: "Anton", "Impact", "Haettenschweiler", "Arial Narrow", sans-serif;
+  --jc-font-mono: "JetBrains Mono", ui-monospace, "SF Mono",
+             "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --jc-text-3xs: 10px;  /* diagnostic keys only */
+  --jc-text-2xs: 11px;  /* eyebrows, chip labels */
+  --jc-text-xs:  12px;  /* meta, captions */
+  --jc-text-sm:  13px;  /* BODY DEFAULT */
+  --jc-text-md:  15px;  /* card titles, lead sentence */
+  --jc-text-lg:  18px;  /* job title */
+  --jc-text-xl:  24px;  /* section verdict */
+  --jc-text-score: 44px;/* fit score numeral */
+
+  --jc-leading-tight: 1.2;
+  --jc-leading-snug:  1.4;
+  --jc-leading-body:  1.55;
+
+  --jc-1: 4px;  --jc-2: 8px;  --jc-3: 12px; --jc-4: 16px;
+  --jc-5: 20px; --jc-6: 24px; --jc-8: 32px; --jc-10: 40px;
+
+  /* Mockup 1a leans on smaller radii — 10–12px on cards, 8px on
+     controls. Rounder-than-flat still, just less bubbly than before. */
+  --jc-radius-sm: 8px;    /* controls */
+  --jc-radius:    12px;   /* cards, inputs */
+  --jc-radius-lg: 16px;   /* hero blocks */
+  --jc-radius-pill: 999px;
+
+  --jc-panel-w: 420px;         /* canonical sidebar width */
+  --jc-panel-w-min: 360px;
+  --jc-header-h: 48px;
+
+  --jc-ease: cubic-bezier(.2,.7,.3,1);
+  --jc-dur-fast: 120ms;
+  --jc-dur: 200ms;
+  --jc-dur-slow: 420ms;
+}
+
+/* ---------- 2. PANEL SHELL ---------- */
+
+.jc {
+  /* Fill whatever width Chrome's side panel gives us. An explicit
+     min-width here becomes a lower bound on the whole browser window
+     (Chrome enforces window width ≥ panel width + tab-strip minimum),
+     which manifests as the window "refusing" to resize below a certain
+     point. Let the panel shrink; internal flex children have their own
+     min-width: 0 so they don't force-overflow. */
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--jc-bg);
+  color: var(--jc-text);
+  font: 400 var(--jc-text-sm)/var(--jc-leading-body) var(--jc-font);
+  -webkit-font-smoothing: antialiased;
+  border-left: 1px solid var(--jc-border);
+  overflow: hidden;
+  text-wrap: pretty;
+}
+.jc *, .jc *::before, .jc *::after { box-sizing: border-box; }
+.jc a { color: var(--jc-accent); text-decoration: none; }
+.jc a:hover { color: var(--jc-accent-hover); text-decoration: underline; }
+.jc :focus-visible {
+  outline: 2px solid var(--jc-accent);
+  outline-offset: 2px;
+  border-radius: var(--jc-radius-sm);
+}
+
+.jc__header {
+  flex: none;
+  height: 52px;
+  padding: 0 var(--jc-4);
+  display: flex; align-items: center; gap: 10px;
+  /* Cream Jawboard chrome with the brand red as a hard bottom rule —
+     matches mockup 1c/1d. The wordmark reads as red Anton on cream. */
+  background: var(--jaw-cream);
+  border-bottom: 3px solid var(--jaw-red);
+  color: var(--jc-text);
+}
+.jc__wordmark {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+/* On the sidepanel the wordmark carries the shark-logo icon plus the
+   literal word "Jawboard". Archive/recall pages replace the small
+   icon with the plain jaws graphic. */
+.jc__brand-logo {
+  width: 30px; height: 30px;
+  object-fit: contain;
+  flex: none;
+  display: block;
+}
+.jc__header-actions { margin-left: auto; display: flex; gap: var(--jc-1); }
+/* Header Jawboard button carries a small jaws icon on the left. */
+.jc-jawboard-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.jc-jawboard-btn__jaws { width: 18px; height: 18px; object-fit: contain; }
+
+/* Jawbridge button — same treatment with the crow's-nest icon. */
+.jc-jawbridge-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.jc-jawbridge-btn__icon { width: 18px; height: 18px; object-fit: contain; }
+/* On a primary (teal) button the teal-on-transparent icon vanishes.
+   Filter to solid white so it reads. Swap for a real jawbridge-white.png
+   later if you want richer shading. */
+.jc-jawbridge-btn__icon--onprimary {
+  filter: brightness(0) invert(1);
+}
+
+/* The literal word "Jawboard" always renders in the brand display font
+   (Anton). Every occurrence of the word in HTML must be wrapped in
+   <span class="jc-brand">Jawboard</span>. scaleX pulls the letterforms
+   slightly wider so the condensed Anton doesn't feel cramped next to
+   the surrounding UI text. */
+.jc-brand {
+  font-family: var(--jc-font-brand);
+  font-weight: 400;
+  letter-spacing: -.005em;
+  text-transform: uppercase;
+  color: var(--jaw-red);
+  transform: scaleX(1.05);
+  transform-origin: left;
+  display: inline-block;
+  line-height: .85;
+}
+/* Big brand mark — used in the sidepanel and page headers. Line-height
+   is clamped to .8 so the Anton wordmark aligns to the surrounding UI. */
+.jc-brand--lg { font-size: 28px; }
+.jc-brand--xl { font-size: 34px; }
+
+/* Sidepanel delete-job icon button — red trash SVG with no border or
+   background. Scoped to .jc-icon-btn so the recall page's text-label
+   Delete button (also id="deleteJob") isn't red-on-red. */
+.jc-icon-btn#deleteJob { color: var(--jc-neg); }
+.jc-icon-btn#deleteJob:hover { color: var(--jc-neg); background: var(--jc-neg-weak); }
+
+/* Thresh icon (shark inside circular arrows). Source PNG is white-on-
+   transparent; we mask it with the button's currentColor so it inherits
+   the ghost button's accent tint rather than rendering invisibly. */
+.icon-thresh {
+  display: inline-block;
+  width: 18px; height: 18px;
+  background-color: currentColor;
+  -webkit-mask: url('../assets/icon-thresh.png') center / contain no-repeat;
+          mask: url('../assets/icon-thresh.png') center / contain no-repeat;
+  vertical-align: middle;
+}
+
+/* the scroll region — everything below the sticky verdict */
+.jc__body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--jc-3);
+  padding: var(--jc-4) var(--jc-4) var(--jc-10);
+  scrollbar-width: thin;
+  scrollbar-color: var(--jc-border-strong) transparent;
+}
+.jc__body::-webkit-scrollbar { width: 10px; }
+.jc__body::-webkit-scrollbar-thumb {
+  background: var(--jc-border-strong); border-radius: var(--jc-radius-pill);
+  border: 3px solid var(--jc-bg);
+}
+
+/* ---------- 3. VERDICT BAR (sticky, always answers "should I apply?") ---------- */
+
+.jc__verdict {
+  flex: none;
+  position: sticky; top: 0; z-index: 5;
+  padding: var(--jc-4);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+  background: var(--jc-surface-1);
+  border-bottom: 1px solid var(--jc-border);
+}
+.jc-job-title {
+  font: 600 var(--jc-text-lg)/var(--jc-leading-tight) var(--jc-font);
+  letter-spacing: -.01em; margin: 0;
+}
+.jc-job-meta {
+  font: 400 var(--jc-text-xs)/1.4 var(--jc-font);
+  color: var(--jc-text-2);
+  display: flex; flex-wrap: wrap; gap: 0 var(--jc-2);
+}
+
+/* score: numeral + track with floor/target markers */
+.jc-score { display: flex; align-items: flex-end; gap: var(--jc-3); }
+.jc-score__num {
+  font: 500 var(--jc-text-score)/.85 var(--jc-font-mono);
+  letter-spacing: -.04em; font-variant-numeric: tabular-nums;
+}
+.jc-score__den {
+  font: 400 var(--jc-text-xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3); padding-bottom: 5px;
+}
+/* Small tag under the score (FIT / STRENGTH / tier label). Keeps the
+   two score blocks visually distinguishable without introducing a new
+   label row above the numerals. */
+.jc-score__label {
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-3); padding-bottom: 5px;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.jc-score--pos .jc-score__num { color: var(--jc-pos); }
+.jc-score--caution .jc-score__num { color: var(--jc-caution); }
+.jc-score--neg .jc-score__num { color: var(--jc-neg); }
+
+/* ---------- 4. VERDICT PILL / BADGES ---------- */
+
+.jc-verdict-pill {
+  display: inline-flex; align-items: center; gap: var(--jc-2);
+  padding: 7px var(--jc-3);
+  border-radius: var(--jc-radius-sm);
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase;
+  border: 1px solid;
+}
+.jc-verdict-pill[data-tone="pos"]     { color: var(--jc-pos);     background: var(--jc-pos-weak);     border-color: var(--jc-pos-line); }
+.jc-verdict-pill[data-tone="caution"] { color: var(--jc-caution); background: var(--jc-caution-weak); border-color: var(--jc-caution-line); }
+.jc-verdict-pill[data-tone="neg"]     { color: var(--jc-neg);     background: var(--jc-neg-weak);     border-color: var(--jc-neg-line); }
+
+.jc-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 7px; border-radius: var(--jc-radius-sm);
+  font: 500 var(--jc-text-2xs)/1.4 var(--jc-font-mono);
+  letter-spacing: .04em;
+  background: var(--jc-surface-3); color: var(--jc-text-2);
+  border: 1px solid transparent;
+}
+.jc-badge[data-tone="pos"]     { color: var(--jc-pos);     background: var(--jc-pos-weak);     border-color: var(--jc-pos-line); }
+.jc-badge[data-tone="caution"] { color: var(--jc-caution); background: var(--jc-caution-weak); border-color: var(--jc-caution-line); }
+.jc-badge[data-tone="neg"]     { color: var(--jc-neg);     background: var(--jc-neg-weak);     border-color: var(--jc-neg-line); }
+.jc-badge[data-tone="info"]    { color: var(--jc-info);    background: var(--jc-info-weak);    border-color: var(--jc-info-line); }
+.jc-badge--reposted {
+  margin-left: 6px;
+  color: var(--jc-caution); background: var(--jc-caution-weak); border-color: var(--jc-caution-line);
+}
+
+/* Gold count chip — sits next to the Jawboard wordmark to show the
+   total jawb count. Matches the mockup's yellow "157" square. */
+.jc-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  margin-left: 4px;
+  border-radius: 4px;
+  background: var(--jaw-highlight);
+  color: #473300;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .02em;
+  vertical-align: middle;
+}
+
+/* ---------- 5. CARDS (one per analysis section) ---------- */
+
+.jc-card {
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  overflow: hidden;
+  box-shadow: var(--jc-shadow-sm);
+  transition: box-shadow var(--jc-dur) var(--jc-ease);
+  position: relative;
+}
+.jc-card[data-open="true"] { box-shadow: var(--jc-shadow); }
+
+/* Processing state — the section actively being analyzed gets a soft
+   orange shimmer sliding across it. Same color language as the top
+   progress bar (#ff9500) so it visually parallels "work in flight."
+   Uses an ::after overlay with a wide linear-gradient sweeping right
+   to left, kept behind the card's real content via pointer-events:none.
+   Border tints orange to reinforce the "this one is active" cue. */
+.jc-card[data-processing="true"] {
+  border-color: #ff9500;
+  box-shadow: 0 0 0 1px rgba(255, 149, 0, 0.35), var(--jc-shadow);
+}
+.jc-card[data-processing="true"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 149, 0, 0) 0%,
+    rgba(255, 149, 0, 0) 30%,
+    rgba(255, 149, 0, 0.18) 50%,
+    rgba(255, 149, 0, 0) 70%,
+    rgba(255, 149, 0, 0) 100%
+  );
+  background-size: 250% 100%;
+  animation: jc-card-shimmer 2.2s linear infinite;
+  z-index: 0;
+}
+/* Ensure the card's real children paint above the shimmer overlay. */
+.jc-card[data-processing="true"] > * { position: relative; z-index: 1; }
+@keyframes jc-card-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -50% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jc-card[data-processing="true"]::after { animation: none; opacity: 0.5; }
+}
+.jc-card__head {
+  width: 100%; display: flex; align-items: center; gap: var(--jc-3);
+  padding: var(--jc-3) var(--jc-4);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  color: var(--jc-text);
+  font: 600 var(--jc-text-md)/1.3 var(--jc-font);
+  letter-spacing: -.005em;
+}
+.jc-card__head:hover { background: var(--jc-surface-2); }
+/* the at-a-glance value on a collapsed card — lets users scan
+   without opening anything */
+.jc-card__glance {
+  margin-left: auto; display: flex; align-items: center; gap: var(--jc-2);
+  font: 500 var(--jc-text-xs)/1 var(--jc-font-mono); color: var(--jc-text-2);
+}
+.jc-card__chev {
+  flex: none; width: 14px; color: var(--jc-text-3);
+  transition: transform var(--jc-dur) var(--jc-ease);
+}
+.jc-card[data-open="true"] .jc-card__chev { transform: rotate(90deg); }
+.jc-card__body {
+  padding: 0 var(--jc-4) var(--jc-4);
+  display: flex; flex-direction: column; gap: var(--jc-4);
+}
+.jc-card[data-open="false"] .jc-card__body { display: none; }
+
+.jc-eyebrow {
+  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .12em; text-transform: uppercase; color: var(--jc-text-3);
+}
+.jc-prose { margin: 0; color: var(--jc-text-2); font-size: var(--jc-text-sm); }
+.jc-prose strong { color: var(--jc-text); font-weight: 600; }
+.jc-lead { margin: 0; color: var(--jc-text); font-size: var(--jc-text-md); line-height: var(--jc-leading-snug); }
+
+/* finding: one gap / red flag / level signal. The tone stripe is the
+   only place a left-edge accent is allowed. */
+.jc-finding {
+  padding: var(--jc-3); padding-left: var(--jc-3);
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-2);
+  border: 1px solid var(--jc-border);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.jc-finding__title { margin: 0; font-weight: 600; color: var(--jc-text); }
+.jc-finding__quote {
+  margin: 0; padding-left: var(--jc-3);
+  border-left: 2px solid var(--jc-border-strong);
+  color: var(--jc-text-2); font-style: normal;
+}
+.jc-finding[data-tone="neg"] { border-color: var(--jc-neg-line); background: var(--jc-neg-weak); }
+.jc-finding[data-tone="caution"] { border-color: var(--jc-caution-line); background: var(--jc-caution-weak); }
+
+.jc-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--jc-2); }
+.jc-list > li { display: flex; gap: var(--jc-2); color: var(--jc-text-2); }
+.jc-list > li::before {
+  content: "—"; flex: none; color: var(--jc-text-3); font-family: var(--jc-font-mono);
+}
+
+/* metric row — currency, ranges, anchors. Always mono + tabular. */
+.jc-metric { display: flex; align-items: baseline; justify-content: space-between; gap: var(--jc-3); }
+.jc-metric__label { font-size: var(--jc-text-xs); color: var(--jc-text-3); }
+.jc-metric__value {
+  font: 500 var(--jc-text-sm)/1.3 var(--jc-font-mono);
+  font-variant-numeric: tabular-nums; color: var(--jc-text);
+}
+.jc-metric--hero .jc-metric__value { font-size: var(--jc-text-xl); letter-spacing: -.02em; }
+
+/* ---------- 6. CONTROLS ---------- */
+
+.jc-btn {
+  --_bg: var(--jc-surface-3); --_fg: var(--jc-text); --_bd: var(--jc-border-strong);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 32px; padding: 0 var(--jc-3);
+  border-radius: var(--jc-radius-sm);
+  border: 1px solid var(--_bd); background: var(--_bg); color: var(--_fg);
+  font: 500 var(--jc-text-xs)/1 var(--jc-font);
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--jc-dur-fast) var(--jc-ease),
+              border-color var(--jc-dur-fast) var(--jc-ease),
+              color var(--jc-dur-fast) var(--jc-ease);
+}
+.jc-btn:hover { --_bg: var(--jc-surface-2); }
+.jc-btn[data-variant="primary"] {
+  background: linear-gradient(180deg, #1E79C0 0%, #0D4576 100%);
+  color: var(--jc-accent-ink);
+  border: 1px solid transparent;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(22, 78, 134, 0.28);
+}
+.jc-btn[data-variant="primary"]:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 16px rgba(22, 78, 134, 0.38);
+}
+/* Red brand CTA — used for top-level primary actions rendered on the
+   cream chrome (Delete, destructive Sync flows). */
+.jc-btn[data-variant="brand"] {
+  background: var(--jaw-red);
+  color: var(--jaw-red-ink);
+  border: 1px solid transparent;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 0 14px;
+  min-height: 34px;
+}
+.jc-btn[data-variant="brand"]:hover { background: var(--jaw-red-hover); }
+
+/* Gold highlight CTA — the mockup's yellow "Sync with LinkedIn" pill.
+   Dark navy ink so the label reads on the bright gold background. */
+.jc-btn[data-variant="highlight"] {
+  background: var(--jaw-highlight);
+  color: #14293D;
+  border: 1px solid transparent;
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 0 14px;
+  min-height: 34px;
+}
+.jc-btn[data-variant="highlight"]:hover { background: #FFCD1F; }
+/* LinkedIn glyph on the gold CTA — the corporate blue reads fine on
+   gold, so no filter needed. */
+.jc-btn[data-variant="highlight"] .jc-li-icon { filter: none; }
+.jc-btn[data-variant="ghost"] { --_bg: transparent; --_bd: transparent; --_fg: var(--jc-text-2); }
+.jc-btn[data-variant="ghost"]:hover { --_bg: var(--jc-surface-2); --_fg: var(--jc-text); }
+.jc-btn[data-variant="danger"] { --_fg: var(--jc-neg); --_bd: var(--jc-neg-line); --_bg: var(--jc-neg-weak); }
+.jc-btn[data-size="sm"] { min-height: 26px; padding: 0 var(--jc-2); font-size: var(--jc-text-2xs); }
+.jc-btn[data-icon-only] { width: 32px; padding: 0; }
+.jc-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Compact icon-only action button — used inline in the Jawboard row
+   for the Delete affordance. Neutral by default; `--danger` variant
+   tints icon + hover to the negative palette so it reads as a
+   destructive action without shouting for attention until hover. */
+.jc-icon-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  border-radius: var(--jc-radius-sm);
+  cursor: pointer;
+  color: var(--jc-text-3);
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle;
+  transition: background var(--jc-dur-fast) var(--jc-ease),
+              color var(--jc-dur-fast) var(--jc-ease);
+}
+.jc-icon-btn:hover { background: var(--jc-surface-2); color: var(--jc-text); }
+.jc-icon-btn--danger:hover {
+  background: var(--jc-neg-weak);
+  color: var(--jc-neg);
+}
+.jc-icon-btn:focus-visible {
+  outline: 2px solid var(--jc-accent);
+  outline-offset: 1px;
+}
+/* Buttons that pair a leading icon with a text label — gap so the
+   icon doesn't crush against the label. */
+.jc-btn--icon-lead { gap: 6px; }
+
+/* Small "opens in a new tab" glyph appended to buttons/links whose
+   click leaves the current view (Details → Recall in a new tab,
+   corp-site search → external Google, live posting → LinkedIn).
+   Sits slightly above the baseline and reads muted so it never
+   competes with the label. */
+.jc-ext-icon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.85em;
+  line-height: 1;
+  opacity: 0.75;
+  transform: translateY(-1px);
+}
+/* Leading arrow on the Jawbar "Details" button — hints that clicking
+   loads the full-page detail view. Mirror of .jc-ext-icon but on the
+   left side and slightly bolder so it reads as a directional cue
+   rather than a decoration. */
+.jc-details-arrow {
+  display: inline-block;
+  margin-right: 4px;
+  font-size: 0.95em;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+/* LinkedIn brand mark used inline on any link that points to
+   linkedin.com — a jawb posting, a person's profile, or a search
+   URL. Replaces the generic ↗ external-link glyph on those links so
+   the destination is instantly recognizable. */
+.jc-li-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  vertical-align: -3px;
+  margin-left: 4px;
+  flex: none;
+}
+/* Variant when the icon sits between words ("Open [LinkedIn] Jawbs")
+   rather than trailing a label. Kills the built-in left margin so
+   the surrounding text-node spaces alone control the gap. */
+.jc-li-icon--inline { margin-left: 0; }
+/* LinkedIn glyph on the red brand CTA — the SVG is authored in its
+   corporate blue, which vanishes against the red. Filter it to solid
+   white so it reads. */
+.jc-li-icon--onbrand { filter: brightness(0) invert(1); }
+
+.jc-btn-row { display: flex; flex-wrap: wrap; gap: var(--jc-2); }
+
+.jc-input, .jc-textarea, .jc-select {
+  width: 100%; padding: 10px var(--jc-3);
+  background: var(--jc-surface-input); color: var(--jc-text);
+  border: 1px solid var(--jc-border-strong); border-radius: var(--jc-radius-sm);
+  font: 400 var(--jc-text-sm)/1.5 var(--jc-font); resize: vertical;
+  transition: border-color var(--jc-dur-fast) var(--jc-ease),
+              box-shadow var(--jc-dur-fast) var(--jc-ease);
+}
+.jc-input:focus, .jc-textarea:focus, .jc-select:focus {
+  outline: none;
+  border-color: var(--jc-accent);
+  box-shadow: 0 0 0 3px var(--jc-accent-weak);
+}
+.jc-input::placeholder, .jc-textarea::placeholder { color: var(--jc-text-3); }
+.jc-textarea { min-height: 72px; }
+
+.jc-tabs {
+  display: flex; gap: var(--jc-1); padding: var(--jc-1);
+  background: var(--jc-surface-2); border-radius: var(--jc-radius-sm);
+}
+.jc-tab {
+  flex: 1; min-height: 28px; border: 0; border-radius: 3px; cursor: pointer;
+  background: transparent; color: var(--jc-text-2);
+  font: 500 var(--jc-text-xs)/1 var(--jc-font);
+}
+.jc-tab[aria-selected="true"] { background: var(--jc-surface-3); color: var(--jc-text); }
+
+/* ---------- 7. ARTIFACT CARD (cover letter, tailored resume) ---------- */
+
+.jc-artifact {
+  display: flex; align-items: center; gap: var(--jc-3);
+  padding: var(--jc-4);
+  background: var(--jc-surface-1); border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
+  box-shadow: var(--jc-shadow-sm);
+}
+.jc-artifact__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jc-artifact__name { font-weight: 600; font-size: var(--jc-text-sm); }
+.jc-artifact__status { font: 400 var(--jc-text-xs)/1.3 var(--jc-font-mono); color: var(--jc-text-3); }
+.jc-artifact__actions { margin-left: auto; display: flex; gap: var(--jc-2); }
+
+/* ---------- 8. STATES ---------- */
+
+/* empty */
+.jc-empty {
+  padding: var(--jc-6) var(--jc-4); text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: var(--jc-3);
+  border: 1px dashed var(--jc-border-strong); border-radius: var(--jc-radius);
+  color: var(--jc-text-2);
+}
+.jc-empty__title { font-weight: 600; color: var(--jc-text); font-size: var(--jc-text-sm); }
+
+/* Quick-launch cards inside the empty state — Jawboard and Settings, so
+   users can jump to those without hunting for the small header icons. */
+.jc-empty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jc-2);
+  width: 100%;
+  margin-top: var(--jc-3);
+}
+.jc-empty-card {
+  display: flex; align-items: center; gap: var(--jc-3);
+  padding: var(--jc-3) var(--jc-4);
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border-strong);
+  border-left: 3px solid var(--jc-accent);
+  border-radius: var(--jc-radius);
+  text-align: left;
+  cursor: pointer;
+  color: var(--jc-text);
+  transition: background var(--jc-dur-fast) var(--jc-ease),
+              border-color var(--jc-dur-fast) var(--jc-ease),
+              transform var(--jc-dur-fast) var(--jc-ease);
+}
+.jc-empty-card:hover {
+  background: var(--jc-accent-weak);
+  border-color: var(--jc-accent);
+  transform: translateY(-1px);
+}
+.jc-empty-card:focus-visible {
+  outline: 2px solid var(--jc-accent);
+  outline-offset: 2px;
+}
+.jc-empty-card__icon {
+  flex: none;
+  width: 38px; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--jc-accent-weak);
+  color: var(--jc-accent);
+  overflow: hidden;
+}
+/* Jawboard uses a real PNG icon (shark jaws) instead of an SVG glyph.
+   Sized to fully fill the 38px round slot without cropping the teeth. */
+.jc-empty-card__jaws {
+  width: 32px; height: 32px;
+  object-fit: contain;
+}
+.jc-empty-card__body {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
+}
+.jc-empty-card__title {
+  font: 600 var(--jc-text-sm)/1.2 var(--jc-font);
+  color: var(--jc-text);
+}
+/* Per-status breakdown under the Jawboard card's description. Only rows
+   with a count > 0 render, so the card grows with actual pipeline shape
+   instead of always showing a wall of zeros. */
+.jc-status-counts {
+  display: flex; flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+/* "Today" capture count on the Jawboard card. Positive count reads
+   in the accent-pos tone; zero-count reads muted so the card still
+   communicates state without shouting. */
+.jc-today-count {
+  display: block;
+  margin-top: 6px;
+  font: 700 var(--jc-text-2xs)/1.2 var(--jc-font-mono);
+  letter-spacing: .06em;
+  color: var(--jc-text-3);
+}
+.jc-today-count[data-tone='pos'] { color: var(--jc-pos); }
+.jc-today-count:empty { display: none; }
+/* Headline variant — used above the Jawboard section instead of
+   inside a card. Bumped size and a bit more breathing room. */
+.jc-today-count--headline {
+  font: 700 var(--jc-text-xs)/1.2 var(--jc-font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin: 0 0 var(--jc-3);
+}
+
+/* Last-thresh timestamp under the Jawboard card — muted, mono. */
+.jc-last-thresh {
+  display: block;
+  margin-top: 6px;
+  font: 500 var(--jc-text-2xs)/1.2 var(--jc-font-mono);
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--jc-text-3);
+}
+.jc-last-thresh:empty { display: none; }
+.jc-status-counts__row {
+  display: flex; align-items: baseline;
+  gap: var(--jc-2);
+  font: 500 var(--jc-text-xs)/1.3 var(--jc-font);
+  color: var(--jc-text-2);
+}
+.jc-status-counts__label { flex: 1; text-align: left; }
+.jc-status-counts__count {
+  flex: none;
+  font-family: var(--jc-font-mono);
+  font-weight: 600;
+  color: var(--jc-text);
+}
+/* Tone rows by their status so the pipeline shape reads visually. Terminal
+   states dim; active states pop. */
+.jc-status-counts__row[data-status='interviewing']         { color: var(--jc-pos); }
+.jc-status-counts__row[data-status='interviewing'] .jc-status-counts__count { color: var(--jc-pos); }
+.jc-status-counts__row[data-status='applied']              { color: var(--jc-info); }
+.jc-status-counts__row[data-status='applied'] .jc-status-counts__count      { color: var(--jc-info); }
+.jc-status-counts__row[data-status='inProgressClickedApply'],
+.jc-status-counts__row[data-status='inProgressDraft']      { color: var(--jc-caution); }
+.jc-status-counts__row[data-status='archived'],
+.jc-status-counts__row[data-status='notMovingForward']     { color: var(--jc-text-3); opacity: .75; }
+.jc-empty-card__desc {
+  font: 400 var(--jc-text-xs)/1.35 var(--jc-font);
+  color: var(--jc-text-2);
+}
+
+/* generating — skeleton lines + a token counter */
+.jc-skeleton {
+  height: 10px; border-radius: var(--jc-radius-pill);
+  background: linear-gradient(90deg, var(--jc-surface-2) 0%, var(--jc-surface-3) 50%, var(--jc-surface-2) 100%);
+  background-size: 200% 100%;
+  animation: jc-shimmer 1.4s linear infinite;
+}
+@keyframes jc-shimmer { to { background-position: -200% 0; } }
+.jc-caret {
+  display: inline-block; width: 7px; height: 1.05em; vertical-align: -2px;
+  background: var(--jc-accent); animation: jc-blink 1s steps(2, start) infinite;
+}
+@keyframes jc-blink { 50% { opacity: 0; } }
+/* Loading strip visualized as a shark fin swimming above the water line.
+   Subtle blue water tint fills the strip; a horizontal line at the bottom
+   is the "surface"; the fin sits on that line and slides left → right on
+   loop, with a small vertical bob. Bigger than the old 2px bar (22px)
+   because a fin needs vertical space to be recognizable. */
+/* Loading indicator = single strip with the shark-fin water animation as
+   the background and the "what am I doing" text overlaid on top. Fin
+   image (800×30, water-blue edges) tiles seamlessly; one-tile shift on
+   background-position makes a loop with no visual jump. */
+.jc-progress {
+  position: relative;
+  height: 30px;
+  min-height: 30px;
+  flex: none;
+  overflow: hidden;
+  background: var(--jaw-red);
+  display: block;
+}
+.jc-progress__bar {
+  position: absolute;
+  inset: 0;
+  background-image: url('../assets/shark-fin-progress-bar.png');
+  background-repeat: repeat-x;
+  background-size: 500px 30px;
+  background-position: 0 0;
+  animation: jc-fin-slide 4s linear infinite;
+}
+@keyframes jc-fin-slide {
+  from { background-position: 0 0; }
+  to   { background-position: 500px 0; }
+}
+/* Text overlays the fin. White type with a soft gray shadow so the
+   message stays legible while the fin scrolls beneath. */
+.jc-progress__msg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--jc-4);
+  font: 700 var(--jc-text-xs)/1 var(--jc-font);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(70, 70, 70, 0.7);
+  pointer-events: none;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jc-skeleton, .jc-caret, .jc-progress__bar { animation: none; }
+  .jc * { transition: none !important; }
+}
+
+/* notice — degraded scrape, missing key, hard error. Rank by tone,
+   never stack more than one at a time. */
+.jc-notice {
+  display: flex; gap: var(--jc-3); padding: var(--jc-3);
+  border-radius: var(--jc-radius-sm);
+  border: 1px solid var(--jc-caution-line); background: var(--jc-caution-weak);
+  color: var(--jc-text-2); font-size: var(--jc-text-xs);
+}
+.jc-notice__title {
+  color: var(--jc-caution); font: 600 var(--jc-text-2xs)/1.4 var(--jc-font-mono);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.jc-notice[data-tone="neg"] { border-color: var(--jc-neg-line); background: var(--jc-neg-weak); }
+.jc-notice[data-tone="neg"] .jc-notice__title { color: var(--jc-neg); }
+.jc-notice[data-tone="info"] { border-color: var(--jc-info-line); background: var(--jc-info-weak); }
+.jc-notice[data-tone="info"] .jc-notice__title { color: var(--jc-info); }
+.jc-notice__body { display: flex; flex-direction: column; gap: var(--jc-2); }
+
+/* ---------- 9. DIAGNOSTICS DRAWER ---------- */
+/* Extraction sources, DOM snapshot, token counts, model name. Muted by
+   design: mono, --jc-diag-text, collapsed by default. */
+
+.jc-diag {
+  border: 1px solid var(--jc-diag-line); border-radius: var(--jc-radius-sm);
+  background: var(--jc-diag-surface);
+  font-family: var(--jc-font-mono); font-size: var(--jc-text-xs);
+  color: var(--jc-diag-text);
+}
+.jc-diag > summary {
+  list-style: none; cursor: pointer; padding: var(--jc-2) var(--jc-3);
+  display: flex; align-items: center; gap: var(--jc-2);
+  letter-spacing: .06em; text-transform: uppercase; font-size: var(--jc-text-3xs);
+}
+.jc-diag > summary::-webkit-details-marker { display: none; }
+.jc-diag__grid {
+  padding: 0 var(--jc-3) var(--jc-3);
+  display: grid; grid-template-columns: auto 1fr; gap: 3px var(--jc-3);
+  font-size: var(--jc-text-3xs); line-height: 1.6;
+}
+.jc-diag__grid dt { color: var(--jc-text-3); }
+.jc-diag__grid dd { margin: 0; color: var(--jc-diag-text); overflow-wrap: anywhere; }
+.jc-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: var(--jc-pos);
+}
+.jc-dot[data-tone="caution"] { background: var(--jc-caution); }
+.jc-dot[data-tone="neg"] { background: var(--jc-neg); }
+
+.jc-footnote {
+  font: 400 var(--jc-text-3xs)/1.5 var(--jc-font-mono);
+  color: var(--jc-text-3); letter-spacing: .03em;
+}
+
+/* ---------- 10. FULL-SCREEN JOB GRID (planned view) ---------- */
+/* Same tokens, wider container. Cards reuse .jc-card; the score chip
+   and verdict pill carry over unchanged so the two views read as one
+   product. */
+
+.jc-page {
+  min-height: 100vh; background: var(--jc-bg); color: var(--jc-text);
+  font: 400 var(--jc-text-sm)/var(--jc-leading-body) var(--jc-font);
+}
+.jc-toolbar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: var(--jc-3);
+  padding: 12px var(--jc-6);
+  /* Cream chrome + red brand-line matches the sidepanel header so
+     every Jawboard surface reads as one product. Text lands on the
+     cream background as dark navy, not white. */
+  background: var(--jaw-cream);
+  color: var(--jc-text);
+  border-bottom: 3px solid var(--jaw-red);
+  min-height: 66px;
+}
+/* Shared toolbar wordmark layout — logo + Anton brand + divider + mono
+   subtitle. Individual pages can bump the logo size in their own CSS. */
+.jc-toolbar .jc__wordmark { display: inline-flex; align-items: baseline; gap: 14px; }
+.jc-toolbar .jc__brand-logo { width: 40px; height: 40px; align-self: center; }
+.jc-toolbar .toolbar-sep {
+  display: inline-block;
+  width: 1px; height: 26px;
+  background: var(--jaw-cream-line);
+  align-self: center;
+}
+.jc-toolbar .toolbar-count {
+  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--jc-text-2);
+}
+.jc-grid {
+  display: grid; gap: var(--jc-3); padding: var(--jc-5);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}

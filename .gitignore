@@ -1,0 +1,59 @@
+# ---- Editor / OS ----
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ---- IDE ----
+.vscode/
+.idea/
+*.iml
+
+# ---- Node ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ---- Claude Code local settings (per-user) ----
+.claude/
+
+# ---- Personal data — NEVER commit ----
+# The extension stores everything in chrome.storage.local at runtime; anything
+# below is a local export/scratch file that must stay out of version control.
+personal-data.json
+*.backup.json
+*-export-*.json
+jawboard-export*.json
+job-thresher-export*.json
+scratch/
+notes/
+
+# ---- Build / dist ----
+dist/
+build/
+*.zip
+*.crx
+*.pem
+
+# ---- Logs ----
+*.log
+
+# ---- Secrets — defense in depth ----
+# Anthropic keys live in chrome.storage.local at runtime; nothing that
+# smells like a secret should ever land in a working tree.
+.env
+.env.*
+*.key
+*credentials*
+*secret*
+*backup_code*
+
+# ---- Non-runtime assets ----
+# Large or design-source files that were sitting in the extension folder
+# during development but don't belong in the shipped or public repo.
+assets/Antigravity.dmg
+assets/BrowserExtensionSingleJobInJawbarMockup.zip
+assets/*.pxz
