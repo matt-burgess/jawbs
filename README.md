@@ -63,22 +63,23 @@ Not on the Chrome Web Store yet. Two ways to get it running.
 
 Best for anyone who doesn't want to touch `git`. Five minutes end-to-end.
 
-**Step 1 — Download the zip.** One click:
+**Step 1 — Download the zip.** One click — this link always returns
+the latest build from `main`:
 
 <p align="center">
-  <a href="https://github.com/matt-burgess/jawbs/releases/latest/download/jawbs.zip"><b>⬇ &nbsp; Download jawbs.zip &nbsp; ⬇</b></a>
+  <a href="https://github.com/matt-burgess/jawbs/archive/refs/heads/main.zip"><b>⬇ &nbsp; Download the latest Jawbs zip &nbsp; ⬇</b></a>
 </p>
 
-Prefer the bleeding-edge `main` branch or a specific tagged version?
-Grab either from [Releases](https://github.com/matt-burgess/jawbs/releases/latest).
+Prefer a specific tagged version? Grab one from
+[Releases](https://github.com/matt-burgess/jawbs/releases/latest).
 
 <p align="center">
   <img src="docs/install/step-1-download.svg" width="640" alt="Screenshot: the direct download link on the Jawbs GitHub repo" />
 </p>
 
 **Step 2 — Unzip it somewhere permanent.** You'll get a folder named
-`jawbs`. Save it in Documents, ~/Applications, wherever — just don't
-move the folder afterwards or the extension will break.
+`jawbs-main`. Save it in Documents, ~/Applications, wherever — just
+don't move the folder afterwards or the extension will break.
 
 <p align="center">
   <img src="docs/install/step-2-unzip.svg" width="480" alt="Screenshot: unzipped jawbs folder shown in Finder / File Explorer" />
