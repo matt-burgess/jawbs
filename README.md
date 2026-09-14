@@ -24,6 +24,22 @@
 
 ---
 
+## See it in action
+
+The **Jawbar** side panel sits next to every LinkedIn job posting — one click gives you a fit score, comp read, and tailored paperwork.
+
+<p align="center">
+  <img src="docs/screenshots/jawbar-in-linkedin.png" width="900" alt="The Jawbs side panel showing a fit-score, comp range, connection callout, and Cast / Bait analysis buttons next to a LinkedIn Engineering Manager, Information Security posting" />
+</p>
+
+The **Jawboard** is your permanent archive — every jawb you've saved, applied to, or interviewed for, scored and sortable, with an overview of your pipeline on the right.
+
+<p align="center">
+  <img src="docs/screenshots/jawboard-full-archive.png" width="900" alt="The Jawbs Jawboard showing a table of five example roles across every shark tier — Chief of Police (interviewing), LinkedIn Head of Product Job Search (applied), Shark Hunter (saved), LinkedIn Senior Data Scientist (applied), Marine Biologist (analyzed) — with pipeline strip, strength scores, and comp ranges" />
+</p>
+
+---
+
 ## Why
 
 LinkedIn's job UI optimizes for LinkedIn, not for you. Jawbs adds the **Jawbar** — a persistent side panel that reads the posting you're looking at, cross-references it against your own profile / resume / preferences, and answers the questions you actually have:

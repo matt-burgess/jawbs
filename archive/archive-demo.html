@@ -1,0 +1,267 @@
+<!doctype html>
+<!--
+  Jawboard demo page — a static snapshot pre-populated with fake, non-real
+  people/companies for public sharing (screenshots, docs, README).
+  Every name, salary, and analysis in this file is invented. No real user
+  data lives here. Do not load this file as part of the extension — it has
+  no wiring and duplicates the Jawboard's markup for illustration only.
+-->
+<html data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Jawbs · Jawboard (demo)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="../styles/job-copilot.css" />
+    <link rel="stylesheet" href="archive.css" />
+  </head>
+  <body>
+    <div class="jc-page">
+      <header class="jc-toolbar">
+        <div class="toolbar-left">
+          <span class="jc__wordmark">
+            <img class="jc__brand-logo" src="../assets/jawb-logo.png" alt="" aria-hidden="true" />
+            <span class="jc-brand jc-brand--xl">Jawboard</span>
+            <span class="toolbar-sep" aria-hidden="true"></span>
+            <span id="count" class="toolbar-count">170 jawbs in the water</span>
+          </span>
+        </div>
+        <div class="toolbar-actions">
+          <button class="jc-btn" data-variant="highlight" type="button" title="Sync with LinkedIn — walks every tracker stage and shows a diff you can resolve per-row.">
+            <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true">
+            <span>Sync with LinkedIn</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="jc-jb-board">
+        <!-- Pipeline strip — colored segments per stage, count on each.
+             Widths are proportional to the count. -->
+        <div class="jc-jb-pipeline" id="pipelineStrip">
+          <button class="jc-jb-pipeline__seg" data-stage="saved" type="button" style="flex: 28" title="Saved: 28 jawbs">
+            <span class="jc-jb-pipeline__count">28</span>
+            <span class="jc-jb-pipeline__label">Saved</span>
+            <span class="jc-jb-pipeline__bar"></span>
+          </button>
+          <button class="jc-jb-pipeline__seg" data-stage="inProgressClickedApply" type="button" style="flex: 6" title="In Progress: 6 jawbs">
+            <span class="jc-jb-pipeline__count">6</span>
+            <span class="jc-jb-pipeline__label">In Progress</span>
+            <span class="jc-jb-pipeline__bar"></span>
+          </button>
+          <button class="jc-jb-pipeline__seg" data-stage="applied" type="button" style="flex: 56" title="Applied: 56 jawbs">
+            <span class="jc-jb-pipeline__count">62</span>
+            <span class="jc-jb-pipeline__label">Applied</span>
+            <span class="jc-jb-pipeline__bar"></span>
+          </button>
+          <button class="jc-jb-pipeline__seg" data-stage="interviewing" type="button" style="flex: 5" title="Interviewing: 5 jawbs">
+            <span class="jc-jb-pipeline__count">5</span>
+            <span class="jc-jb-pipeline__label">Interviewing</span>
+            <span class="jc-jb-pipeline__bar"></span>
+          </button>
+          <button class="jc-jb-pipeline__seg" data-stage="archived" type="button" style="flex: 44" title="Archived: 44 jawbs">
+            <span class="jc-jb-pipeline__count">44</span>
+            <span class="jc-jb-pipeline__label">Archived</span>
+            <span class="jc-jb-pipeline__bar"></span>
+          </button>
+          <button class="jc-jb-pipeline__seg" data-stage="notMovingForward" type="button" style="flex: 24" title="Not Moving Forward: 24 jawbs">
+            <span class="jc-jb-pipeline__count">24</span>
+            <span class="jc-jb-pipeline__label">Not Moving Forward</span>
+            <span class="jc-jb-pipeline__bar"></span>
+          </button>
+        </div>
+
+        <div class="controls">
+          <div class="controls__search">
+            <span class="controls__search-icon" aria-hidden="true">🔍</span>
+            <input class="jc-input controls__search-input" type="search" placeholder="Search title, company, description, notes, interviewers…  (press / to focus)" />
+          </div>
+          <select class="jc-select">
+            <option value="">All statuses</option>
+          </select>
+          <select class="jc-select">
+            <option value="">All waters</option>
+          </select>
+          <label class="controls__toggle">
+            <input type="checkbox" />
+            <span>Show Archived</span>
+          </label>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-select"><input type="checkbox" /></th>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Strength</th>
+                <th>People</th>
+                <th>Captured</th>
+                <th>Interview</th>
+                <th>Comp Lo</th>
+                <th>Comp Hi</th>
+              </tr>
+            </thead>
+            <tbody>
+
+              <!-- Row 1 — Great white / Interviewing
+                   Chief Brody's job: small-town Chief of Police. -->
+              <tr data-tier="great-white" title="Captured from LinkedIn">
+                <td class="col-select"><input type="checkbox" class="row-select" /></td>
+                <td class="col-title">
+                  <div class="col-title__wrap">
+                    <div class="col-title__row">
+                      <span class="col-title__text clickable">Chief of Police</span>
+                    </div>
+                    <a class="col-title__company" href="#" target="_blank" rel="noopener noreferrer">Town of Amity, NY</a>
+                  </div>
+                </td>
+                <td><span class="status-badge status-interviewing" data-status="interviewing">Interviewing</span></td>
+                <td class="col-strength">
+                  <span class="strength-cell" data-tier="great-white" title="Great white — top of the food chain">
+                    <span class="strength-cell__row strength-cell__row--head">
+                      <span class="strength-cell__score">91</span>
+                      <img class="strength-cell__shark" src="../assets/shark-great-white.png" alt="Great white shark" width="69" height="42" />
+                    </span>
+                  </span>
+                </td>
+                <td class="col-people-wrap"><span>4</span></td>
+                <td class="col-captured">Sep 8, 2026</td>
+                <td class="col-interview-wrap"><span class="col-interview col-interview--upcoming" title="Next interview: Sep 22, 2026">Sep 22, 2026</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num">$85K</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num col-comp-num--hi">$125K</span></td>
+              </tr>
+
+              <!-- Row 2 — Tiger / Applied
+                   LinkedIn's Jobs product leader. -->
+              <tr data-tier="tiger" title="Captured from LinkedIn">
+                <td class="col-select"><input type="checkbox" class="row-select" /></td>
+                <td class="col-title">
+                  <div class="col-title__wrap">
+                    <div class="col-title__row">
+                      <span class="col-title__text clickable">Head of Product, Job Search</span>
+                    </div>
+                    <a class="col-title__company" href="#" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                  </div>
+                </td>
+                <td><span class="status-badge status-applied" data-status="applied">Applied</span></td>
+                <td class="col-strength">
+                  <span class="strength-cell" data-tier="tiger" title="Tiger shark — strong candidate">
+                    <span class="strength-cell__row strength-cell__row--head">
+                      <span class="strength-cell__score">78</span>
+                      <img class="strength-cell__shark" src="../assets/shark-tiger.png" alt="Tiger shark" width="69" height="42" />
+                    </span>
+                  </span>
+                </td>
+                <td class="col-people-wrap"><span>8</span></td>
+                <td class="col-captured">Sep 5, 2026</td>
+                <td class="col-interview-wrap"><span class="col-empty">—</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num">$95K</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num col-comp-num--hi">$195K</span></td>
+              </tr>
+
+              <!-- Row 3 — Bull / Saved
+                   Quint's job: shark-hunting boat captain. -->
+              <tr data-tier="bull" title="Captured from LinkedIn">
+                <td class="col-select"><input type="checkbox" class="row-select" /></td>
+                <td class="col-title">
+                  <div class="col-title__wrap">
+                    <div class="col-title__row">
+                      <span class="col-title__text clickable">Shark Hunter &amp; Vessel Captain</span>
+                    </div>
+                    <a class="col-title__company" href="#" target="_blank" rel="noopener noreferrer">Orca Fishing Co.</a>
+                  </div>
+                </td>
+                <td><span class="status-badge status-saved" data-status="saved">Saved</span></td>
+                <td class="col-strength">
+                  <span class="strength-cell" data-tier="bull" title="Bull shark — solid contender">
+                    <span class="strength-cell__row strength-cell__row--head">
+                      <span class="strength-cell__score">66</span>
+                      <img class="strength-cell__shark" src="../assets/shark-bull.png" alt="Bull shark" width="69" height="42" />
+                    </span>
+                  </span>
+                </td>
+                <td class="col-people-wrap"><span>1</span></td>
+                <td class="col-captured">Sep 1, 2026</td>
+                <td class="col-interview-wrap"><span class="col-empty">—</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num">$55K</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num col-comp-num--hi">$95K</span></td>
+              </tr>
+
+              <!-- Row 4 — Mako / Applied
+                   LinkedIn Jobs recommender team. -->
+              <tr data-tier="mako" title="Captured from LinkedIn">
+                <td class="col-select"><input type="checkbox" class="row-select" /></td>
+                <td class="col-title">
+                  <div class="col-title__wrap">
+                    <div class="col-title__row">
+                      <span class="col-title__text clickable">Senior Data Scientist, Jobs Recommendations</span>
+                    </div>
+                    <a class="col-title__company" href="#" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                  </div>
+                </td>
+                <td><span class="status-badge status-applied" data-status="applied">Applied</span></td>
+                <td class="col-strength">
+                  <span class="strength-cell" data-tier="mako" title="Mako shark — worth a closer look">
+                    <span class="strength-cell__row strength-cell__row--head">
+                      <span class="strength-cell__score">54</span>
+                      <img class="strength-cell__shark" src="../assets/shark-mako.png" alt="Mako shark" width="69" height="42" />
+                    </span>
+                  </span>
+                </td>
+                <td class="col-people-wrap"><span>3</span></td>
+                <td class="col-captured">Aug 28, 2026</td>
+                <td class="col-interview-wrap"><span class="col-empty">—</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num">$90K</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num col-comp-num--hi">$180K</span></td>
+              </tr>
+
+              <!-- Row 5 — Nurse / Analyzed
+                   Matt Hooper's world: elasmobranch research. -->
+              <tr data-tier="nurse" title="Captured from LinkedIn">
+                <td class="col-select"><input type="checkbox" class="row-select" /></td>
+                <td class="col-title">
+                  <div class="col-title__wrap">
+                    <div class="col-title__row">
+                      <span class="col-title__text clickable">Marine Biologist, Elasmobranch Research</span>
+                    </div>
+                    <a class="col-title__company" href="#" target="_blank" rel="noopener noreferrer">Woods Hole Oceanographic Institution</a>
+                  </div>
+                </td>
+                <td><span class="status-badge status-analyzed" data-status="analyzed">Analyzed</span></td>
+                <td class="col-strength">
+                  <span class="strength-cell" data-tier="nurse" title="Nurse shark — weak fit">
+                    <span class="strength-cell__row strength-cell__row--head">
+                      <span class="strength-cell__score">42</span>
+                      <img class="strength-cell__shark" src="../assets/shark-nurse.png" alt="Nurse shark" width="69" height="42" />
+                    </span>
+                  </span>
+                </td>
+                <td class="col-people-wrap"><span>2</span></td>
+                <td class="col-captured">Aug 20, 2026</td>
+                <td class="col-interview-wrap"><span class="col-empty">—</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num">$70K</span></td>
+                <td class="col-comp-cell"><span class="col-comp-num col-comp-num--hi">$115K</span></td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer summary strip inside the board card — count of what
+             the table currently shows plus a stale-jobs nudge. -->
+        <div class="jc-jb-board__foot" id="boardFoot">
+          <span id="boardSummary" class="jc-jb-board__summary">Showing 5 of 170 · sorted by strength score</span>
+          <span id="boardStale" class="jc-jb-board__stale">3 jawbs going stale — no move in 21+ days</span>
+        </div>
+      </div>
+
+      <footer class="jawboard-footer">
+        <button class="jc-btn" data-size="sm" type="button">Export JSON</button>
+        <button class="jc-btn" data-size="sm" type="button">Export CSV</button>
+        <label class="jc-btn" data-size="sm">Import JSON</label>
+      </footer>
+    </div>
+  </body>
+</html>
