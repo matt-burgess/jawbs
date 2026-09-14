@@ -1,0 +1,78 @@
+# Auto-build a shippable Jawbs zip on every push to main.
+#
+# Produces `jawbs.zip` containing a top-level `jawbs/` folder (so
+# double-clicking the zip yields a clean `jawbs/` directory that
+# users select in Chrome's Load unpacked).
+#
+# The zip is published to a rolling GitHub Release tagged `continuous`.
+# make_latest: false keeps the "Latest release" badge on whichever real
+# versioned release is current, so this rolling build doesn't compete
+# with proper v0.x.0 releases in the sidebar.
+#
+# Stable download URL: this file's whole reason for existing.
+#   https://github.com/matt-burgess/jawbs/releases/download/continuous/jawbs.zip
+
+name: Build continuous release
+
+on:
+  push:
+    branches: [main]
+  # Also allow manual re-runs from the Actions tab if a release upload
+  # ever fails and needs a nudge without a code change.
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # required to create/update the release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Build jawbs.zip
+        run: |
+          set -euo pipefail
+          BUILD_DIR="$(mktemp -d)"
+          # Copy the extension into a clean `jawbs/` folder inside the
+          # build dir. Exclude dev artifacts + design sources that don't
+          # belong in the shipped extension.
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.claude' \
+            --exclude='.DS_Store' \
+            --exclude='docs' \
+            --exclude='node_modules' \
+            --exclude='assets/Antigravity.dmg' \
+            --exclude='assets/BrowserExtensionSingleJobInJawbarMockup.zip' \
+            --exclude='assets/*.pxz' \
+            --exclude='CONTRIBUTING.md' \
+            ./ "$BUILD_DIR/jawbs/"
+          (cd "$BUILD_DIR" && zip -r jawbs.zip jawbs)
+          mv "$BUILD_DIR/jawbs.zip" "$GITHUB_WORKSPACE/jawbs.zip"
+          ls -lh "$GITHUB_WORKSPACE/jawbs.zip"
+
+      - name: Publish to `continuous` release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: continuous
+          name: Continuous build (main)
+          body: |
+            **Auto-built from the latest push to `main`.**
+
+            Commit: `${{ github.sha }}`
+            Built at: `${{ github.event.head_commit.timestamp }}`
+
+            Grab `jawbs.zip` below — unzip and load the `jawbs/` folder
+            in Chrome via **Load unpacked**. See the
+            [Install section](https://github.com/matt-burgess/jawbs#install)
+            for the full walkthrough.
+
+            This rolling release is regenerated automatically. Tagged
+            versioned releases (`v0.x.y`) live in the Releases sidebar
+            and are the official cut points.
+          make_latest: false
+          prerelease: false
+          files: jawbs.zip
