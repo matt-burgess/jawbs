@@ -1,0 +1,420 @@
+/* Setup wizard — sits on top of the shared job-copilot.css tokens and
+   reuses the toolbar / modal treatments from welcome.css. Focused on
+   one-step-per-screen scannability: big lead, one input area, sticky
+   nav at the bottom. */
+
+.setup-page { background: transparent; }
+
+/* Progress dots — one per step, filled up to the current one. Sits
+   between the toolbar and the wizard shell. */
+.setup-dots {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 18px var(--jc-4) 8px;
+  background: var(--jaw-cream);
+  border-bottom: 1px solid var(--jaw-cream-line);
+}
+.setup-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 700 12px/1 var(--jc-font-mono);
+  cursor: pointer;
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jaw-cream-line);
+  color: var(--jc-text-2);
+  transition: transform var(--jc-dur-fast) var(--jc-ease);
+}
+.setup-dot:hover { transform: scale(1.06); }
+.setup-dot[data-state="past"] {
+  background: var(--jc-pos-weak);
+  border-color: var(--jc-pos-line);
+  color: var(--jc-pos);
+}
+.setup-dot[data-state="now"] {
+  background: var(--jaw-red);
+  border-color: var(--jaw-red);
+  color: var(--jaw-cream);
+  transform: scale(1.15);
+  box-shadow: 0 6px 12px -4px rgba(204, 0, 0, .4);
+}
+.setup-dot[data-state="next"] {
+  color: var(--jc-text-3);
+  opacity: .8;
+}
+
+.setup-shell {
+  max-width: 780px;
+  margin: var(--jc-6) auto var(--jc-8);
+  padding: var(--jc-6) var(--jc-6) 0;
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px -30px rgba(11, 51, 88, .28), var(--jc-shadow);
+  display: flex; flex-direction: column;
+  gap: var(--jc-5);
+}
+
+.setup-step {
+  display: flex; flex-direction: column;
+  gap: var(--jc-4);
+  min-height: 380px;
+}
+/* Cap the width of single-input steps so full-width text fields
+   don't stretch across a 1600px viewport. */
+.setup-step .jc-input,
+.setup-step .jc-select { max-width: 480px; }
+.setup-step .jc-textarea { max-width: 100%; }
+.setup-step__head {
+  display: flex; flex-direction: column;
+  gap: 8px;
+  padding-bottom: var(--jc-3);
+  border-bottom: 3px solid var(--jaw-red);
+}
+.setup-step__eyebrow {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--jaw-red);
+}
+.setup-step__title {
+  margin: 0;
+  font: 700 32px/1.1 var(--jc-font);
+  letter-spacing: -.02em;
+  color: var(--jc-text);
+}
+.setup-step__lead {
+  margin: 0;
+  font: 400 var(--jc-text-md)/1.55 var(--jc-font);
+  color: var(--jc-text-2);
+}
+.setup-step__body {
+  display: flex; flex-direction: column;
+  gap: var(--jc-3);
+}
+
+/* Intro / done screens share the same content style. */
+.setup-intro-list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.setup-intro-list li {
+  position: relative;
+  padding: 10px 14px 10px 42px;
+  background: var(--jc-surface-2);
+  border-radius: var(--jc-radius-sm);
+  font-size: var(--jc-text-sm);
+  line-height: 1.5;
+  color: var(--jc-text);
+}
+.setup-intro-list li::before {
+  content: "";
+  position: absolute; left: 12px; top: 12px;
+  width: 20px; height: 20px;
+  background: url('../assets/chum-barrel.png') center / contain no-repeat;
+}
+.setup-intro-list li strong { color: var(--jaw-red); font-weight: 700; }
+.setup-intro-note {
+  margin: 0;
+  padding: var(--jc-3);
+  background: var(--jc-caution-weak);
+  border-left: 3px solid var(--jc-caution);
+  border-radius: 6px;
+  font-size: var(--jc-text-sm);
+  color: var(--jc-text);
+}
+.setup-intro-note b { color: var(--jaw-red); }
+
+.setup-done { display: flex; flex-direction: column; gap: var(--jc-3); }
+.setup-done p { margin: 0; font-size: var(--jc-text-md); }
+
+/* Privacy stance — pinned below the wizard shell on every step. */
+.setup-privacy {
+  max-width: 960px;
+  margin: 0 auto var(--jc-8);
+  padding: 0 var(--jc-5);
+}
+
+/* Welcome-step hero art — the Big Catch boat. Centered, full-width
+   of the wizard card with rounded corners so it reads as a framed
+   illustration, not raw image bleed. */
+.setup-welcome-art {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+.setup-welcome-art img {
+  width: 50%;
+  max-width: 50%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+}
+
+/* Done-step tip callout — captain portrait on the left, tip copy +
+   gold CTA on the right. The wizard's primary Next button already
+   opens LinkedIn, so this whole panel is dedicated to the tip ask. */
+.setup-tip {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--jc-6);
+  align-items: center;
+  padding: var(--jc-5);
+  background:
+    radial-gradient(80% 140% at 100% 100%, rgba(239,183,0,.20) 0%, rgba(239,183,0,0) 60%),
+    linear-gradient(180deg, #FDF6E0 0%, #FBEAB6 100%);
+  border: 1px solid var(--jc-caution-line);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px -30px rgba(11, 51, 88, .28);
+}
+.setup-tip__captain {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+}
+.setup-tip__copy {
+  display: flex; flex-direction: column;
+  gap: var(--jc-2);
+  margin: 0;
+}
+.setup-tip__eyebrow {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .16em; text-transform: uppercase;
+  color: #7A5400;
+}
+.setup-tip__title {
+  margin: 0;
+  font: 700 26px/1.15 var(--jc-font);
+  letter-spacing: -.01em;
+  color: #14293D;
+}
+.setup-tip__desc {
+  margin: 0;
+  font-size: var(--jc-text-md);
+  line-height: 1.5;
+  color: #473300;
+  max-width: 46ch;
+}
+.setup-tip__cta {
+  align-self: flex-start;
+  margin-top: var(--jc-2);
+  min-height: 56px;
+  padding: 0 22px;
+  gap: 12px;
+  font: 700 var(--jc-text-md)/1 var(--jc-font);
+}
+.setup-tip__jar {
+  width: 44px; height: 44px;
+  object-fit: contain;
+  flex: none;
+}
+@media (max-width: 620px) {
+  .setup-tip { grid-template-columns: 1fr; text-align: center; }
+  .setup-tip__captain { max-width: 200px; margin: 0 auto; }
+  .setup-tip__desc { margin-left: auto; margin-right: auto; }
+  .setup-tip__cta { align-self: center; }
+}
+
+/* AI-helper callout — sits above every textarea step. Gold band with
+   explicit copy so first-time users see the "outsource this to your
+   AI" affordance before they meet a blank textbox. */
+.setup-ai-helper {
+  display: flex; align-items: center; gap: var(--jc-4);
+  padding: var(--jc-4);
+  background: linear-gradient(180deg, #FDF6E0 0%, #FBEAB6 100%);
+  border: 1px solid var(--jc-caution-line);
+  border-left: 4px solid var(--jaw-highlight);
+  border-radius: var(--jc-radius);
+}
+.setup-ai-helper__body {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.setup-ai-helper__eyebrow {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .14em; text-transform: uppercase;
+  color: #7A5400;
+}
+.setup-ai-helper__title {
+  margin: 0;
+  font: 700 var(--jc-text-md)/1.2 var(--jc-font);
+  color: #14293D;
+}
+.setup-ai-helper__desc {
+  margin: 0;
+  font: 400 var(--jc-text-sm)/1.5 var(--jc-font);
+  color: #473300;
+}
+.setup-ai-helper__actions {
+  flex: none;
+  display: flex; flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+.setup-ai-helper__cta {
+  min-height: 44px;
+  padding: 0 18px;
+  font-weight: 700;
+  justify-content: center;
+}
+.setup-ai-helper__load {
+  min-height: 40px;
+  padding: 0 16px;
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-caution-line);
+  color: var(--jc-text);
+  font: 500 var(--jc-text-xs)/1 var(--jc-font);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--jc-radius-sm);
+}
+.setup-ai-helper__load:hover {
+  border-color: var(--jaw-red);
+  color: var(--jaw-red);
+}
+@media (max-width: 620px) {
+  .setup-ai-helper { flex-direction: column; align-items: stretch; }
+  .setup-ai-helper__actions { flex-direction: column; }
+}
+
+/* Field / input treatment */
+.setup-field {
+  display: flex; flex-direction: column;
+  gap: 6px;
+}
+.setup-field__label {
+  font: 700 var(--jc-text-xs)/1 var(--jc-font);
+  color: var(--jc-text);
+}
+.setup-field__hint {
+  font: 400 var(--jc-text-2xs)/1.4 var(--jc-font);
+  color: var(--jc-text-3);
+}
+.setup-comp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--jc-3);
+}
+
+.setup-note {
+  margin: 0;
+  font: 400 var(--jc-text-xs)/1.4 var(--jc-font);
+  color: var(--jc-text-3);
+  padding-top: var(--jc-2);
+  border-top: 1px solid var(--jc-border);
+}
+.setup-note a { color: var(--jaw-red); font-weight: 600; }
+
+/* Sticky nav bar at the bottom of the shell */
+.setup-nav {
+  display: flex; align-items: center; gap: var(--jc-2);
+  padding: var(--jc-3) 0;
+  margin: 0 calc(-1 * var(--jc-6));
+  padding-left: var(--jc-6);
+  padding-right: var(--jc-6);
+  border-top: 1px solid var(--jc-border);
+  background: var(--jc-surface-1);
+  position: sticky; bottom: 0;
+  z-index: 5;
+}
+.setup-nav__label {
+  margin: 0 auto;
+  text-align: center;
+  font-family: var(--jc-font-mono);
+  letter-spacing: .1em;
+  color: var(--jc-text-3);
+}
+.setup-nav .jc-btn[data-variant="primary"] { min-width: 180px; }
+/* Give the ghost Previous / Skip buttons a visible outline so they
+   don't render as plain text against the wizard's white surface. */
+.setup-nav .jc-btn[data-variant="ghost"],
+.jc-toolbar .toolbar-actions .jc-btn[data-variant="ghost"] {
+  --_bd: var(--jc-border-strong);
+  --_bg: transparent;
+  --_fg: var(--jc-text-2);
+}
+.setup-nav .jc-btn[data-variant="ghost"]:hover,
+.jc-toolbar .toolbar-actions .jc-btn[data-variant="ghost"]:hover {
+  --_bd: var(--jaw-red);
+  --_fg: var(--jaw-red);
+  --_bg: var(--jc-surface-2);
+}
+
+/* Modal — inline copy since welcome pages don't share options.css. */
+.jc-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--jc-4);
+}
+.jc-modal[hidden] { display: none; }
+.jc-modal__scrim {
+  position: absolute; inset: 0;
+  background: var(--jc-scrim, rgba(11, 51, 88, .45));
+}
+.jc-modal__panel {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: calc(100vh - 2 * var(--jc-4));
+  overflow-y: auto;
+  background: var(--jc-surface-1);
+  border-radius: var(--jc-radius);
+  box-shadow: var(--jc-shadow-xl);
+  padding: var(--jc-4) var(--jc-5);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+}
+.jc-modal__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--jc-2);
+  padding-bottom: var(--jc-3);
+  border-bottom: 3px solid var(--jaw-red);
+}
+.jc-modal__title {
+  margin: 0;
+  font-family: var(--jc-font-brand);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: .85;
+  text-transform: uppercase;
+  color: var(--jaw-red);
+  transform: scaleX(1.05);
+  transform-origin: left;
+}
+.jc-modal__close {
+  font: 700 22px/1 var(--jc-font);
+  color: var(--jc-text-3);
+  width: 30px; height: 30px;
+}
+.jc-modal__close:hover { color: var(--jaw-red); }
+.jc-modal__intro {
+  margin: 0;
+  font-size: var(--jc-text-sm);
+  line-height: 1.5;
+  color: var(--jc-text-2);
+}
+.jc-modal__body {
+  font: 400 12px/1.5 var(--jc-font-mono);
+  min-height: 260px;
+  background: var(--jc-surface-2);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius-sm);
+  padding: var(--jc-3);
+  white-space: pre-wrap;
+  resize: vertical;
+}
+.jc-modal__actions {
+  display: flex; align-items: center; gap: var(--jc-2);
+  flex-wrap: wrap;
+}
+.jc-modal__ai-links {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: auto;
+}
+.jc-modal__ai-links .jc-footnote { margin-right: 4px; }
+.jc-modal__foot {
+  margin: 0;
+  padding-top: var(--jc-2);
+  border-top: 1px solid var(--jc-border);
+}

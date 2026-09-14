@@ -1,4 +1,4 @@
-import { getApiKey, getLinkedInProfileUrl, getContactEmail, getContactPhone, getContactLocation, getCompTargets, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
+import { getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getLinkedInProfileUrl, getContactEmail, getContactPhone, getContactLocation, getCompTargets, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
 import { attachQuickFill } from '../lib/linkedInFill.js';
 import { estimateCostUsd, formatUsd } from '../lib/pricing.js';
 import { normalizeStatus, statusLabel, STATUS_ORDER } from '../lib/statuses.js';
@@ -2277,14 +2277,25 @@ async function init() {
   // whenever the user edits comp floor/target/walk-away.
   try { compTargets = await getCompTargets(); } catch { compTargets = null; }
 
-  const key = await getApiKey();
-  if (!key) {
+  // Check whichever provider is currently active. Nothing leaves the
+  // browser until the user provides a key for their chosen cloud AI.
+  const [provider, anthKey, oaKey, gmKey] = await Promise.all([
+    getCloudProvider(),
+    getApiKey(),
+    getOpenAIKey(),
+    getGeminiKey(),
+  ]);
+  const activeKey = provider === 'openai' ? oaKey : provider === 'gemini' ? gmKey : anthKey;
+  if (!activeKey) {
+    const providerLabel = provider === 'openai' ? 'OpenAI'
+                        : provider === 'gemini' ? 'Google Gemini'
+                        : 'Anthropic';
     els.statusText.textContent = '';
     els.noticeSlot.innerHTML = '';
     els.noticeSlot.append(h('div', { class: 'jc-notice', dataset: { tone: 'info' } },
       h('div', { class: 'jc-notice__body' },
         h('span', { class: 'jc-notice__title' }, 'API key required'),
-        h('span', {}, 'Add an Anthropic API key to run analyses. Nothing leaves your browser until you do.'),
+        h('span', {}, `Add an ${providerLabel} API key to run analyses, or switch to a different provider in Settings. Nothing leaves your browser until you do.`),
         h('button', {
           class: 'jc-btn', 'data-variant': 'primary', 'data-size': 'sm', type: 'button',
           style: 'align-self:flex-start',

@@ -61,23 +61,62 @@ Not on the Chrome Web Store yet. Two ways to get it running.
 
 ### 1. Easy path — sideload the packaged zip
 
-Best for anyone who doesn't want to touch `git`.
+Best for anyone who doesn't want to touch `git`. Five minutes end-to-end.
 
-1. **Download** the latest release zip from
-   [github.com/matt-burgess/jawbs/releases/latest](https://github.com/matt-burgess/jawbs/releases/latest)
-   (grab `jawbs-<version>.zip`).
-2. **Unzip** it somewhere permanent — Documents, ~/Applications, wherever.
-   Moving the folder later breaks the extension.
-3. Open Chrome, Edge, Brave, or another Chromium browser →
-   `chrome://extensions`.
-4. Toggle **Developer mode** on (top right).
-5. Click **Load unpacked** → select the unzipped folder.
-6. Pin the Jawbs icon in the toolbar, open the side panel, and the
-   welcome tab walks you through the 3-step setup.
+**Step 1 — Download the release zip.** Head to
+[github.com/matt-burgess/jawbs/releases/latest](https://github.com/matt-burgess/jawbs/releases/latest)
+and click `jawbs-<version>.zip` under **Assets**.
 
-You'll also need an Anthropic API key from
+<p align="center">
+  <img src="docs/install/step-1-download.svg" width="640" alt="Screenshot: GitHub Releases page with the jawbs-*.zip asset highlighted" />
+</p>
+
+**Step 2 — Unzip it somewhere permanent.** Documents, ~/Applications,
+wherever — just don't move the folder afterwards or the extension will
+break.
+
+<p align="center">
+  <img src="docs/install/step-2-unzip.svg" width="480" alt="Screenshot: unzipped jawbs folder shown in Finder / File Explorer" />
+</p>
+
+**Step 3 — Open the extensions page.** Paste `chrome://extensions` into
+your address bar (works in Chrome, Edge, Brave, and other Chromium
+browsers).
+
+<p align="center">
+  <img src="docs/install/step-3-extensions-url.svg" width="640" alt="Screenshot: chrome://extensions typed in the address bar" />
+</p>
+
+**Step 4 — Turn on Developer mode.** Flip the toggle in the top-right
+corner. Two new buttons appear on the left (**Load unpacked**, **Pack
+extension**, **Update**).
+
+<p align="center">
+  <img src="docs/install/step-4-developer-mode.svg" width="640" alt="Screenshot: Developer mode toggle highlighted in the top-right of chrome://extensions" />
+</p>
+
+**Step 5 — Load unpacked → pick your unzipped folder.** Click **Load
+unpacked**, then in the folder picker choose the folder you unzipped
+in Step 2. The Jawbs card appears immediately.
+
+<p align="center">
+  <img src="docs/install/step-5-load-unpacked.svg" width="640" alt="Screenshot: Load unpacked button and the folder picker dialog" />
+</p>
+
+**Step 6 — Pin it and open the side panel.** Click the puzzle-piece icon
+in the browser toolbar, find **Jawbs**, and click the pin so its icon
+stays visible. Click the pinned icon to open the Jawbar side panel —
+the welcome tab loads automatically and walks you through the 3-step
+setup.
+
+<p align="center">
+  <img src="docs/install/step-6-pin-and-open.svg" width="640" alt="Screenshot: puzzle-piece extensions menu with the Jawbs pin toggled on" />
+</p>
+
+**You'll also need** an Anthropic API key from
 [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys).
-Optional: run Ollama locally to route routine analyses off the paid API.
+Optional: run [Ollama](https://ollama.com) locally to route routine analyses off
+the paid API — see the **Local model (Ollama)** section below.
 
 ### 2. From source
 

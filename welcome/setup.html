@@ -1,0 +1,93 @@
+<!doctype html>
+<html data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Jawbs · Setup wizard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="../styles/job-copilot.css" />
+    <link rel="stylesheet" href="welcome.css" />
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body>
+    <div class="jc-page setup-page">
+      <header class="jc-toolbar">
+        <div class="toolbar-left">
+          <span class="jc__wordmark">
+            <img class="jc__brand-logo" src="../assets/jawb-logo.png" alt="" aria-hidden="true" />
+            <span class="jc-brand jc-brand--xl">Setup</span>
+          </span>
+        </div>
+        <div class="toolbar-actions"></div>
+      </header>
+
+      <!-- Progress dots — one per step, filled up to the active one -->
+      <ol id="setupDots" class="setup-dots" aria-label="Progress"></ol>
+
+      <main class="setup-shell">
+        <section id="setupStep" class="setup-step" aria-live="polite"></section>
+
+        <nav class="setup-nav" aria-label="Wizard navigation">
+          <button id="setupPrev" class="jc-btn" data-variant="ghost" type="button">← Previous</button>
+          <span id="setupStepLabel" class="jc-footnote setup-nav__label"></span>
+          <button id="setupSkip" class="jc-btn" data-variant="ghost" type="button" hidden>Skip step</button>
+          <button id="setupNext" class="jc-btn" data-variant="primary" type="button">Save &amp; continue →</button>
+        </nav>
+      </main>
+
+      <!-- Privacy stance — pinned to the bottom of the wizard page so
+           first-time users see the reassurance no matter which step
+           they're on. Moved here from the old welcome landing page. -->
+      <section class="w-section w-privacy setup-privacy">
+        <h2 class="w-h2">Privacy stance</h2>
+        <div class="w-privacy__grid">
+          <div class="w-privacy__pt">
+            <span class="w-privacy__icon" aria-hidden="true"><img src="../assets/settings-propeller.png" alt="" /></span>
+            <p><strong>All data is local.</strong> Everything lives in <code>chrome.storage.local</code> on this machine.</p>
+          </div>
+          <div class="w-privacy__pt">
+            <span class="w-privacy__icon" aria-hidden="true"><img src="../assets/settings-aviators.png" alt="" /></span>
+            <p><strong>API key is plaintext.</strong> Standard for extensions &mdash; appropriate for personal use, not shared devices.</p>
+          </div>
+          <div class="w-privacy__pt">
+            <span class="w-privacy__icon" aria-hidden="true"><img src="../assets/settings-radar.png" alt="" /></span>
+            <p><strong>No telemetry.</strong> Nothing is logged, phoned home, or sent anywhere except your AI provider.</p>
+          </div>
+          <div class="w-privacy__pt">
+            <span class="w-privacy__icon" aria-hidden="true"><img src="../assets/jawboard.png" alt="" /></span>
+            <p><strong>You own your data.</strong> Export the whole <span class="jc-brand">Jawboard</span> as JSON any time. Delete the extension to erase.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Shared AI-prompt modal — same shape as the Settings one. Opens
+         when the ✨ Get AI prompt button on any text-field step is
+         clicked. Contents swapped per step by setup.js. -->
+    <div id="promptModal" class="jc-modal" hidden>
+      <div class="jc-modal__scrim" data-modal-close></div>
+      <div class="jc-modal__panel" role="dialog" aria-labelledby="promptModalTitle" aria-modal="true">
+        <div class="jc-modal__head">
+          <h2 id="promptModalTitle" class="jc-modal__title">AI prompt</h2>
+          <button type="button" class="jc-icon-btn jc-modal__close" data-modal-close aria-label="Close">×</button>
+        </div>
+        <p id="promptModalIntro" class="jc-modal__intro"></p>
+        <textarea id="promptModalBody" class="jc-textarea jc-modal__body" rows="14" spellcheck="false" readonly></textarea>
+        <div class="jc-modal__actions">
+          <button id="promptCopy" class="jc-btn" data-variant="primary" data-size="sm" type="button">📋 Copy prompt</button>
+          <span class="jc-modal__ai-links">
+            <span class="jc-footnote">Open in:</span>
+            <a class="jc-btn" data-variant="ghost" data-size="sm" href="https://claude.ai" target="_blank" rel="noopener">Claude</a>
+            <a class="jc-btn" data-variant="ghost" data-size="sm" href="https://chatgpt.com" target="_blank" rel="noopener">ChatGPT</a>
+            <a class="jc-btn" data-variant="ghost" data-size="sm" href="https://gemini.google.com" target="_blank" rel="noopener">Gemini</a>
+          </span>
+          <span id="promptCopyStatus" class="jc-footnote"></span>
+        </div>
+        <p class="jc-footnote jc-modal__foot">Paste this into your AI. If it already knows you from prior conversations it'll draft the file directly; otherwise it'll ask a few questions first. Copy the AI's response back into the wizard textarea.</p>
+      </div>
+    </div>
+
+    <script src="setup.js" type="module"></script>
+  </body>
+</html>

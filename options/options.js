@@ -1,5 +1,8 @@
 import {
   getApiKey, setApiKey,
+  getOpenAIKey, setOpenAIKey,
+  getGeminiKey, setGeminiKey,
+  getCloudProvider, setCloudProvider,
   getModels, setModels,
   getProfile, setProfile,
   getMasterResume, setMasterResume,
@@ -23,29 +26,88 @@ import { attachQuickFill } from '../lib/linkedInFill.js';
 import { DEFAULT_PROFILE, DEFAULT_COMP_TARGETS, DEFAULT_PREP_QUESTIONS } from '../lib/defaults.js';
 import { DEFAULT_MODELS, MODEL_IDS } from '../lib/models.js';
 import { estimateCostUsd, formatUsd, MODEL_PRICING } from '../lib/pricing.js';
+import { PROMPTS } from '../lib/onboardingPrompts.js';
 
 const $ = (id) => document.getElementById(id);
 const els = new Proxy({}, { get: (_, id) => $(id) });
 
 const flash = (el, text, ms = 2000) => { el.textContent = text; setTimeout(() => (el.textContent = ''), ms); };
 
-// ---------- API key ----------
+// ---------- Cloud provider + API keys ----------
+//
+// Three providers (Anthropic / OpenAI / Gemini) each have their own
+// key input; the visible one tracks the provider selector. Save
+// writes ALL currently-typed keys (so switching providers doesn't
+// lose the key you just typed for a different one).
+
+function providerKeyInputId(provider) {
+  if (provider === 'openai') return 'openaiKey';
+  if (provider === 'gemini') return 'geminiKey';
+  return 'apiKey';
+}
+function showProviderKeyInput(provider) {
+  document.querySelectorAll('[data-provider-key]').forEach((el) => {
+    el.hidden = el.dataset.providerKey !== provider;
+  });
+  // Reset any reveal state whenever we swap.
+  const input = $(providerKeyInputId(provider));
+  if (input) input.type = 'password';
+  const btn = $('revealKey');
+  if (btn) btn.textContent = 'Show';
+}
 
 async function loadKey() {
-  els.apiKey.value = await getApiKey();
-  // Auto-expand the setup guide when there's no key yet — invisible when
-  // the user has one, always available to re-open.
-  if (els.anthropicSetup) els.anthropicSetup.open = !els.apiKey.value;
+  const [provider, anthKey, openaiKey, geminiKey] = await Promise.all([
+    getCloudProvider(),
+    getApiKey(),
+    getOpenAIKey(),
+    getGeminiKey(),
+  ]);
+  if ($('cloudProvider')) $('cloudProvider').value = provider;
+  if (els.apiKey) els.apiKey.value = anthKey;
+  if ($('openaiKey')) $('openaiKey').value = openaiKey;
+  if ($('geminiKey')) $('geminiKey').value = geminiKey;
+  showProviderKeyInput(provider);
+  // Setup guide is Anthropic-only — auto-expand only when Anthropic
+  // is active AND its key is missing.
+  if (els.anthropicSetup) {
+    els.anthropicSetup.open = provider === 'anthropic' && !anthKey;
+    els.anthropicSetup.hidden = provider !== 'anthropic';
+  }
 }
-els.saveKey.addEventListener('click', async () => {
-  await setApiKey(els.apiKey.value.trim());
-  flash(els.keyStatus, 'Saved.');
-  // Once a key is present, collapse the guide.
-  if (els.anthropicSetup && els.apiKey.value) els.anthropicSetup.open = false;
+
+$('cloudProvider')?.addEventListener('change', async (e) => {
+  const provider = e.target.value;
+  await setCloudProvider(provider);
+  showProviderKeyInput(provider);
+  if (els.anthropicSetup) {
+    els.anthropicSetup.open = provider === 'anthropic' && !(await getApiKey());
+    els.anthropicSetup.hidden = provider !== 'anthropic';
+  }
+  flash(els.keyStatus, `Switched to ${provider === 'openai' ? 'OpenAI' : provider === 'gemini' ? 'Gemini' : 'Anthropic'}.`);
 });
-els.revealKey.addEventListener('click', () => {
-  const isPw = els.apiKey.type === 'password';
-  els.apiKey.type = isPw ? 'text' : 'password';
+
+els.saveKey.addEventListener('click', async () => {
+  await Promise.all([
+    setApiKey(($('apiKey')?.value || '').trim()),
+    setOpenAIKey(($('openaiKey')?.value || '').trim()),
+    setGeminiKey(($('geminiKey')?.value || '').trim()),
+  ]);
+  flash(els.keyStatus, 'Saved.');
+  // Once the active provider's key is present, collapse the Anthropic
+  // setup guide (only meaningful when Anthropic is active).
+  const provider = await getCloudProvider();
+  if (els.anthropicSetup && provider === 'anthropic' && els.apiKey.value) {
+    els.anthropicSetup.open = false;
+  }
+});
+
+els.revealKey.addEventListener('click', async () => {
+  const provider = await getCloudProvider();
+  const input = $(providerKeyInputId(provider));
+  if (!input) return;
+  const isPw = input.type === 'password';
+  input.type = isPw ? 'text' : 'password';
   els.revealKey.textContent = isPw ? 'Hide' : 'Show';
 });
 
@@ -367,6 +429,9 @@ els.saveNegativeKeywords.addEventListener('click', async () => {
 // so users can re-open as many times as they like.
 els.openWelcome?.addEventListener('click', () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('welcome/welcome.html') });
+});
+document.getElementById('openSetupWizard')?.addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('welcome/setup.html') });
 });
 
 // ---------- Tip prompts toggle ----------
@@ -826,9 +891,142 @@ els.importBackup.addEventListener('change', async () => {
   }
 });
 
+// ---------- AI-prompt helper + setup-helper panel ----------
+//
+// New users landing on Settings for the first time see empty textareas
+// with terse placeholder guidance. The ✨ Get AI prompt buttons next to
+// each free-form field open a shared modal with a tailored prompt they
+// can paste into Claude / ChatGPT / Gemini. Two branches inside every
+// prompt: if the AI already knows the user, draft the file directly;
+// otherwise, ask a targeted question sequence first.
+
+
+function openPromptModal(key) {
+  const preset = PROMPTS[key];
+  if (!preset) return;
+  const modal = document.getElementById('promptModal');
+  const title = document.getElementById('promptModalTitle');
+  const intro = document.getElementById('promptModalIntro');
+  const body = document.getElementById('promptModalBody');
+  const status = document.getElementById('promptCopyStatus');
+  if (!modal || !title || !body) return;
+  title.textContent = preset.title;
+  intro.textContent = preset.intro;
+  body.value = preset.body;
+  status.textContent = '';
+  modal.hidden = false;
+  // Preselect so keyboard users can ctrl+A → ctrl+C without hunting.
+  setTimeout(() => { body.focus(); body.select(); }, 30);
+}
+
+function closePromptModal() {
+  const modal = document.getElementById('promptModal');
+  if (modal) modal.hidden = true;
+}
+
+// Delegated: any button with data-prompt-key opens the modal for that field.
+document.addEventListener('click', (e) => {
+  const trigger = e.target.closest('[data-prompt-key]');
+  if (trigger) { openPromptModal(trigger.dataset.promptKey); return; }
+  if (e.target.closest('[data-modal-close]')) closePromptModal();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('promptModal');
+    if (modal && !modal.hidden) closePromptModal();
+  }
+});
+
+document.getElementById('promptCopy')?.addEventListener('click', async () => {
+  const body = document.getElementById('promptModalBody');
+  const status = document.getElementById('promptCopyStatus');
+  if (!body) return;
+  try {
+    await navigator.clipboard.writeText(body.value);
+    if (status) {
+      status.textContent = 'Copied — paste into your AI.';
+      setTimeout(() => { status.textContent = ''; }, 4000);
+    }
+  } catch {
+    // Clipboard API rejected (rare in extension pages) — fall back to
+    // selecting the text so the user can ctrl+C manually.
+    body.focus(); body.select();
+    if (status) status.textContent = 'Press ⌘/Ctrl+C to copy.';
+  }
+});
+
+// Setup-helper panel — one row per required field, checked off when
+// the corresponding textarea has content. Refreshes on every save so
+// users see progress land. Auto-hides once everything is filled in.
+const SETUP_STEPS = [
+  { key: 'profile',       label: 'Profile',                 anchor: '#you-about',     testEl: 'profile',      promptKey: 'profile',       required: true  },
+  { key: 'resume',        label: 'Master resume',           anchor: '#you-materials', testEl: 'resume',       promptKey: 'resume',        required: true  },
+  { key: 'samples',       label: 'Writing samples',         anchor: '#you-materials', testEl: 'samples',      promptKey: 'samples',       required: false },
+  { key: 'prepQuestions', label: 'Question Prep questions', anchor: '#you-materials', testEl: 'prepQuestions', promptKey: 'prepQuestions', required: false },
+];
+
+function fieldHasContent(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return false;
+  const val = String(el.value || '').trim();
+  if (!val) return false;
+  // Discard the shipped placeholder so users aren't misled into thinking
+  // Profile is "done" when it still says the default "Write a 2-sentence
+  // positioning: ..." template text.
+  if (/^Write a 2-sentence positioning:/i.test(val)) return false;
+  // Legacy — earlier default started with "[Replace this...]"; keep the
+  // check so users who reset before this change still see the callout.
+  if (/^\[Replace this with your own profile/i.test(val)) return false;
+  return true;
+}
+
+function refreshSetupHelper() {
+  const panel = document.getElementById('setupHelper');
+  const list = document.getElementById('setupHelperList');
+  if (!panel || !list) return;
+  list.innerHTML = '';
+  let anyMissing = false;
+  for (const step of SETUP_STEPS) {
+    const done = fieldHasContent(step.testEl);
+    if (!done && step.required) anyMissing = true;
+    const li = document.createElement('li');
+    li.dataset.done = done ? 'true' : 'false';
+    if (done) {
+      li.textContent = `${step.label} — ready`;
+    } else {
+      const link = document.createElement('a');
+      link.href = step.anchor;
+      link.textContent = step.label;
+      li.appendChild(link);
+      const rest = document.createElement('span');
+      rest.textContent = step.required
+        ? ' — required. Click ✨ Get AI prompt next to the field.'
+        : ' — optional, but the Bait analyses get much better with it.';
+      li.appendChild(rest);
+    }
+    list.appendChild(li);
+  }
+  // Show whenever any required field is missing, OR any optional one
+  // is empty (nudge, don't shame — the copy tells the difference).
+  const anyEmpty = SETUP_STEPS.some((s) => !fieldHasContent(s.testEl));
+  panel.hidden = !anyEmpty;
+}
+
+// Hook refresh into every save button — the input's own storage roundtrip
+// isn't observable, so re-check after each explicit save action.
+['saveProfile', 'saveResume', 'saveSamples', 'savePrepQuestions', 'resetProfile', 'resetPrepQuestions'].forEach((id) => {
+  document.getElementById(id)?.addEventListener('click', () => {
+    // Wait a tick so the save handler's own textarea updates have
+    // committed before we test values.
+    setTimeout(() => refreshSetupHelper(), 100);
+  });
+});
+
 // ---------- Init ----------
 
 (async () => {
   await Promise.all([loadKey(), loadProfile(), loadResume(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadShortcuts(), loadModels(), loadUsage(), loadActivity()]);
   refreshOllamaStatus();
+  refreshSetupHelper();
 })();

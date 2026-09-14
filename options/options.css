@@ -395,15 +395,237 @@ code {
   margin-bottom: 0;
 }
 
-/* Compact checkbox row used by the tip-prompts toggle. */
-.settings-toggle {
-  display: inline-flex; align-items: center; gap: 10px;
+/* Compact checkbox row used by the tip-prompts toggle. Overrides the
+   generic label / label > span rules that turn every label into a
+   column-stacked mono-uppercase eyebrow. */
+.settings-toggle,
+label.settings-toggle {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   cursor: pointer;
   user-select: none;
   padding: 6px 0;
 }
 .settings-toggle input { width: 16px; height: 16px; cursor: pointer; margin: 0; }
-.settings-toggle__label {
+.settings-toggle > .settings-toggle__label,
+.settings-toggle span.settings-toggle__label {
   font: 500 var(--jc-text-sm)/1.3 var(--jc-font);
   color: var(--jc-text);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Compact sections — used by Setup wizard and Tip prompts where the
+   content is only a description and one or two rows of controls. The
+   default .options-section spacing feels padded to the point of empty. */
+.options-section--compact {
+  gap: var(--jc-2);
+  padding: var(--jc-4) var(--jc-5);
+}
+.options-section--compact .section-head { margin: 0; }
+.options-section--compact .section-head h2 { margin: 0; }
+.options-section--compact .section-head .jc-footnote { margin: 2px 0 0; }
+.options-section--compact .jc-btn-row { margin-top: 4px !important; }
+
+/* ============================================================
+   First-time setup helper — shown at the top of the You tab
+   until every required material has content. Uses a warm cream
+   band + red brand rule to feel welcoming rather than admonishing.
+   ============================================================ */
+.setup-helper {
+  margin: var(--jc-3) 0 var(--jc-5);
+  padding: var(--jc-4) var(--jc-4) var(--jc-3);
+  background: var(--jaw-cream);
+  border: 1px solid var(--jaw-cream-line);
+  border-left: 4px solid var(--jaw-red);
+  border-radius: var(--jc-radius);
+}
+.setup-helper[hidden] { display: none; }
+.setup-helper__head {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-bottom: var(--jc-3);
+}
+.setup-helper__title {
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--jaw-red);
+}
+.setup-helper__hint {
+  font: 400 var(--jc-text-sm)/1.5 var(--jc-font);
+  color: var(--jc-text);
+}
+.setup-helper__hint b { color: var(--jaw-red); }
+.setup-helper__list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  counter-reset: setup;
+}
+.setup-helper__list li {
+  counter-increment: setup;
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 6px 0;
+  font-size: var(--jc-text-sm);
+  color: var(--jc-text);
+}
+.setup-helper__list li::before {
+  content: counter(setup);
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jaw-cream-line);
+  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  color: var(--jc-text-2);
+}
+.setup-helper__list li[data-done="true"] { color: var(--jc-text-3); }
+.setup-helper__list li[data-done="true"]::before {
+  content: "✓";
+  color: var(--jc-pos);
+  background: var(--jc-pos-weak);
+  border-color: var(--jc-pos-line);
+}
+.setup-helper__list a {
+  color: var(--jc-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.setup-helper__list a:hover { text-decoration: underline; }
+
+/* ============================================================
+   Shared modal — used by the AI-prompt helper. Fixed overlay,
+   centered panel, focus-trapped by JS. Cream + red chrome so
+   the modal reads as part of the Jawbs product, not a system
+   alert.
+   ============================================================ */
+.jc-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--jc-4);
+}
+.jc-modal[hidden] { display: none; }
+.jc-modal__scrim {
+  position: absolute; inset: 0;
+  background: var(--jc-scrim, rgba(11, 51, 88, .45));
+}
+.jc-modal__panel {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: calc(100vh - 2 * var(--jc-4));
+  overflow-y: auto;
+  background: var(--jc-surface-1);
+  border-radius: var(--jc-radius);
+  box-shadow: var(--jc-shadow-xl);
+  padding: var(--jc-4) var(--jc-5) var(--jc-4);
+  display: flex; flex-direction: column; gap: var(--jc-3);
+}
+.jc-modal__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--jc-2);
+  padding-bottom: var(--jc-3);
+  border-bottom: 3px solid var(--jaw-red);
+}
+.jc-modal__title {
+  margin: 0;
+  font-family: var(--jc-font-brand);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: .85;
+  text-transform: uppercase;
+  letter-spacing: -.005em;
+  color: var(--jaw-red);
+  transform: scaleX(1.05);
+  transform-origin: left;
+}
+.jc-modal__close {
+  font: 700 22px/1 var(--jc-font);
+  color: var(--jc-text-3);
+  width: 30px; height: 30px;
+}
+.jc-modal__close:hover { color: var(--jaw-red); }
+.jc-modal__intro {
+  margin: 0;
+  font-size: var(--jc-text-sm);
+  line-height: 1.5;
+  color: var(--jc-text-2);
+}
+.jc-modal__body {
+  font: 400 12px/1.5 var(--jc-font-mono);
+  min-height: 260px;
+  background: var(--jc-surface-2);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius-sm);
+  padding: var(--jc-3);
+  white-space: pre-wrap;
+  resize: vertical;
+}
+.jc-modal__actions {
+  display: flex; align-items: center; gap: var(--jc-2);
+  flex-wrap: wrap;
+}
+.jc-modal__ai-links {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: auto;
+}
+.jc-modal__ai-links .jc-footnote { margin-right: 4px; }
+.jc-modal__foot {
+  margin: 0;
+  padding-top: var(--jc-2);
+  border-top: 1px solid var(--jc-border);
+}
+
+/* Comp targets — single primary Target input, Advanced disclosure
+   below with Floor / Walk-away / Current benchmark tucked in. */
+.comp-grid__primary { grid-column: 1 / -1; max-width: 360px; }
+.comp-advanced {
+  margin-top: var(--jc-3);
+  padding: var(--jc-3) var(--jc-4);
+  background: var(--jc-surface-2);
+  border-radius: var(--jc-radius-sm);
+}
+.comp-advanced > summary {
+  cursor: pointer;
+  font: 600 var(--jc-text-sm)/1 var(--jc-font);
+  color: var(--jc-text);
+  padding: 4px 0;
+}
+.comp-advanced[open] > summary { margin-bottom: var(--jc-3); }
+.comp-advanced__hint { margin: 0 0 var(--jc-3); }
+
+/* Wizard single-column comp step */
+.setup-field--single { max-width: 420px; }
+.setup-comp-input { max-width: 220px; font-family: var(--jc-font-mono); }
+
+/* Pinned Support strip — sits above every tab so users always see
+   where to reach out. Cream band matches the Jawbs chrome; the
+   mailto CTA renders as the gold highlight variant for scannability. */
+.settings-support {
+  display: flex; align-items: center; gap: var(--jc-4);
+  padding: 10px var(--jc-6);
+  background: var(--jaw-cream);
+  border-bottom: 1px solid var(--jaw-cream-line);
+}
+.settings-support__body {
+  display: flex; flex-direction: column;
+  gap: 2px;
+  flex: 1; min-width: 0;
+}
+.settings-support__title {
+  font: 700 var(--jc-text-sm)/1.2 var(--jc-font);
+  color: var(--jc-text);
+}
+.settings-support__hint {
+  font: 400 var(--jc-text-xs)/1.3 var(--jc-font);
+  color: var(--jc-text-2);
+}
+.settings-support__cta {
+  flex: none;
+  font-family: var(--jc-font-mono);
+  letter-spacing: 0;
+  text-transform: none;
+}
+@media (max-width: 640px) {
+  .settings-support { flex-direction: column; align-items: stretch; }
 }

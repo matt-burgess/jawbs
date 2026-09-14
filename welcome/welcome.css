@@ -167,8 +167,8 @@ body {
   margin-top: var(--jc-2);
 }
 /* Reskin the shared buttons for the dark hero — gold pill with black
-   ink so the "Take me to Settings" label reads flatly against the
-   bright button. Overrides both the button-native color and the red
+   ink so the "Start Setup" label reads flatly against the bright
+   button. Overrides both the button-native color and the red
    .jc-brand color inside the label span. */
 .w-hero__actions .jc-btn[data-variant="primary"],
 .w-hero__actions .jc-btn[data-variant="primary"] .jc-brand {
@@ -182,6 +182,15 @@ body {
 .w-hero__actions .jc-btn[data-variant="primary"]:hover {
   background: #FFCD1F; filter: none;
 }
+/* Enlarged primary CTA — replaces the old row of three buttons with a
+   single dominant call to action on the hero card. */
+.w-hero__start-cta {
+  min-height: 64px;
+  padding: 0 40px;
+  font-size: var(--jc-text-xl);
+  border-radius: 12px;
+}
+.w-hero__start-cta .jc-brand { font-size: 32px; }
 .w-hero__actions .jc-btn[data-variant="ghost"] {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;

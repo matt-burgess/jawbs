@@ -1,4 +1,5 @@
 import { callAnthropic, extractText } from './lib/anthropic.js';
+import { callAI } from './lib/aiRouter.js';
 import { callJsonAnthropic } from './lib/json.js';
 import {
   getApiKey, getModels,
@@ -1679,12 +1680,12 @@ async function runBrief(jobId) {
       return { text: t.text, usage: t.usage, model: t.model };
     },
     cloud: async () => {
-      const response = await callAnthropic({
+      const r = await callAI({
         apiKey: ctx.apiKey, model: ctx.models.questionPrep, maxTokens: 4000,
         system: BRIEF_SYSTEM,
         messages: [{ role: 'user', content: userMessage }],
       });
-      return { text: extractText(response), usage: response.usage || null, model: ctx.models.questionPrep };
+      return { text: r.text, usage: r.usage || null, model: r.model };
     },
   });
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
@@ -1715,13 +1716,13 @@ async function runAsk(jobId, prompt, providerOverride) {
       return { text: t.text, usage: t.usage, model };
     },
     cloud: async () => {
-      const response = await callAnthropic({
+      const r = await callAI({
         apiKey: ctx.apiKey, model: ctx.models.questionPrep,
         system: ASK_SYSTEM,
         messages: [{ role: 'user', content: userMessage }],
         maxTokens: 2500,
       });
-      return { text: extractText(response), usage: response.usage || null, model: ctx.models.questionPrep };
+      return { text: r.text, usage: r.usage || null, model: r.model };
     },
   });
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
@@ -1751,22 +1752,20 @@ async function getChats(jobId) {
 // Cloud-only — setup-time operations where the strongest model matters.
 
 async function runFieldGenerator({ system, userMessage, maxTokens }) {
-  const apiKey = await getApiKey();
-  if (!apiKey) throw new Error('Anthropic API key not set. Add one in AI Settings first.');
   const models = await getModels();
   const model = models.fit || models.default;
-  const response = await callAnthropic({
-    apiKey, model, system,
+  const r = await callAI({
+    model, system,
     messages: [{ role: 'user', content: userMessage }],
     maxTokens,
   });
-  await addUsage({ model, usage: response.usage || null });
+  await addUsage({ model: r.model, usage: r.usage || null });
   return {
     ok: true,
     data: {
-      text: extractText(response).trim(),
-      model,
-      usage: response.usage || null,
+      text: (r.text || '').trim(),
+      model: r.model,
+      usage: r.usage || null,
       promptVersion: BOOTSTRAP_PROMPT_VERSION,
     },
   };
@@ -2026,19 +2025,16 @@ async function runOllamaStatus() {
 
 async function runDiagnostic() {
   const started = performance.now();
-  const apiKey = await getApiKey();
   const models = await getModels();
   const model = models.diagnostic || MODEL_IDS.haiku;
 
-  const response = await callAnthropic({
-    apiKey, model, maxTokens: 32,
+  const r = await callAI({
+    model, maxTokens: 32,
     system: 'You are a connectivity probe. Reply with exactly the word: OK',
     messages: [{ role: 'user', content: 'ping' }],
   });
 
-  const text = extractText(response);
   const elapsedMs = Math.round(performance.now() - started);
-  const usage = response.usage || null;
-  await addUsage({ model, usage });
-  return { ok: true, text, model, elapsedMs, usage };
+  await addUsage({ model: r.model, usage: r.usage || null });
+  return { ok: true, text: r.text, model: r.model, provider: r.provider, elapsedMs, usage: r.usage || null };
 }

@@ -54,10 +54,9 @@
               </li>
             </ul>
             <div class="w-hero__actions">
-              <button class="jc-btn" data-variant="primary" type="button" id="wDone">
-                <span class="jc-brand">Take me to Settings</span>
-              </button>
-              <button class="jc-btn" data-variant="ghost" type="button" id="wLater">Skip &mdash; I'll set up later</button>
+              <a class="jc-btn w-hero__start-cta" data-variant="primary" href="./setup.html" id="wStartWizard">
+                <span class="jc-brand">Start Setup</span>
+              </a>
             </div>
             <p class="w-hero__aside">Tell them I'm going fishing&hellip;</p>
           </div>
@@ -74,127 +73,6 @@
         </div>
       </header>
 
-      <!-- SETUP + ANCHOR POINTS side-by-side. Setup on the left so
-           the primary action lands first for the eye; Anchor Points
-           on the right as reference reading. Collapses to a single
-           column on narrow viewports (see .w-two-col in CSS). -->
-      <div class="w-two-col">
-
-      <!-- SETUP -->
-      <section class="w-section w-setup">
-        <h2 class="w-h2">3 Step Setup</h2>
-        <ol class="w-steps">
-          <li class="w-step">
-            <span class="w-step__num">1</span>
-            <div class="w-step__body">
-              <h3 class="w-step__title">Add your Anthropic API key</h3>
-              <p>Grab one from <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Stored locally in <code>chrome.storage.local</code> &mdash; never sent anywhere except <code>api.anthropic.com</code>.</p>
-              <button class="jc-btn" data-variant="primary" data-size="sm" type="button" data-open-tab="ai">Open AI Settings &rarr;</button>
-            </div>
-          </li>
-          <li class="w-step">
-            <span class="w-step__num">2</span>
-            <div class="w-step__body">
-              <h3 class="w-step__title">Fill in your profile and materials</h3>
-              <p>The fit analysis is only as good as what you tell it about yourself. Load or paste your profile, master resume, and (optionally) writing samples.</p>
-              <button class="jc-btn" data-variant="primary" data-size="sm" type="button" data-open-tab="you">Open Your Settings &rarr;</button>
-            </div>
-          </li>
-          <li class="w-step">
-            <span class="w-step__num">3</span>
-            <div class="w-step__body">
-              <h3 class="w-step__title">Open a LinkedIn jawb posting</h3>
-              <p>The <span class="jc-brand">Jawbar</span> populates automatically. Click <em>Analyze</em> on the Career Fit card to run your first analysis.</p>
-              <button class="jc-btn" data-size="sm" type="button" id="wOpenLinkedIn">Open <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="LinkedIn" width="14" height="14"> Jawbs</button>
-            </div>
-          </li>
-        </ol>
-      </section>
-
-      <!-- ANCHOR POINTS -->
-      <section class="w-section">
-        <h2 class="w-h2">Anchor Points</h2>
-        <div class="w-glossary">
-          <div class="w-term">
-            <span class="w-term__icon" aria-hidden="true"><img src="../assets/icon-48.png" alt="" /></span>
-            <div class="w-term__body-wrap">
-              <div class="w-term__label"><span class="jc-brand">Jawbar</span></div>
-              <p class="w-term__body">The side panel that opens on the right. Analyzes whichever LinkedIn jawb you're viewing &mdash; one card per analysis type, nothing runs until you click.</p>
-            </div>
-          </div>
-          <div class="w-term">
-            <span class="w-term__icon" aria-hidden="true"><img src="../assets/jawboard.png" alt="" /></span>
-            <div class="w-term__body-wrap">
-              <div class="w-term__label"><span class="jc-brand">Jawboard</span></div>
-              <p class="w-term__body">Your permanent archive of every saved / applied jawb. Sort, search, filter, export. Top-4 analytics preview lives here.</p>
-            </div>
-          </div>
-          <div class="w-term">
-            <span class="w-term__icon" aria-hidden="true"><img src="../assets/jawbridge.png" alt="" /></span>
-            <div class="w-term__body-wrap">
-              <div class="w-term__label"><span class="jc-brand">Jawbridge</span></div>
-              <p class="w-term__body">All 11 analytics charts on one screen &mdash; funnel, voyage log, cadence, calibration, and more.</p>
-            </div>
-          </div>
-          <div class="w-term">
-            <span class="w-term__icon" aria-hidden="true"><img src="../assets/chum-barrel.png" alt="" /></span>
-            <div class="w-term__body-wrap">
-              <div class="w-term__label">Cast markers</div>
-              <p class="w-term__body">Barrel icons on Jawbar cards mean "not yet cast" &mdash; that analysis hasn't run. They flip to green ✓ once done.</p>
-            </div>
-          </div>
-          <div class="w-term">
-            <div class="w-term__body-wrap w-term__body-wrap--noicon">
-              <div class="w-term__label">Saved searches</div>
-              <p class="w-term__body">Save any LinkedIn <code>/jobs/search/*</code> URL. Manage them from the Jawboard; one-click to re-run.</p>
-            </div>
-          </div>
-          <div class="w-term">
-            <div class="w-term__body-wrap w-term__body-wrap--noicon">
-              <div class="w-term__label">Negative keywords</div>
-              <p class="w-term__body">Phrases you want to skip. LinkedIn jawb cards matching any get dimmed on search-results pages.</p>
-            </div>
-          </div>
-          <div class="w-term">
-            <div class="w-term__body-wrap w-term__body-wrap--noicon">
-              <div class="w-term__label">Local vs Cloud AI</div>
-              <p class="w-term__body">Anthropic Claude by default. Optional Ollama routing per feature &mdash; keeps routine tasks off your API bill.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      </div><!-- /.w-two-col -->
-
-      <!-- PRIVACY -->
-      <section class="w-section w-privacy">
-        <h2 class="w-h2">Privacy stance</h2>
-        <div class="w-privacy__grid">
-          <div class="w-privacy__pt">
-            <span class="w-privacy__icon" aria-hidden="true"><img src="../assets/settings-propeller.png" alt="" /></span>
-            <p><strong>All data is local.</strong> Everything lives in <code>chrome.storage.local</code> on this machine.</p>
-          </div>
-          <div class="w-privacy__pt">
-            <span class="w-privacy__icon" aria-hidden="true"><img src="../assets/settings-aviators.png" alt="" /></span>
-            <p><strong>API key is plaintext.</strong> Standard for extensions &mdash; appropriate for personal use, not shared devices.</p>
-          </div>
-          <div class="w-privacy__pt">
-            <span class="w-privacy__icon" aria-hidden="true"><img src="../assets/settings-radar.png" alt="" /></span>
-            <p><strong>No telemetry.</strong> Nothing is logged, phoned home, or sent anywhere except your AI provider.</p>
-          </div>
-          <div class="w-privacy__pt">
-            <span class="w-privacy__icon" aria-hidden="true"><img src="../assets/jawboard.png" alt="" /></span>
-            <p><strong>You own your data.</strong> Export the whole <span class="jc-brand">Jawboard</span> as JSON any time. Delete the extension to erase.</p>
-          </div>
-        </div>
-      </section>
-
-      <footer class="w-footer">
-        <button class="jc-btn" data-variant="primary" type="button" id="wDone2">
-          <span class="jc-brand">Take me to Settings</span>
-        </button>
-        <button class="jc-btn" data-variant="ghost" type="button" id="wLater2">I'll set up later</button>
-      </footer>
 
       <!-- Support address — questions, bug reports, feature ideas. Not
            an auto-triaged inbox; the maker reads it himself. -->

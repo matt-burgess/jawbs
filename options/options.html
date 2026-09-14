@@ -34,6 +34,20 @@
         </nav>
       </header>
 
+      <!-- Support — pinned above every tab so users always know where
+           to reach the maker for questions, bugs, or feature ideas.
+           Not an auto-triaged inbox. -->
+      <aside class="settings-support" id="sys-support">
+        <div class="settings-support__body">
+          <span class="settings-support__title">Need help or have feedback?</span>
+          <span class="settings-support__hint">Questions, bug reports, and feature ideas go straight to the maker.</span>
+        </div>
+        <a class="jc-btn settings-support__cta" data-variant="highlight" data-size="sm"
+           href="mailto:jawbsthebrowserextension@gmail.com?subject=Jawbs%20feedback">
+          jawbsthebrowserextension@gmail.com
+        </a>
+      </aside>
+
       <main class="options-main">
 
         <!-- ================================================================
@@ -46,11 +60,6 @@
             <a href="#you-params"     class="settings-subnav__chip" data-subnav>Search parameters</a>
             <a href="#you-shortcuts"  class="settings-subnav__chip" data-subnav>Shortcuts</a>
           </nav>
-
-          <p class="tab-intro">
-            Everything the analyses read as context about you. Profile is the required minimum;
-            add the rest as you have material.
-          </p>
 
           <!-- ============================================================
                SUBSECTION · ABOUT ME — narrative context
@@ -70,7 +79,8 @@
               <textarea id="profile" class="jc-textarea" rows="12" spellcheck="false"></textarea>
               <div class="jc-btn-row">
                 <button id="saveProfile" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
-                <button id="generateProfile" class="jc-btn" data-size="sm" type="button" title="Generate a fresh Profile from your Master Resume using Anthropic. Overwrites the textarea; nothing is saved until you click Save.">✨ Generate from resume</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="profile" type="button" title="Copy a prompt to paste into Claude, ChatGPT, or Gemini — it'll either draft this file directly or ask you a few questions first.">✨ Get AI prompt</button>
+                <button id="generateProfile" class="jc-btn" data-size="sm" type="button" title="Generate a fresh Profile from your Master Resume using Anthropic. Overwrites the textarea; nothing is saved until you click Save.">Generate from resume</button>
                 <label for="loadProfileFile" class="jc-btn" data-size="sm">Load .md file</label>
                 <input id="loadProfileFile" type="file" accept=".md,text/markdown,text/plain" hidden />
                 <button id="resetProfile" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Reset to default</button>
@@ -87,7 +97,8 @@
               <textarea id="knowledgeBase" class="jc-textarea" rows="10" spellcheck="false" placeholder="Paste or load a markdown knowledge document…"></textarea>
               <div class="jc-btn-row">
                 <button id="saveKnowledge" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
-                <button id="generateKnowledge" class="jc-btn" data-size="sm" type="button" title="Generate a fresh Knowledge Base from your Master Resume using Anthropic. Overwrites the textarea; nothing is saved until you click Save.">✨ Generate from resume</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="knowledge" type="button" title="Copy a prompt for your AI chat product — it produces a longer knowledge-base document going deeper than the Profile.">✨ Get AI prompt</button>
+                <button id="generateKnowledge" class="jc-btn" data-size="sm" type="button" title="Generate a fresh Knowledge Base from your Master Resume using Anthropic. Overwrites the textarea; nothing is saved until you click Save.">Generate from resume</button>
                 <label for="loadKnowledgeFile" class="jc-btn" data-size="sm">Load .md file</label>
                 <input id="loadKnowledgeFile" type="file" accept=".md,text/markdown,text/plain" hidden />
                 <button id="clearKnowledge" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Clear</button>
@@ -116,7 +127,8 @@
               <textarea id="resume" class="jc-textarea" rows="12" spellcheck="false" placeholder="Paste your full master resume as plain text or markdown…"></textarea>
               <div class="jc-btn-row">
                 <button id="saveResume" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
-                <button id="generateResumeField" class="jc-btn" data-size="sm" type="button" title="Clean up formatting on the pasted resume. Preserves every specific claim; normalizes headings, bullets, and line breaks.">✨ Generate / clean up</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="resume" type="button" title="Copy a prompt for your AI chat product — it produces a full master-resume Markdown document.">✨ Get AI prompt</button>
+                <button id="generateResumeField" class="jc-btn" data-size="sm" type="button" title="Clean up formatting on the pasted resume. Preserves every specific claim; normalizes headings, bullets, and line breaks.">Clean up formatting</button>
                 <span id="resumeStatus" class="jc-footnote"></span>
                 <span id="resumeLen" class="jc-footnote"></span>
               </div>
@@ -131,6 +143,7 @@
               <textarea id="samples" class="jc-textarea" rows="8" spellcheck="false" placeholder="Paste 2–3 paragraphs in your voice…"></textarea>
               <div class="jc-btn-row">
                 <button id="saveSamples" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="samples" type="button" title="Copy a prompt for your AI chat product — it collects 2–3 paragraphs in your own voice.">✨ Get AI prompt</button>
                 <span id="samplesStatus" class="jc-footnote"></span>
               </div>
             </section>
@@ -145,6 +158,7 @@
               <textarea id="prepQuestions" class="jc-textarea" rows="12" spellcheck="false" placeholder="Why are you interested in this role?&#10;Describe a time you scaled a team.&#10;…"></textarea>
               <div class="jc-btn-row">
                 <button id="savePrepQuestions" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="prepQuestions" type="button" title="Copy a prompt for your AI chat product — it produces a fresh interview-question list for your target level.">✨ Get AI prompt</button>
                 <button id="resetPrepQuestions" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Reset to defaults</button>
                 <span id="prepQuestionsStatus" class="jc-footnote"></span>
                 <span id="prepQuestionsCount" class="jc-footnote"></span>
@@ -186,27 +200,38 @@
 
             <section class="options-section">
               <div class="section-head">
-                <h2>Compensation targets</h2>
-                <p class="jc-footnote">Base-salary anchors. Comp analysis flags any posting whose low end falls below your floor.</p>
+                <h2>Compensation target</h2>
+                <p class="jc-footnote">Your target base salary — the number you're pursuing. Comp gauge in
+                  the Jawbar is tinted based on where each posting's range lands vs this.</p>
               </div>
               <div class="comp-grid">
-                <label>
-                  <span>Floor (USD base)</span>
-                  <input id="compFloor" class="jc-input" type="number" min="0" step="1000" />
-                </label>
-                <label>
+                <label class="comp-grid__primary">
                   <span>Target (USD base)</span>
-                  <input id="compTarget" class="jc-input" type="number" min="0" step="1000" />
-                </label>
-                <label>
-                  <span>Walk-away (USD base)</span>
-                  <input id="compWalkAway" class="jc-input" type="number" min="0" step="1000" />
-                </label>
-                <label>
-                  <span>Current benchmark (USD base)</span>
-                  <input id="compCurrent" class="jc-input" type="number" min="0" step="1000" />
+                  <input id="compTarget" class="jc-input" type="number" min="0" step="1000" placeholder="e.g. 220000" />
                 </label>
               </div>
+              <details class="comp-advanced">
+                <summary>Advanced anchors (optional)</summary>
+                <p class="jc-footnote comp-advanced__hint">
+                  Floor triggers an "under-comp" flag when a posting's low end drops below it.
+                  Walk-away is your "leave money on the table if I don't push" mark.
+                  Current benchmark seeds the Jawbar's negotiation anchor.
+                </p>
+                <div class="comp-grid">
+                  <label>
+                    <span>Floor (USD base)</span>
+                    <input id="compFloor" class="jc-input" type="number" min="0" step="1000" />
+                  </label>
+                  <label>
+                    <span>Walk-away (USD base)</span>
+                    <input id="compWalkAway" class="jc-input" type="number" min="0" step="1000" />
+                  </label>
+                  <label>
+                    <span>Current benchmark (USD base)</span>
+                    <input id="compCurrent" class="jc-input" type="number" min="0" step="1000" />
+                  </label>
+                </div>
+              </details>
               <div class="jc-btn-row">
                 <button id="saveComp" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
                 <span id="compStatus" class="jc-footnote"></span>
@@ -308,16 +333,32 @@
 
             <section class="options-section">
               <div class="section-head">
-                <h2>API key</h2>
-                <p class="jc-footnote">Stored locally in <code>chrome.storage.local</code>.
-                  Never included in exports.</p>
+                <h2>Cloud provider &amp; API key</h2>
+                <p class="jc-footnote">Pick which cloud AI runs the analyses. Each provider's key is
+                  stored locally in <code>chrome.storage.local</code> — never included in exports.</p>
               </div>
               <label>
-                <span>API key</span>
+                <span>Provider</span>
+                <select id="cloudProvider" class="jc-select">
+                  <option value="anthropic">Anthropic Claude</option>
+                  <option value="openai">OpenAI (GPT-4o)</option>
+                  <option value="gemini">Google Gemini (2.5 Pro)</option>
+                </select>
+              </label>
+              <label data-provider-key="anthropic">
+                <span>Anthropic API key</span>
                 <input type="password" id="apiKey" class="jc-input" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
               </label>
+              <label data-provider-key="openai" hidden>
+                <span>OpenAI API key</span>
+                <input type="password" id="openaiKey" class="jc-input" placeholder="sk-…" autocomplete="off" spellcheck="false" />
+              </label>
+              <label data-provider-key="gemini" hidden>
+                <span>Google Gemini API key</span>
+                <input type="password" id="geminiKey" class="jc-input" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+              </label>
               <div class="jc-btn-row">
-                <button id="saveKey" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save key</button>
+                <button id="saveKey" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
                 <button id="revealKey" class="jc-btn" data-size="sm" type="button">Show</button>
                 <span id="keyStatus" class="jc-footnote"></span>
               </div>
@@ -526,64 +567,40 @@ sudo systemctl restart ollama
             <a href="#sys-backup"     class="settings-subnav__chip" data-subnav>Backup</a>
             <a href="#sys-tour"       class="settings-subnav__chip" data-subnav>Tour</a>
             <a href="#sys-tips"       class="settings-subnav__chip" data-subnav>Tip prompts</a>
-            <a href="#sys-support"    class="settings-subnav__chip" data-subnav>Support</a>
           </nav>
 
           <p class="tab-intro">
             Verify connectivity, review lifetime token spend, and back up your <span class="jc-brand">Jawboard</span>.
           </p>
 
-          <section class="options-section" id="sys-tour">
+          <section class="options-section options-section--compact" id="sys-tour">
             <div class="section-head">
-              <h2>Welcome tour</h2>
-              <p class="jc-footnote">Re-open the onboarding page you saw at install. Useful if you skipped it
-                or want to re-check the setup steps.</p>
+              <h2>Setup wizard</h2>
+              <p class="jc-footnote">Re-run onboarding.</p>
             </div>
             <div class="jc-btn-row">
-              <button id="openWelcome" class="jc-btn" data-variant="primary" data-size="sm" type="button">Show welcome tour</button>
+              <button id="openSetupWizard" class="jc-btn" data-variant="primary" data-size="sm" type="button">Re-run setup wizard</button>
+              <!-- "Show welcome page" hidden — the welcome page is now
+                   just a landing for first-time installations. Kept in
+                   the DOM so options.js still finds it for wiring. -->
+              <button id="openWelcome" class="jc-btn" data-size="sm" type="button" hidden>Show welcome page</button>
             </div>
           </section>
 
-          <!-- Tip prompts — user-facing toggle for the "Tip Captain"
-               nudge that appears at the top of the Jawbar once a few
-               milestones are hit. Off silences both the tip nudge
-               and its share-fallback follow-up. -->
-          <section class="options-section" id="sys-tips">
+          <section class="options-section options-section--compact" id="sys-tips">
             <div class="section-head">
               <h2>Tip prompts</h2>
-              <p class="jc-footnote">
-                Occasional yellow banner at the top of the <span class="jc-brand">Jawbar</span>
-                asking if you'd like to tip the captain. Only appears
-                after you've gotten real value (10+ archived jawbs,
-                5+ applied, an interview logged, or a week of use)
-                and at most once every 30 days after dismiss.
-              </p>
+              <p class="jc-footnote">Occasional tip banner in the <span class="jc-brand">Jawbar</span>.</p>
             </div>
             <label class="settings-toggle" for="tipPromptsToggle">
               <input id="tipPromptsToggle" type="checkbox" />
               <span class="settings-toggle__label">Show tip prompts in the Jawbar</span>
             </label>
-            <div class="jc-btn-row" style="margin-top: var(--jc-3)">
-              <button id="tipForceShow" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Force the tip prompt to appear the next time the Jawbar loads, bypassing the usual milestone eligibility check.">Show tip prompt on next load</button>
-              <button id="tipResetState" class="jc-btn" data-variant="ghost" data-size="sm" type="button" title="Clear the dismissed / shared / tipped timestamps so the next eligible check re-shows the CTA.">Reset dismiss state</button>
+            <div class="jc-btn-row">
+              <button id="tipForceShow" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Show the tip prompt on the next Jawbar load.">Show tip prompt on next load</button>
+              <button id="tipResetState" class="jc-btn" data-variant="ghost" data-size="sm" type="button" title="Clear dismiss state.">Reset dismiss state</button>
               <span id="tipStateStatus" class="jc-footnote"></span>
             </div>
-          </section>
-
-          <!-- Support — questions, bug reports, and feature ideas
-               land in a real inbox the maker reads himself. Not a
-               triaged support desk. -->
-          <section class="options-section" id="sys-support">
-            <div class="section-head">
-              <h2>Support</h2>
-              <p class="jc-footnote">Questions, bug reports, or feature ideas? Send them to the maker directly.</p>
-            </div>
-            <p style="margin: 0; font-size: var(--jc-text-sm);">
-              <a href="mailto:jawbsthebrowserextension@gmail.com?subject=Jawbs%20feedback"
-                 style="color: var(--jc-accent); text-decoration: none; font-weight: 600;">
-                jawbsthebrowserextension@gmail.com
-              </a>
-            </p>
           </section>
 
           <section class="options-section" id="sys-diagnostic">
@@ -651,6 +668,34 @@ sudo systemctl restart ollama
         </div>
 
       </main>
+    </div>
+
+    <!-- AI prompt modal — one instance, contents swapped per field.
+         Triggered by any button with [data-prompt-key]. Handler wired
+         in options.js opens with the matching prompt, copies to
+         clipboard on click, and provides quick-launch links to the
+         three most-common AI chat products. -->
+    <div id="promptModal" class="jc-modal" hidden>
+      <div class="jc-modal__scrim" data-modal-close></div>
+      <div class="jc-modal__panel" role="dialog" aria-labelledby="promptModalTitle" aria-modal="true">
+        <div class="jc-modal__head">
+          <h2 id="promptModalTitle" class="jc-modal__title">AI prompt</h2>
+          <button type="button" class="jc-icon-btn jc-modal__close" data-modal-close aria-label="Close">×</button>
+        </div>
+        <p id="promptModalIntro" class="jc-modal__intro"></p>
+        <textarea id="promptModalBody" class="jc-textarea jc-modal__body" rows="14" spellcheck="false" readonly></textarea>
+        <div class="jc-modal__actions">
+          <button id="promptCopy" class="jc-btn" data-variant="primary" data-size="sm" type="button">📋 Copy prompt</button>
+          <span class="jc-modal__ai-links">
+            <span class="jc-footnote">Open in:</span>
+            <a class="jc-btn" data-variant="ghost" data-size="sm" href="https://claude.ai" target="_blank" rel="noopener">Claude</a>
+            <a class="jc-btn" data-variant="ghost" data-size="sm" href="https://chatgpt.com" target="_blank" rel="noopener">ChatGPT</a>
+            <a class="jc-btn" data-variant="ghost" data-size="sm" href="https://gemini.google.com" target="_blank" rel="noopener">Gemini</a>
+          </span>
+          <span id="promptCopyStatus" class="jc-footnote"></span>
+        </div>
+        <p class="jc-footnote jc-modal__foot">Paste this into your AI. If it already knows you from prior conversations it'll draft the file directly; otherwise it'll ask a few questions first. Save the AI's response as an <code>.md</code> file and use <b>Load .md file</b> here, or paste it straight into the textarea and click Save.</p>
+      </div>
     </div>
 
     <script src="options.js" type="module"></script>
