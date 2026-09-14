@@ -61,7 +61,7 @@ Not on the Chrome Web Store yet. Two ways to get it running.
 
 ### 1. Easy path — sideload the packaged zip
 
-Best for anyone who doesn't want to touch `git`. Five minutes end-to-end.
+Best for anyone who doesn't want to touch `git`. Three steps.
 
 **Step 1 — Download the zip.** One click — auto-built from the
 latest push to `main`:
@@ -71,58 +71,45 @@ latest push to `main`:
 </p>
 
 Prefer a specific tagged version? Grab one from
-[Releases](https://github.com/matt-burgess/jawbs/releases/latest).
+[Releases](https://github.com/matt-burgess/jawbs/releases/latest). Save
+the file — it'll go to your Downloads folder by default.
 
 <p align="center">
-  <img src="docs/install/step-1-download.svg" width="640" alt="Screenshot: the direct download link on the Jawbs GitHub repo" />
+  <img src="docs/install/step-1-download.png" width="640" alt="Browser save dialog for jawbs.zip going into the Downloads folder" />
 </p>
 
-**Step 2 — Unzip it somewhere permanent.** You'll get a folder named
-`jawbs`. Save it in Documents, ~/Applications, wherever — just don't
-move the folder afterwards or the extension will break.
+**Step 2 — Unzip it.** On macOS, double-click `jawbs.zip` (or right-click
+→ **Open With** → **Archive Utility**). On Windows, right-click →
+**Extract All**. You'll get a folder called `jawbs`. Leave it in Downloads
+or move it somewhere permanent (Documents, `~/Applications`) — just don't
+move it again afterwards or the extension will break.
 
 <p align="center">
-  <img src="docs/install/step-2-unzip.svg" width="480" alt="Screenshot: unzipped jawbs folder shown in Finder / File Explorer" />
+  <img src="docs/install/step-2-unzip.png" width="640" alt="Right-click context menu on jawbs.zip showing Open With Archive Utility on macOS" />
 </p>
 
-**Step 3 — Open the extensions page.** Paste `chrome://extensions` into
-your address bar (works in Chrome, Edge, Brave, and other Chromium
-browsers).
+**Step 3 — Load it into your browser.** Paste `chrome://extensions` into
+your address bar (works in Chrome, Edge, Brave, or any Chromium browser).
+Then:
+
+1. Flip the **Developer mode** toggle in the top-right corner.
+2. Click **Load unpacked** on the left.
+3. In the folder picker, pick the unzipped **jawbs** folder and click **Select**.
 
 <p align="center">
-  <img src="docs/install/step-3-extensions-url.svg" width="640" alt="Screenshot: chrome://extensions typed in the address bar" />
+  <img src="docs/install/step-3-load.png" width="700" alt="chrome://extensions page with Developer mode ON (1), Load unpacked button highlighted (2), and the folder picker showing the jawbs folder selected with the Select button highlighted (3)" />
 </p>
 
-**Step 4 — Turn on Developer mode.** Flip the toggle in the top-right
-corner. Two new buttons appear on the left (**Load unpacked**, **Pack
-extension**, **Update**).
+The Jawbs card appears in your extensions list immediately. Pin the icon
+from the toolbar's puzzle-piece menu, then click it to open the side
+panel — the welcome tab loads automatically and walks you through the
+setup wizard.
 
-<p align="center">
-  <img src="docs/install/step-4-developer-mode.svg" width="640" alt="Screenshot: Developer mode toggle highlighted in the top-right of chrome://extensions" />
-</p>
-
-**Step 5 — Load unpacked → pick your unzipped folder.** Click **Load
-unpacked**, then in the folder picker choose the folder you unzipped
-in Step 2. The Jawbs card appears immediately.
-
-<p align="center">
-  <img src="docs/install/step-5-load-unpacked.svg" width="640" alt="Screenshot: Load unpacked button and the folder picker dialog" />
-</p>
-
-**Step 6 — Pin it and open the side panel.** Click the puzzle-piece icon
-in the browser toolbar, find **Jawbs**, and click the pin so its icon
-stays visible. Click the pinned icon to open the Jawbar side panel —
-the welcome tab loads automatically and walks you through the 3-step
-setup.
-
-<p align="center">
-  <img src="docs/install/step-6-pin-and-open.svg" width="640" alt="Screenshot: puzzle-piece extensions menu with the Jawbs pin toggled on" />
-</p>
-
-**You'll also need** an Anthropic API key from
-[console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys).
-Optional: run [Ollama](https://ollama.com) locally to route routine analyses off
-the paid API — see the **Local model (Ollama)** section below.
+Once you land in the wizard you'll pick a cloud AI provider and paste
+its key — Anthropic, OpenAI, or Google Gemini all work.
+Optional: run [Ollama](https://ollama.com) locally to route routine
+analyses off the paid API — see the **Local model (Ollama)** section
+below.
 
 ### 2. From source
 
