@@ -55,12 +55,12 @@ chrome.sidePanel
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('Jawbs installed.');
   reinjectContentScripts();
-  // First-run onboarding — open the welcome tab only on fresh install
-  // (not on update / browser_update / shared_module_update). The welcome
-  // page marks onboarding.done itself when the user acknowledges.
+  // First-run onboarding — drop the user straight into the setup wizard
+  // (not the marketing welcome page). Only fires on fresh install, not
+  // on update / browser_update / shared_module_update.
   if (details?.reason === 'install') {
-    chrome.tabs.create({ url: chrome.runtime.getURL('welcome/welcome.html') })
-      .catch((e) => console.warn('Welcome tab open failed:', e));
+    chrome.tabs.create({ url: chrome.runtime.getURL('welcome/setup.html') })
+      .catch((e) => console.warn('Setup wizard open failed:', e));
   }
 });
 chrome.runtime.onStartup?.addListener?.(reinjectContentScripts);

@@ -3,6 +3,12 @@
    one-step-per-screen scannability: big lead, one input area, sticky
    nav at the bottom. */
 
+/* .jc-btn sets display:inline-flex which overrides the browser's
+   default `display: none` for the `hidden` attribute, so Previous on
+   step 1 and Skip step on non-optional steps kept showing. Force the
+   attribute back to authoritative for every child of the wizard. */
+[hidden] { display: none !important; }
+
 .setup-page { background: transparent; }
 
 /* Progress dots — one per step, filled up to the current one. Sits
@@ -220,14 +226,28 @@
 
 /* AI-helper callout — sits above every textarea step. Gold band with
    explicit copy so first-time users see the "outsource this to your
-   AI" affordance before they meet a blank textbox. */
+   AI" affordance before they meet a blank textbox. Two rows possible
+   inside one band: primary Stage 1 (draft-with-AI + load .md) and
+   optional Stage 2 (refine strip that opens the Get-AI-Prompt modal
+   with the full interview instructions). */
 .setup-ai-helper {
-  display: flex; align-items: center; gap: var(--jc-4);
+  display: flex; flex-direction: column;
+  gap: var(--jc-3);
   padding: var(--jc-4);
   background: linear-gradient(180deg, #FDF6E0 0%, #FBEAB6 100%);
   border: 1px solid var(--jc-caution-line);
   border-left: 4px solid var(--jaw-highlight);
   border-radius: var(--jc-radius);
+}
+.setup-ai-helper__row {
+  display: flex; align-items: center; gap: var(--jc-4);
+}
+.setup-ai-helper__row[hidden] { display: none !important; }
+/* Row 2 — refine strip. Separator rule so the two rows read as
+   related-but-distinct paths. */
+.setup-ai-helper__row--refine {
+  padding-top: var(--jc-3);
+  border-top: 1px solid var(--jc-caution-line);
 }
 .setup-ai-helper__body {
   flex: 1; min-width: 0;
@@ -248,6 +268,16 @@
   font: 400 var(--jc-text-sm)/1.5 var(--jc-font);
   color: #473300;
 }
+/* Refine-row copy — same font family but muted so the row reads as
+   secondary next to the Stage 1 title above. */
+.setup-ai-helper__refine-title {
+  font: 700 var(--jc-text-sm)/1.2 var(--jc-font);
+  color: #473300;
+}
+.setup-ai-helper__refine-desc {
+  font: 400 var(--jc-text-xs)/1.4 var(--jc-font);
+  color: #5C4300;
+}
 .setup-ai-helper__actions {
   flex: none;
   display: flex; flex-direction: row;
@@ -259,6 +289,17 @@
   padding: 0 18px;
   font-weight: 700;
   justify-content: center;
+}
+.setup-ai-helper__refine-cta {
+  min-height: 36px;
+  padding: 0 14px;
+  background: var(--jc-surface-1);
+  border-color: var(--jc-caution-line);
+  color: var(--jc-text);
+}
+.setup-ai-helper__refine-cta:hover {
+  border-color: var(--jaw-red);
+  color: var(--jaw-red);
 }
 .setup-ai-helper__load {
   min-height: 40px;
@@ -276,7 +317,7 @@
   color: var(--jaw-red);
 }
 @media (max-width: 620px) {
-  .setup-ai-helper { flex-direction: column; align-items: stretch; }
+  .setup-ai-helper__row { flex-direction: column; align-items: stretch; }
   .setup-ai-helper__actions { flex-direction: column; }
 }
 

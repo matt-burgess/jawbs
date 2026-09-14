@@ -36,7 +36,7 @@ const STEPS = [
     key: 'welcome',
     kind: 'intro',
     title: 'Welcome aboard',
-    lead: 'Five minutes to get Jawbs set up so it does its best work. You can skip any step and come back later from Settings.',
+    lead: 'Five minutes to setup Jawbs to catch the BIG ONE fast.',
     body: `
       <figure class="setup-welcome-art">
         <img src="../assets/big-catch-boat.png" alt="A sportfishing boat named Big Catch on calm water at dawn" />
@@ -46,19 +46,19 @@ const STEPS = [
     firstButton: 'Start setup',
   },
   {
-    key: 'apiKey',
-    kind: 'apiKey',
-    title: 'Your AI Provider',
-    lead: 'Pick an AI (Anthropic Claude, OpenAI, or Google Gemini) and paste your API key.',
-    optional: false,
-  },
-  {
     key: 'comp',
     kind: 'comp',
     title: 'Compensation Target',
     lead: 'Your target base salary is the number you\'re pursuing.',
     getter: getCompTargets,
     setter: setCompTargets,
+    optional: false,
+  },
+  {
+    key: 'apiKey',
+    kind: 'apiKey',
+    title: 'Your AI Provider',
+    lead: 'Pick an AI (Anthropic Claude, OpenAI, or Google Gemini) and paste your API key.',
     optional: false,
   },
   {
@@ -89,7 +89,7 @@ const STEPS = [
     key: 'samples',
     kind: 'textarea',
     title: 'Writing samples',
-    lead: '2–3 paragraphs in your own voice. Without this, cover letters and interview answers read generic. Paste from a LinkedIn post, an email, a Slack message — anything you\'ve actually written.',
+    lead: '2–3 paragraphs in your own voice. Use anything you\'ve actually written.',
     promptKey: 'samples',
     getter: getWritingSamples,
     setter: setWritingSamples,
@@ -284,24 +284,43 @@ async function saveApiKeyStep() {
 }
 
 // ---- Textarea step ----
+//
+// AI-helper strip above the textarea offers three paths:
+//   1. Draft with my AI — Stage 1: one-click API generation using
+//      whatever context we've already captured. Only shown when the
+//      active provider has a key.
+//   2. Get AI prompt — fallback / manual path: opens the copy-a-prompt
+//      modal (same as before). Shown when no API key is present.
+//   3. Load .md file instead — for users who already have a doc.
 async function renderTextareaStep(root, step) {
   const current = (await step.getter()) || '';
   const isPrepList = step.key === 'prepQuestions';
   const raw = isPrepList && Array.isArray(current) ? current.join('\n') : current;
+
+  const providerId = await getCloudProvider();
+  const providerLabel = providerId === 'openai' ? 'ChatGPT'
+                      : providerId === 'gemini' ? 'Gemini'
+                      : 'Claude';
+
   root.innerHTML = `
-    <!-- Prominent AI-helper callout above the textarea so first-time
-         users see the "outsource this" option before they see a blank
-         box asking them to write. Yellow band + explicit copy makes
-         the affordance discoverable. Two-button stack on the right:
-         1) copy the AI prompt, 2) load the .md file the AI produces. -->
+    <!-- AI helper — one path.
+         Button opens the Get-AI-Prompt modal so the user copies the
+         prompt and takes it to their AI product, where their account
+         memory / Projects / Custom Instructions can actually
+         personalize the draft. A stateless API auto-draft was tried
+         earlier and pulled — it invented details and set the wrong
+         expectation vs the chat product. -->
     <div class="setup-ai-helper">
-      <div class="setup-ai-helper__body">
-        <h3 class="setup-ai-helper__title">Not sure what to write?</h3>
-      </div>
-      <div class="setup-ai-helper__actions">
-        <button class="jc-btn setup-ai-helper__cta" data-variant="highlight" data-prompt-key="${step.promptKey}" type="button">✨ Get AI prompt →</button>
-        <label for="wFieldFile" class="jc-btn setup-ai-helper__load" title="Load the .md file the AI produced.">Then, Click to Load the .MD File</label>
-        <input id="wFieldFile" type="file" accept=".md,text/markdown,text/plain" hidden />
+      <div class="setup-ai-helper__row">
+        <div class="setup-ai-helper__body">
+          <h3 class="setup-ai-helper__title">Draft this in ${providerLabel}.</h3>
+          <span class="setup-ai-helper__desc">${providerLabel} sees your account's memory, projects, and preferences — the personalized draft goes fastest here.</span>
+        </div>
+        <div class="setup-ai-helper__actions">
+          <button class="jc-btn setup-ai-helper__cta" data-variant="highlight" type="button" data-prompt-key="${step.promptKey}">Draft in ${providerLabel} →</button>
+          <label for="wFieldFile" class="jc-btn setup-ai-helper__load" title="Load a .md file you already have.">Or, Load a .MD file</label>
+          <input id="wFieldFile" type="file" accept=".md,text/markdown,text/plain" hidden />
+        </div>
       </div>
     </div>
 
@@ -323,7 +342,10 @@ async function renderTextareaStep(root, step) {
     const status = $('wFieldStatus');
     if (status) status.textContent = `Loaded ${f.name}.`;
   });
+  // Draft button uses data-prompt-key so the delegated click handler
+  // at the bottom of this file opens the Get-AI-Prompt modal on click.
 }
+
 async function saveTextareaStep(step) {
   const ta = $('wField');
   if (!ta) return true;
