@@ -292,6 +292,81 @@ els.findOnTracker?.addEventListener('click', async () => {
   }
 });
 
+// ---------- Confirm on LinkedIn state ----------
+//
+// Tracks which jawbs the user has already clicked the "Confirm on
+// LinkedIn" button for so the CTA doesn't keep nagging after they've
+// closed the loop. Persists at ui.confirmedLinkedIn = { jobId: iso }.
+// Deliberately a UI-state key rather than a field on the job record
+// — no schema change, no SW handler, and losing the state on backup
+// re-import is acceptable (worst case the button reappears once).
+
+const UI_CONFIRMED_KEY = 'ui.confirmedLinkedIn';
+const confirmedLinkedIn = new Set();
+
+(async () => {
+  try {
+    const r = await chrome.storage.local.get(UI_CONFIRMED_KEY);
+    const map = r?.[UI_CONFIRMED_KEY] || {};
+    for (const id of Object.keys(map)) confirmedLinkedIn.add(id);
+  } catch { /* non-fatal — button just reappears next render */ }
+})();
+
+async function markConfirmedLinkedIn(jobId) {
+  if (!jobId || confirmedLinkedIn.has(jobId)) return;
+  confirmedLinkedIn.add(jobId);
+  try {
+    const r = await chrome.storage.local.get(UI_CONFIRMED_KEY);
+    const map = r?.[UI_CONFIRMED_KEY] || {};
+    map[jobId] = new Date().toISOString();
+    await chrome.storage.local.set({ [UI_CONFIRMED_KEY]: map });
+  } catch { /* in-memory set already updated; persist is best-effort */ }
+}
+
+// Mini-hunt click → force-set status. Escape hatch for when LinkedIn's
+// Save/Apply UI didn't fire our detection (their DOM has A/B tested
+// away from aria-label on some rollouts). Delegated on the <ol> since
+// the <li> children are re-rendered on every renderMiniHunt call.
+// Force-set semantics: whatever cell the user clicks becomes the exact
+// status — no upgradeStatus() gating. The user knows what they want.
+els.miniHunt?.addEventListener('click', async (e) => {
+  const li = e.target.closest('.mini-hunt__step');
+  if (!li) return;
+  const newStatus = li.dataset.status;
+  if (!newStatus || !currentJob?.jobId) return;
+  try {
+    const r = await send('update-job-status', {
+      jobId: currentJob.jobId,
+      status: newStatus,
+      note: `Status set from mini-hunt (${newStatus})`,
+    });
+    if (r?.ok) {
+      // Re-render from fresh storage so every gated affordance (Confirm
+      // on LinkedIn, Delete, etc.) re-evaluates against the new status.
+      await renderJob(currentJob);
+    }
+  } catch (err) {
+    console.warn('[Jawbs] mini-hunt status update failed:', err);
+  }
+});
+
+// Anchor's default target="_blank" opens the tracker in a new tab; we
+// intercept only to persist state, hand off an auto-confirm signal to
+// the tracker's content script, and hide the button. Not preventing
+// default — the browser still opens the link. The storage write races
+// page load, but chrome.storage.local completes in single-digit ms while
+// the LinkedIn tracker takes seconds to hydrate, so the content script
+// sees the signal by the time it can act on it.
+els.confirmOnLinkedIn?.addEventListener('click', () => {
+  const jobId = currentJob?.jobId;
+  if (!jobId) return;
+  chrome.storage.local.set({
+    'ui.pendingConfirmClick': { jobId: String(jobId), createdAt: Date.now() },
+  });
+  markConfirmedLinkedIn(jobId);
+  els.confirmOnLinkedIn.hidden = true;
+});
+
 // ---------- Usage strip ----------
 
 function dayCostFromBuckets(byModel) {
@@ -962,14 +1037,19 @@ function renderVerdict(job) {
     els.findOnTracker.hidden = !onTracker;
   }
   // Confirm on LinkedIn — the "applied on corp site, still need to
-  // mark it applied on LinkedIn" nudge. Only for LinkedIn-sourced jobs
-  // that have been marked applied inside Jawbs. Opens LinkedIn's own
-  // tracker at ?stage=clicked_apply; the user finishes the flow
-  // manually. See panel.html for the anchor.
+  // mark it applied on LinkedIn" nudge. Shown whenever the mini-hunt
+  // is on its "Applied" band, which covers three real statuses:
+  // applied, inProgressClickedApply, and inProgressDraft. The
+  // inProgress* states are the ones where LinkedIn's tracker is
+  // literally prompting "Did you finish applying?" — exactly when
+  // this button is most useful. Gating on source is intentionally
+  // dropped so the workflow "found on LinkedIn, applied on corp site
+  // (Rippling / Greenhouse / ...)" isn't blocked. Also hidden once
+  // the user has clicked through — see confirmedLinkedIn set.
   if (els.confirmOnLinkedIn) {
-    const norm = normalizeStatus(job.status);
-    const isLinkedIn = (job.source || 'linkedin') === 'linkedin';
-    els.confirmOnLinkedIn.hidden = !(norm === 'applied' && isLinkedIn);
+    const inAppliedBand = huntStageIndex(job.status) === 2;
+    const alreadyConfirmed = confirmedLinkedIn.has(job.jobId);
+    els.confirmOnLinkedIn.hidden = !inAppliedBand || alreadyConfirmed;
   }
   // Company gets its own span so the Details↗ open-full-view and 🗑 delete buttons
   // can sit inline with it. Location / workplace live in a separate span
@@ -1091,6 +1171,10 @@ function renderVerdict(job) {
 // carry the past/next state coloring; markers reuse the voyage-log
 // vocabulary (barrel = past, red fin = now, dashed circle = next).
 const HUNT_STAGES = ['Captured', 'Saved', 'Applied', 'Interviewing', 'Offer'];
+// Internal status a mini-hunt click writes for each stage. Kept aligned
+// with HUNT_STAGES by index. 'Offer' is null — the status vocabulary
+// doesn't have a matching value, so that cell renders but isn't clickable.
+const HUNT_STAGE_STATUS = ['analyzed', 'saved', 'applied', 'interviewing', null];
 function huntStageIndex(status) {
   const norm = normalizeStatus(status || '');
   if (norm === 'interviewing') return 3;
@@ -1114,7 +1198,15 @@ function renderMiniHunt(job) {
   const items = [];
   for (let i = start; i < start + 3 && i <= last; i++) {
     const state = i < cur ? 'past' : i === cur ? 'now' : 'next';
-    items.push(`<li class="mini-hunt__step" data-state="${state}">
+    const status = HUNT_STAGE_STATUS[i];
+    // Cells are clickable escape hatches for when LinkedIn UI detection
+    // misses a Save/Apply — user force-sets the status to what they want.
+    // Offer stage has no matching internal status; render it non-clickable.
+    const statusAttr = status ? ` data-status="${status}"` : '';
+    const title = status
+      ? `Click to mark this jawb as ${HUNT_STAGES[i]}`
+      : '';
+    items.push(`<li class="mini-hunt__step" data-state="${state}"${statusAttr}${title ? ` title="${title}"` : ''}>
       <span class="mini-hunt__mark" aria-hidden="true"></span>
       <span class="mini-hunt__label">${HUNT_STAGES[i]}</span>
     </li>`);

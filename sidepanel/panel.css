@@ -602,6 +602,14 @@ body { background: var(--jc-bg); }
    destructive action is separated from the navigation actions. */
 .jc-jobcard__delete { margin-left: auto; }
 
+/* Secondary button row — holds the wide "Confirm on LinkedIn" CTA on
+   its own line so it can't overflow into the primary nav row. Hidden
+   when its only child is hidden so we don't leave a phantom gap. */
+.jc-jobcard__actions .jc-btn-row--secondary {
+  margin-top: 6px;
+}
+.jc-jobcard__actions .jc-btn-row--secondary:has(> [hidden]) { display: none; }
+
 /* Header row — company on the left, mini hunt strip + delete icon on
    the right. Matches the mockup's "top-right chrome" layout. */
 .jc-jobcard__header {
@@ -625,6 +633,15 @@ body { background: var(--jc-bg); }
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   /* Anchor for the connector line drawn to the next step. */
   position: relative;
+}
+/* Clickable stages get a pointer cursor + subtle label lift on hover so
+   users discover they're actionable. Non-clickable stages (Offer, which
+   has no matching internal status) stay static. */
+.mini-hunt__step[data-status] { cursor: pointer; }
+.mini-hunt__step[data-status]:hover .mini-hunt__label {
+  color: var(--jaw-red);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .mini-hunt__mark {
   width: 28px; height: 28px;
@@ -984,6 +1001,11 @@ body { background: var(--jc-bg); }
 .action-row {
   display: flex; align-items: center; gap: 6px;
 }
+/* Outputs sub-row — hosts the "Copy cover letter" / "Download resume"
+   quick actions below Bait. Collapses entirely when every jc-btn child
+   is hidden so an unbaited jawb has no phantom row taking up space. */
+.action-row--outputs { margin-top: 4px; }
+.action-row--outputs:not(:has(.jc-btn:not([hidden]))) { display: none; }
 .action-row__label {
   display: flex;
   flex-direction: column;

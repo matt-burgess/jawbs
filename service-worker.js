@@ -203,6 +203,16 @@ const handlers = {
   'inbound-match': (msg) => runInboundMatch(msg.message),
   'export-all': exportAll,
   'import-all': (msg) => importAll(msg.data),
+  // Content-script-callable: closes the sender's own tab. Used by the
+  // tracker auto-confirm flow so the user returns to the sidepanel of the
+  // jawb they were viewing once LinkedIn has processed the Yes click.
+  // Safe because it can only close the sender's OWN tab, not arbitrary ones.
+  'close-my-tab': async (_msg, sender) => {
+    const tabId = sender?.tab?.id;
+    if (typeof tabId !== 'number') return { ok: false, error: 'no tab id in sender' };
+    try { await chrome.tabs.remove(tabId); return { ok: true }; }
+    catch (e) { return { ok: false, error: e.message }; }
+  },
   'mark-exported': async () => { await setLastExportAt(new Date().toISOString()); return { ok: true }; },
   'get-last-export': getLastExportAt,
   'get-usage': getUsage,

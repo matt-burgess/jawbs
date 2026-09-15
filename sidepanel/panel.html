@@ -225,16 +225,6 @@
                   <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
                   <span>Job Tracker</span>
                 </button>
-                <!-- Confirm on LinkedIn — for the "applied on the corp site,
-                     still need to mark it applied on LinkedIn" flow. Opens
-                     LinkedIn's tracker at the Clicked Apply stage in a new
-                     tab; user clicks Yes on the "Did you finish applying?"
-                     prompt themselves. No LinkedIn UI automation. Shown only
-                     when status is 'applied' AND the job came from LinkedIn. -->
-                <a id="confirmOnLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="highlight" data-size="sm" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" aria-label="Confirm applied on LinkedIn tracker" title="Open LinkedIn's tracker at the Clicked Apply stage — find this jawb and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>
-                  <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
-                  <span>Confirm on LinkedIn</span>
-                </a>
                 <!-- Delete lives at the tail of the action row now,
                      rendered as an icon-only danger button — the red
                      trash glyph carries the destructive intent on its
@@ -244,6 +234,18 @@
                     <path d="M3 6h18"/><path d="M19 6l-1.2 13.2A2 2 0 0 1 15.8 21H8.2a2 2 0 0 1-2-1.8L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
                   </svg>
                 </button>
+              </div>
+              <!-- Confirm on LinkedIn — dedicated row so the wide CTA
+                   doesn't overflow the primary Details / Corp Site /
+                   Job Tracker row. Shown only while the jawb is in the
+                   Applied mini-hunt band AND the user hasn't already
+                   dismissed it by clicking through once (state is
+                   persisted at ui.confirmedLinkedIn). -->
+              <div class="jc-btn-row jc-btn-row--secondary">
+                <a id="confirmOnLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="highlight" data-size="sm" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" aria-label="Confirm applied on LinkedIn tracker" title="Open LinkedIn's tracker at the Clicked Apply stage — find this jawb and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>
+                  <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
+                  <span>Transition to 'Applied' on LinkedIn</span>
+                </a>
               </div>
               <span id="jobMetaRest" class="jc-job-meta__rest"></span>
             </div>
@@ -265,10 +267,20 @@
                   <span class="action-row__sub">Generation</span>
                 </span>
                 <button class="jc-btn" data-size="sm" data-action="letter" type="button" title="Warm tone">Cover letter</button>
-                <button id="letterCopyTop" class="jc-btn" data-size="sm" data-variant="ghost" type="button" title="Copy the generated cover letter" hidden>📋 Copy</button>
                 <button class="jc-btn" data-size="sm" data-action="resume" type="button">Resume/CV</button>
-                <button id="resumeDownloadTop" class="jc-btn" data-size="sm" data-variant="ghost" type="button" title="Download the tailored resume as Markdown" hidden>↓ Download</button>
                 <button class="jc-btn" data-size="sm" data-action="prep" type="button">Prep brief</button>
+              </div>
+              <!-- Bait outputs — quick actions on already-generated
+                   artifacts. Split off from the Bait row so the wide
+                   "Copy" / "Download" labels stop squeezing the three
+                   generation buttons above. The whole row collapses
+                   (see .action-row--outputs CSS) when no children are
+                   visible, so a fresh jawb with nothing generated
+                   still renders cleanly. -->
+              <div class="action-row action-row--outputs">
+                <span class="action-row__label" aria-hidden="true"></span>
+                <button id="letterCopyTop" class="jc-btn" data-size="sm" type="button" title="Copy the generated cover letter" hidden>📋 Copy cover letter</button>
+                <button id="resumeDownloadTop" class="jc-btn" data-size="sm" type="button" title="Download the tailored resume as Markdown" hidden>↓ Download resume</button>
               </div>
             </div>
             <!-- Comp source note + one-line fit summary retired — the

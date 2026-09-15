@@ -24,6 +24,34 @@
 
   let lastJobId = null;
   let lastTrackerFingerprint = '';
+  // Auto-confirm-click state — set from the sidepanel's "Transition to
+  // Applied on LinkedIn" button via chrome.storage.local. On the tracker
+  // page, we walk the DOM until we find the specific jawb row and click
+  // its "Yes" (Did you finish applying?) button. Cleared once clicked or
+  // once the deadline lapses. Only inspected on /jobs-tracker/*.
+  let pendingAutoConfirm = null; // { jobId: string, deadline: number }
+  (async () => {
+    // Only tracker tabs consume the signal. Otherwise a stale /jobs/view
+    // or /jobs/search tab that happens to load around the same time could
+    // eat the pending signal before the freshly-opened tracker tab reads it.
+    if (!/\/jobs-tracker\//.test(location.pathname)) return;
+    try {
+      const r = await chrome.storage.local.get('ui.pendingConfirmClick');
+      const p = r?.['ui.pendingConfirmClick'];
+      // Clear immediately after read — the signal is single-shot so a
+      // returning user opening the tracker manually later isn't retargeted.
+      if (p) await chrome.storage.local.remove('ui.pendingConfirmClick');
+      if (p?.jobId) {
+        const age = Date.now() - (Number(p.createdAt) || 0);
+        // 30s window is generous for cold LinkedIn tabs but tight enough
+        // that a stale signal from a browser sitting idle overnight won't
+        // fire unexpectedly on the user's next tracker visit.
+        if (age < 30_000) {
+          pendingAutoConfirm = { jobId: String(p.jobId), deadline: Date.now() + 15_000 };
+        }
+      }
+    } catch { /* non-fatal — worst case user clicks Yes themselves */ }
+  })();
   // Guards the search-detected message so the 500ms URL poller
   // doesn't fire duplicate reports on every tick of the same page.
   let lastReportedSearchUrl = null;
@@ -2189,6 +2217,12 @@
         const stage = detectTrackerStage();
         chrome.runtime.sendMessage({ type: 'tracker-list', jobs, url, stage }).catch(() => {});
       }
+      // Sidepanel's "Transition to Applied on LinkedIn" workflow — if
+      // a pending auto-confirm signal targets a jobId visible on the
+      // clicked_apply stage, walk to its row and click the Yes button.
+      if (pendingAutoConfirm && /[?&]stage=clicked_apply\b/.test(location.search)) {
+        tryAutoConfirmClick();
+      }
       if (!suppressInjections) {
         // Backfill sync pill removed — use the Jawboard's "Thresh" button
         // instead. Tracker-list detection still fires so the SW can update
@@ -2199,6 +2233,68 @@
         document.querySelectorAll('.jc-careers-btn').forEach((el) => el.remove());
       }
     }
+  }
+
+  // Locate the target jawb row on the clicked_apply tracker page and
+  // programmatically click its "Did you finish applying? → Yes" button.
+  // Called on every runNow tick while pendingAutoConfirm is set; retries
+  // until success or deadline. LinkedIn's SPA hydrates the tracker list
+  // asynchronously after page load, so the first few ticks will find no
+  // matching row — that's expected. Once we find + click, we null the
+  // signal so we don't fire again on the same page.
+  function tryAutoConfirmClick() {
+    if (!pendingAutoConfirm) return;
+    if (Date.now() > pendingAutoConfirm.deadline) {
+      console.warn('[Jawbs] auto-confirm timed out for', pendingAutoConfirm.jobId);
+      pendingAutoConfirm = null;
+      return;
+    }
+    const jobId = pendingAutoConfirm.jobId;
+    const link = document.querySelector(`a[href*="/jobs/view/${jobId}"]`);
+    if (!link) return; // row hasn't hydrated yet — try again next tick
+    // Walk up the ancestor chain looking for the enclosing card that also
+    // contains the "Did you finish applying?" prompt + Yes/No buttons.
+    // LinkedIn's utility class names are hashed, so anchoring on the
+    // prompt text is the stable anchor.
+    let container = link;
+    let yesBtn = null;
+    for (let depth = 0; depth < 12 && container; depth++) {
+      const prompt = Array.from(container.querySelectorAll('p'))
+        .find((p) => /did you finish applying/i.test(p.textContent || ''));
+      if (prompt) {
+        for (const btn of container.querySelectorAll('button')) {
+          const label = (btn.textContent || '').trim();
+          if (/^Yes$/i.test(label)) { yesBtn = btn; break; }
+        }
+        if (yesBtn) break;
+      }
+      container = container.parentElement;
+    }
+    if (!yesBtn) return; // prompt not in DOM yet or structure changed
+    // Scroll the row into view before clicking so the user visually sees
+    // which row moved. LinkedIn removes the card from the clicked_apply
+    // list after confirmation, which is the "it worked" signal.
+    const row = link.closest('li, article, [role="listitem"], [componentkey]');
+    if (row && typeof row.scrollIntoView === 'function') {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    yesBtn.click();
+    console.info('[Jawbs] auto-confirmed applied on LinkedIn tracker', jobId);
+    pendingAutoConfirm = null;
+    // Close the tracker tab after LinkedIn's had time to process the
+    // click server-side. Returns the user's attention to the sidepanel
+    // of the jawb they were viewing. Wait up to 3s for the row to
+    // disappear (LinkedIn's own confirmation that the state change
+    // stuck) and then close; if it hasn't disappeared by then, close
+    // anyway so we don't leave the tab hanging on a slow network.
+    (async () => {
+      const start = Date.now();
+      while (Date.now() - start < 3000) {
+        await new Promise((r) => setTimeout(r, 200));
+        if (!document.querySelector(`a[href*="/jobs/view/${jobId}"]`)) break;
+      }
+      chrome.runtime.sendMessage({ type: 'close-my-tab' }).catch(() => {});
+    })();
   }
 
   // Debounce with a MAX-WAIT ceiling. Plain trailing-edge debounce breaks
