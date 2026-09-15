@@ -53,7 +53,12 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
   display: inline-flex; align-items: center; gap: 6px;
 }
 .crumb-link:hover { color: var(--jaw-red-hover); }
-.crumb-link .jc-brand { color: inherit; }
+.crumb-link .jc-brand {
+  color: inherit;
+  /* Double the inherited crumb-link size so the Jawboard wordmark
+     reads as the primary brand element, not a footnote-sized crumb. */
+  font-size: calc(var(--jc-text-2xs) * 2);
+}
 
 /* Voyage log — horizontal chain of stages for this jawb. Past stages
    show a small gold flag, the current stage a boat/fin marker, future

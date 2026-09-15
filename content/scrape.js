@@ -80,7 +80,17 @@
     const hiring = t.match(/^(.+?)\s+hiring\s+(.+?)(?:\s+in\s+(.+))?$/i);
     if (hiring) return { company: hiring[1].trim(), title: hiring[2].trim(), location: hiring[3]?.trim() || null };
     const pipe = t.split(/\s*\|\s*/);
-    if (pipe.length === 2 && pipe[0] && pipe[1]) return { title: pipe[0].trim(), company: pipe[1].trim(), location: null };
+    // 2 parts → the classic "Title | Company" LinkedIn header.
+    // 3+ parts → the job title itself contained a pipe (e.g.
+    // "Senior Engineer | Data Platform | BigCo"). The last segment is
+    // still the company; everything before it joined by " | " is the
+    // title. Falling through to the dash matcher used to silently drop
+    // the extraction in this case.
+    if (pipe.length >= 2 && pipe[0] && pipe[pipe.length - 1]) {
+      const company = pipe[pipe.length - 1].trim();
+      const title = pipe.slice(0, -1).map((s) => s.trim()).filter(Boolean).join(' | ');
+      if (title && company) return { title, company, location: null };
+    }
     const dash = t.match(/^(.+?)\s+[-–—]\s+(.+)$/);
     if (dash) return { title: dash[1].trim(), company: dash[2].trim(), location: null };
     return null;

@@ -961,6 +961,16 @@ function renderVerdict(job) {
     const onTracker = norm !== 'analyzed' && (job.source || 'linkedin') === 'linkedin';
     els.findOnTracker.hidden = !onTracker;
   }
+  // Confirm on LinkedIn — the "applied on corp site, still need to
+  // mark it applied on LinkedIn" nudge. Only for LinkedIn-sourced jobs
+  // that have been marked applied inside Jawbs. Opens LinkedIn's own
+  // tracker at ?stage=clicked_apply; the user finishes the flow
+  // manually. See panel.html for the anchor.
+  if (els.confirmOnLinkedIn) {
+    const norm = normalizeStatus(job.status);
+    const isLinkedIn = (job.source || 'linkedin') === 'linkedin';
+    els.confirmOnLinkedIn.hidden = !(norm === 'applied' && isLinkedIn);
+  }
   // Company gets its own span so the Details↗ open-full-view and 🗑 delete buttons
   // can sit inline with it. Location / workplace live in a separate span
   // that follows the buttons.

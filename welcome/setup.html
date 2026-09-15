@@ -19,7 +19,18 @@
             <span class="jc-brand jc-brand--xl">Setup</span>
           </span>
         </div>
-        <div class="toolbar-actions"></div>
+        <div class="toolbar-actions">
+          <!-- Returning-user import shortcut. Uploading a Jawbs backup
+               JSON here bypasses the whole wizard: contents are handed
+               to the SW's import-all handler (same route Settings
+               uses), the wizard is marked completed, and the user is
+               dropped into the Jawboard with their imported jawbs. -->
+          <span id="setupImportStatus" class="jc-footnote setup-import__status" role="status" aria-live="polite"></span>
+          <label id="setupImportBtn" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" for="setupImportFile" title="Import a previously-exported Jawbs backup and skip the wizard.">
+            <span>Back for more? Import your JAWBS Backup</span>
+          </label>
+          <input type="file" id="setupImportFile" accept="application/json,.json" hidden />
+        </div>
       </header>
 
       <!-- Progress dots — one per step, filled up to the active one -->

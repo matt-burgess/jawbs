@@ -406,6 +406,52 @@ function renderDoneStep(root) {
   `;
 }
 
+// ---- Toolbar import shortcut ----
+//
+// Returning users skip the wizard by uploading a Jawbs backup JSON.
+// The button + hidden file input live in setup.html's toolbar-actions
+// so the affordance is visible on every step. On successful import
+// we mark the wizard completed and drop the user into the Jawboard.
+function wireImportShortcut() {
+  const fileInput = $('setupImportFile');
+  const status = $('setupImportStatus');
+  if (!fileInput || !status) return;
+  const setStatus = (text, tone) => {
+    status.textContent = text;
+    status.dataset.tone = tone || '';
+  };
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    setStatus('Reading backup…', 'info');
+    let data;
+    try {
+      const text = await file.text();
+      data = JSON.parse(text);
+    } catch (e) {
+      setStatus(`Invalid JSON: ${e.message}`, 'error');
+      fileInput.value = '';
+      return;
+    }
+    setStatus('Importing…', 'info');
+    try {
+      const r = await chrome.runtime.sendMessage({ type: 'import-all', data });
+      if (!r?.ok) throw new Error(r?.error || 'Import failed');
+      const imported = r.data?.imported ?? 0;
+      setStatus(`Imported ${imported} jawbs. Opening the Jawboard…`, 'success');
+      // Same completion flag the "Open LinkedIn" button on the Done
+      // step sets — future setup-openings resume at the final step.
+      await saveResumeIdx(STEPS.length - 1);
+      setTimeout(() => {
+        chrome.tabs.create({ url: chrome.runtime.getURL('archive/archive.html') });
+      }, 900);
+    } catch (e) {
+      setStatus(`Import failed: ${e.message}`, 'error');
+      fileInput.value = '';
+    }
+  });
+}
+
 // ---------- Save + navigate ----------
 
 async function saveCurrent() {
@@ -481,6 +527,7 @@ $('promptCopy')?.addEventListener('click', async () => {
 $('setupNext').addEventListener('click', advance);
 $('setupPrev').addEventListener('click', goBack);
 $('setupSkip').addEventListener('click', skip);
+wireImportShortcut();
 
 // ---------- Init ----------
 (async () => {

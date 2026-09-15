@@ -157,6 +157,19 @@
   border-radius: 12px;
 }
 
+/* Returning-user import shortcut — lives in the setup toolbar's
+   right side. Tone is signaled via a data-tone attr set from JS
+   (info / success / error). */
+.jc-toolbar .toolbar-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jc-3);
+}
+.setup-import__status[data-tone="success"] { color: var(--jc-pos, #1F7A3A); font-weight: 600; }
+.setup-import__status[data-tone="error"]   { color: var(--jaw-red); font-weight: 600; }
+.setup-import__status[data-tone="info"]    { color: var(--jc-text-2); }
+
 /* Done-step tip callout — captain portrait on the left, tip copy +
    gold CTA on the right. The wizard's primary Next button already
    opens LinkedIn, so this whole panel is dedicated to the tip ask. */

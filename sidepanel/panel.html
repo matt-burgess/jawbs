@@ -225,6 +225,16 @@
                   <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
                   <span>Job Tracker</span>
                 </button>
+                <!-- Confirm on LinkedIn — for the "applied on the corp site,
+                     still need to mark it applied on LinkedIn" flow. Opens
+                     LinkedIn's tracker at the Clicked Apply stage in a new
+                     tab; user clicks Yes on the "Did you finish applying?"
+                     prompt themselves. No LinkedIn UI automation. Shown only
+                     when status is 'applied' AND the job came from LinkedIn. -->
+                <a id="confirmOnLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="highlight" data-size="sm" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" aria-label="Confirm applied on LinkedIn tracker" title="Open LinkedIn's tracker at the Clicked Apply stage — find this jawb and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>
+                  <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
+                  <span>Confirm on LinkedIn</span>
+                </a>
                 <!-- Delete lives at the tail of the action row now,
                      rendered as an icon-only danger button — the red
                      trash glyph carries the destructive intent on its
