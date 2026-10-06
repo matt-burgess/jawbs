@@ -2,16 +2,7 @@
 // passes the full CHARTS list as the "selected" set, and offers the same
 // archive-stale callback as the Jawboard so Lines-in-Water works the same.
 import { renderDashboardCharts, CHARTS, defaultLinks } from '../archive/dashboardCharts.js';
-
-const $ = (id) => document.getElementById(id);
-const els = new Proxy({}, { get: (_, id) => $(id) });
-
-async function send(type, payload = {}) {
-  const response = await chrome.runtime.sendMessage({ type, ...payload });
-  if (!response) throw new Error('No response from service worker');
-  if (!response.ok) throw new Error(response.error || 'Unknown error');
-  return response;
-}
+import { els, send } from '../lib/pageBoot.js';
 
 async function load() {
   els.bridgeStatus.textContent = 'Loading…';

@@ -105,7 +105,7 @@
         <div id="reconcileMissingWrap" class="reconcile-group" hidden>
           <h3 class="reconcile-group__h">Missing on LinkedIn <span id="reconcileMissingCount" class="jc-footnote"></span></h3>
           <div class="reconcile-group__bulk">
-            <button class="jc-btn" data-size="sm" data-bulk="missing" data-choice="accept-linkedin" type="button">All: Mark Not Moving Forward</button>
+            <button class="jc-btn" data-size="sm" data-bulk="missing" data-choice="accept-linkedin" type="button">All: Add Scar</button>
             <button class="jc-btn" data-size="sm" data-bulk="missing" data-choice="keep-local" type="button">All: Keep local</button>
             <button class="jc-btn" data-variant="danger" data-size="sm" data-bulk="missing" data-choice="delete" type="button">All: Delete</button>
           </div>
@@ -162,17 +162,16 @@
           <option value="inProgressClickedApply">In Progress - Clicked Apply</option>
           <option value="applied">Applied</option>
           <option value="interviewing">Interviewing</option>
-          <option value="archived">Archived</option>
-          <option value="notMovingForward">Not Moving Forward</option>
+          <option value="scar">Scars</option>
         </select>
         <select id="sourceFilter" class="jc-select" title="Filter by capture source (Waters)">
           <option value="">All waters</option>
           <option value="linkedin">LinkedIn</option>
           <option value="google_jobs">Google Jobs</option>
         </select>
-        <label class="controls__toggle" title="LinkedIn Archived jawbs are hidden by default. Tick to include them in the list.">
+        <label class="controls__toggle" title="Scars (jawbs marked Archived or Not Moving Forward on LinkedIn) are hidden by default. Tick to include them in the list.">
           <input id="showArchived" type="checkbox" />
-          <span>Show Archived</span>
+          <span>Show Scars</span>
         </label>
       </div>
 

@@ -1,35 +1,57 @@
 import {
-  getApiKey, setApiKey,
-  getOpenAIKey, setOpenAIKey,
-  getGeminiKey, setGeminiKey,
-  getCloudProvider, setCloudProvider,
-  getModels, setModels,
-  getProfile, setProfile,
-  getMasterResume, setMasterResume,
-  getCompTargets, setCompTargets,
-  getWritingSamples, setWritingSamples,
-  getAutoAnalyzeEnabled, setAutoAnalyzeEnabled,
-  getLinkedInProfileUrl, setLinkedInProfileUrl,
-  getContactEmail, setContactEmail,
-  getContactPhone, setContactPhone,
-  getContactLocation, setContactLocation,
-  getWorkLocations, setWorkLocations,
-  getWorkPreferences, setWorkPreferences,
-  getKnowledgeBase, setKnowledgeBase,
-  getLocalModelSettings, setLocalModelSettings,
-  getPrepQuestions, setPrepQuestions,
-  getNegativeKeywords, setNegativeKeywords,
+  getApiKey,
+  setApiKey,
+  getOpenAIKey,
+  setOpenAIKey,
+  getGeminiKey,
+  setGeminiKey,
+  getCloudProvider,
+  setCloudProvider,
+  getModels,
+  setModels,
+  getProfile,
+  setProfile,
+  getMasterResume,
+  setMasterResume,
+  getCompTargets,
+  setCompTargets,
+  getWritingSamples,
+  setWritingSamples,
+  getAutoAnalyzeEnabled,
+  setAutoAnalyzeEnabled,
+  getLinkedInProfileUrl,
+  setLinkedInProfileUrl,
+  getContactEmail,
+  setContactEmail,
+  getContactPhone,
+  setContactPhone,
+  getContactLocation,
+  setContactLocation,
+  getCandidateName,
+  setCandidateName,
+  getCandidateTagline,
+  setCandidateTagline,
+  getWorkLocations,
+  setWorkLocations,
+  getWorkPreferences,
+  setWorkPreferences,
+  getKnowledgeBase,
+  setKnowledgeBase,
+  getLocalModelSettings,
+  setLocalModelSettings,
+  getPrepQuestions,
+  setPrepQuestions,
+  getNegativeKeywords,
+  setNegativeKeywords,
   getUsage,
-  exportAll, importAll, setLastExportAt,
+  setLastExportAt,
 } from '../lib/store.js';
-import { attachQuickFill } from '../lib/linkedInFill.js';
-import { DEFAULT_PROFILE, DEFAULT_COMP_TARGETS, DEFAULT_PREP_QUESTIONS } from '../lib/defaults.js';
+import { initQuickFill } from '../lib/contactFill.js';
+import { $, els, send, escapeHtml } from '../lib/pageBoot.js';
+import { DEFAULT_PROFILE, DEFAULT_PREP_QUESTIONS } from '../lib/defaults.js';
 import { DEFAULT_MODELS, MODEL_IDS } from '../lib/models.js';
 import { estimateCostUsd, formatUsd, MODEL_PRICING } from '../lib/pricing.js';
-import { PROMPTS } from '../lib/onboardingPrompts.js';
-
-const $ = (id) => document.getElementById(id);
-const els = new Proxy({}, { get: (_, id) => $(id) });
+import { initPromptModal } from '../lib/onboardingPrompts.js';
 
 const flash = (el, text, ms = 2000) => { el.textContent = text; setTimeout(() => (el.textContent = ''), ms); };
 
@@ -343,6 +365,21 @@ els.resume.addEventListener('input', () => {
   els.resumeLen.textContent = `${els.resume.value.length.toLocaleString()} chars`;
 });
 
+// ---------- Resume header (name + tagline) ----------
+
+async function loadCandidateHeader() {
+  const [name, tagline] = await Promise.all([getCandidateName(), getCandidateTagline()]);
+  els.candidateName.value = name || '';
+  els.candidateTagline.value = tagline || '';
+}
+els.saveCandidateHeader?.addEventListener('click', async () => {
+  await Promise.all([
+    setCandidateName(els.candidateName.value.trim()),
+    setCandidateTagline(els.candidateTagline.value.trim()),
+  ]);
+  flash(els.candidateHeaderStatus, 'Saved.');
+});
+
 // ---------- Comp ----------
 
 async function loadComp() {
@@ -430,7 +467,7 @@ els.saveNegativeKeywords.addEventListener('click', async () => {
 els.openWelcome?.addEventListener('click', () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('welcome/welcome.html') });
 });
-document.getElementById('openSetupWizard')?.addEventListener('click', () => {
+$('openSetupWizard')?.addEventListener('click', () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('welcome/setup.html') });
 });
 
@@ -442,21 +479,21 @@ document.getElementById('openSetupWizard')?.addEventListener('click', () => {
 // The reset button clears dismiss/share/tipped stamps so the next
 // eligible check re-shows the CTA — useful for testing.
 async function loadTipToggle() {
-  const el = document.getElementById('tipPromptsToggle');
+  const el = $('tipPromptsToggle');
   if (!el) return;
   const s = (await chrome.storage.local.get('tip')).tip || {};
   el.checked = s.enabled !== false; // undefined defaults to on
 }
-document.getElementById('tipPromptsToggle')?.addEventListener('change', async (e) => {
+$('tipPromptsToggle')?.addEventListener('change', async (e) => {
   const enabled = !!e.target.checked;
   const s = (await chrome.storage.local.get('tip')).tip || {};
   await chrome.storage.local.set({ tip: { ...s, enabled } });
 });
-document.getElementById('tipResetState')?.addEventListener('click', async () => {
+$('tipResetState')?.addEventListener('click', async () => {
   const s = (await chrome.storage.local.get('tip')).tip || {};
   const kept = { enabled: s.enabled !== false, installedAt: s.installedAt };
   await chrome.storage.local.set({ tip: kept });
-  const status = document.getElementById('tipStateStatus');
+  const status = $('tipStateStatus');
   if (status) {
     status.textContent = 'Dismiss state cleared — next eligible check will re-show the CTA.';
     setTimeout(() => { status.textContent = ''; }, 4000);
@@ -465,12 +502,12 @@ document.getElementById('tipResetState')?.addEventListener('click', async () => 
 // Force the tip prompt to appear the next time the Jawbar loads —
 // bypasses the milestone eligibility check and the dismiss/share/
 // tipped guards. Consumed and cleared by evaluateTipNudge in panel.js.
-document.getElementById('tipForceShow')?.addEventListener('click', async () => {
+$('tipForceShow')?.addEventListener('click', async () => {
   const s = (await chrome.storage.local.get('tip')).tip || {};
   await chrome.storage.local.set({
     tip: { ...s, enabled: true, forceShow: true },
   });
-  const status = document.getElementById('tipStateStatus');
+  const status = $('tipStateStatus');
   if (status) {
     status.textContent = 'Tip prompt queued — open (or re-open) the Jawbar to see it.';
     setTimeout(() => { status.textContent = ''; }, 5000);
@@ -484,13 +521,6 @@ loadTipToggle().catch(() => {});
 // Anthropic. All three source from what the user has ON SCREEN in the
 // Master Resume textarea — saved or not — so a paste-then-generate
 // workflow doesn't require an explicit Save step between them.
-
-async function send(type, payload = {}) {
-  const response = await chrome.runtime.sendMessage({ type, ...payload });
-  if (!response) throw new Error('No response from service worker');
-  if (!response.ok) throw new Error(response.error || 'Unknown error');
-  return response;
-}
 
 async function runFieldGenerator({ handler, payload = {}, textarea, statusEl, button, label }) {
   const original = button.textContent;
@@ -561,8 +591,13 @@ els.generateKnowledge?.addEventListener('click', () => {
 });
 
 // ---------- Contact shortcuts (email, phone, LinkedIn URL, city/state) ----------
+//
+// initQuickFill() boots the toolbar and returns the mutable cache object.
+// Save handlers below poke the cache directly for immediate feedback,
+// alongside the storage.onChanged listener inside the helper that also
+// catches updates from any other context.
 
-const cachedFill = { email: '', phone: '', linkedInUrl: '', location: '' };
+const cachedFill = initQuickFill();
 async function loadShortcuts() {
   const [email, phone, linkedInUrl, location] = await Promise.all([
     getContactEmail(), getContactPhone(), getLinkedInProfileUrl(), getContactLocation(),
@@ -603,9 +638,6 @@ if (els.saveContactLocation) {
     flash(els.contactLocationStatus, 'Saved.');
   });
 }
-
-// Wire the floating quick-fill toolbar over any focused input on this page too.
-attachQuickFill(document.body, () => cachedFill);
 
 // ---------- Work locations & preferences ----------
 
@@ -843,10 +875,6 @@ function renderActivityRow(e) {
     </div>`;
 }
 
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
 els.refreshActivity?.addEventListener('click', loadActivity);
 els.activityFilter?.addEventListener('change', renderActivity);
 els.clearActivity?.addEventListener('click', async () => {
@@ -901,60 +929,7 @@ els.importBackup.addEventListener('change', async () => {
 // otherwise, ask a targeted question sequence first.
 
 
-function openPromptModal(key) {
-  const preset = PROMPTS[key];
-  if (!preset) return;
-  const modal = document.getElementById('promptModal');
-  const title = document.getElementById('promptModalTitle');
-  const intro = document.getElementById('promptModalIntro');
-  const body = document.getElementById('promptModalBody');
-  const status = document.getElementById('promptCopyStatus');
-  if (!modal || !title || !body) return;
-  title.textContent = preset.title;
-  intro.textContent = preset.intro;
-  body.value = preset.body;
-  status.textContent = '';
-  modal.hidden = false;
-  // Preselect so keyboard users can ctrl+A → ctrl+C without hunting.
-  setTimeout(() => { body.focus(); body.select(); }, 30);
-}
-
-function closePromptModal() {
-  const modal = document.getElementById('promptModal');
-  if (modal) modal.hidden = true;
-}
-
-// Delegated: any button with data-prompt-key opens the modal for that field.
-document.addEventListener('click', (e) => {
-  const trigger = e.target.closest('[data-prompt-key]');
-  if (trigger) { openPromptModal(trigger.dataset.promptKey); return; }
-  if (e.target.closest('[data-modal-close]')) closePromptModal();
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    const modal = document.getElementById('promptModal');
-    if (modal && !modal.hidden) closePromptModal();
-  }
-});
-
-document.getElementById('promptCopy')?.addEventListener('click', async () => {
-  const body = document.getElementById('promptModalBody');
-  const status = document.getElementById('promptCopyStatus');
-  if (!body) return;
-  try {
-    await navigator.clipboard.writeText(body.value);
-    if (status) {
-      status.textContent = 'Copied — paste into your AI.';
-      setTimeout(() => { status.textContent = ''; }, 4000);
-    }
-  } catch {
-    // Clipboard API rejected (rare in extension pages) — fall back to
-    // selecting the text so the user can ctrl+C manually.
-    body.focus(); body.select();
-    if (status) status.textContent = 'Press ⌘/Ctrl+C to copy.';
-  }
-});
+initPromptModal();
 
 // Setup-helper panel — one row per required field, checked off when
 // the corresponding textarea has content. Refreshes on every save so
@@ -967,7 +942,7 @@ const SETUP_STEPS = [
 ];
 
 function fieldHasContent(elId) {
-  const el = document.getElementById(elId);
+  const el = $(elId);
   if (!el) return false;
   const val = String(el.value || '').trim();
   if (!val) return false;
@@ -982,8 +957,8 @@ function fieldHasContent(elId) {
 }
 
 function refreshSetupHelper() {
-  const panel = document.getElementById('setupHelper');
-  const list = document.getElementById('setupHelperList');
+  const panel = $('setupHelper');
+  const list = $('setupHelperList');
   if (!panel || !list) return;
   list.innerHTML = '';
   let anyMissing = false;
@@ -1016,7 +991,7 @@ function refreshSetupHelper() {
 // Hook refresh into every save button — the input's own storage roundtrip
 // isn't observable, so re-check after each explicit save action.
 ['saveProfile', 'saveResume', 'saveSamples', 'savePrepQuestions', 'resetProfile', 'resetPrepQuestions'].forEach((id) => {
-  document.getElementById(id)?.addEventListener('click', () => {
+  $(id)?.addEventListener('click', () => {
     // Wait a tick so the save handler's own textarea updates have
     // committed before we test values.
     setTimeout(() => refreshSetupHelper(), 100);
@@ -1026,7 +1001,7 @@ function refreshSetupHelper() {
 // ---------- Init ----------
 
 (async () => {
-  await Promise.all([loadKey(), loadProfile(), loadResume(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadShortcuts(), loadModels(), loadUsage(), loadActivity()]);
+  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadShortcuts(), loadModels(), loadUsage(), loadActivity()]);
   refreshOllamaStatus();
   refreshSetupHelper();
 })();

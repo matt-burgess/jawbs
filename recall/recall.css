@@ -271,6 +271,35 @@ section > .jc-eyebrow, .section-head-row .jc-eyebrow {
 }
 .recall-box:empty { display: none; }
 
+/* Application-answer entries — collapsed <details>/<summary> pairs so
+   a jawb with a dozen drafted answers doesn't wall of text. Summary
+   is the question (question-first for phone-call scanning); expanding
+   reveals the drafted answer in a monospace pre for scrollability. */
+.application-answer {
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius-sm);
+  padding: 6px 10px;
+  background: var(--jc-surface-2);
+}
+.application-answer + .application-answer { margin-top: 6px; }
+.application-answer > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: var(--jc-3);
+  font-weight: 600;
+  color: var(--jc-text);
+  list-style-position: outside;
+}
+.application-answer__q { flex: 1 1 auto; min-width: 0; }
+.application-answer__meta { flex: none; }
+.application-answer__a {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font: 400 var(--jc-text-sm)/1.5 var(--jc-font);
+  color: var(--jc-text);
+}
+
 /* Fit / Comp readout internals */
 .label {
   font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
@@ -480,6 +509,12 @@ details summary {
   color: var(--jc-text-3);
 }
 .round-card__grid label.full { grid-column: 1 / -1; }
+.round-card__grid label .jc-linkbtn {
+  appearance: none; border: 0; background: none; padding: 0; margin-left: 6px;
+  font: inherit; letter-spacing: inherit; text-transform: none;
+  color: var(--jc-accent); cursor: pointer;
+}
+.round-card__grid label .jc-linkbtn:hover { text-decoration: underline; }
 .round-card__meta { display: flex; align-items: center; gap: var(--jc-2); font-size: var(--jc-text-xs); color: var(--jc-text-3); }
 .round-card__actions { display: flex; gap: var(--jc-2); flex-wrap: wrap; }
 

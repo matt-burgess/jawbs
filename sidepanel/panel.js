@@ -1,13 +1,11 @@
-import { getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getLinkedInProfileUrl, getContactEmail, getContactPhone, getContactLocation, getCompTargets, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
-import { attachQuickFill } from '../lib/linkedInFill.js';
+import { getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getContactEmail, getContactPhone, getContactLocation, getCompTargets, getCandidateName, getCandidateTagline, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
+import { initQuickFill } from '../lib/contactFill.js';
 import { estimateCostUsd, formatUsd } from '../lib/pricing.js';
 import { normalizeStatus, statusLabel, STATUS_ORDER } from '../lib/statuses.js';
-import { derivePeople } from '../lib/people.js';
-import { computeStrengthScore } from '../lib/strength.js';
+import { computeStrengthScore, roundFitToTens } from '../lib/strength.js';
 import { trashSvg } from '../lib/icons.js';
-
-const $ = (id) => document.getElementById(id);
-const els = new Proxy({}, { get: (_, id) => $(id) });
+import { $, els, send } from '../lib/pageBoot.js';
+import { h } from '../lib/h.js';
 
 let currentJob = null;
 let letterTone = 'warm';
@@ -23,13 +21,6 @@ let followMap = {};
 let compTargets = null;
 
 // ---------- Helpers ----------
-
-async function send(type, payload = {}) {
-  const response = await chrome.runtime.sendMessage({ type, ...payload });
-  if (!response) throw new Error('No response from service worker');
-  if (!response.ok) throw new Error(response.error || 'Unknown error');
-  return response;
-}
 
 // Which window this side-panel instance belongs to. Set once on init so we
 // can distinguish "the active tab in MY window" from "the active tab in some
@@ -47,21 +38,6 @@ async function activeTabId() {
   // Fallback for the brief moment before init resolves the window id.
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab?.id || null;
-}
-
-function h(tag, props = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (k === 'class') el.className = v;
-    else if (k === 'dataset') Object.assign(el.dataset, v);
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
-    else if (v != null) el.setAttribute(k, v);
-  }
-  for (const c of children) {
-    if (c == null || c === false) continue;
-    el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-  }
-  return el;
 }
 
 function fmtWhen(iso) {
@@ -259,6 +235,32 @@ els.deleteJob?.addEventListener('click', async () => {
 // flashes an outline around it. Same SW handler used by the Jawboard
 // row-action. Feedback surfaces on the button title (transient, resets
 // after 4s) and via an alert on outright failure.
+// Two-note chime played when the tracker walker successfully locates a
+// jawb. Uses the Web Audio API — no bundled asset, no autoplay policy
+// hassles (the sidepanel click is a fresh user gesture that keeps the
+// audio context authorized). Silent-fails on any error so audio being
+// unavailable never blocks the success path.
+function playFoundChime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    // C5 → G5 rising interval — cheerful, distinct from OS-level dings.
+    osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+    osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.13);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+    setTimeout(() => ctx.close().catch(() => {}), 700);
+  } catch { /* audio unavailable — no-op */ }
+}
+
 els.findOnTracker?.addEventListener('click', async () => {
   if (!currentJob?.jobId) return;
   const btn = els.findOnTracker;
@@ -272,6 +274,7 @@ els.findOnTracker?.addEventListener('click', async () => {
     const r = await send('find-on-tracker', { jobId: currentJob.jobId });
     if (r.ok && r.found) {
       btn.title = `Found on ${r.stageLabel} · page ${r.page}${r.viaHint ? ' (via hint)' : ''}`;
+      playFoundChime();
     } else if (r.ok && !r.found) {
       const note = r.note || 'Job not found on the tracker.';
       btn.title = note;
@@ -463,26 +466,37 @@ async function refreshLastThresh() {
 // Compact rows of `status label · count` for statuses with at least one job.
 // Sits below the Jawboard card description so users see the shape of their
 // pipeline at a glance without opening the Jawboard.
+// Display order for the Jawbar status-count strip. Deliberately NOT
+// STATUS_ORDER — that list carries both archived and notMovingForward
+// as separate rows, which under the unified Scar rebrand would render
+// as two rows both labeled "Scar". Instead we merge them into a
+// virtual `scar` bucket summing both counts. Every other entry maps 1:1
+// to a status code.
+const JAWBOARD_STATUS_DISPLAY = [
+  { key: 'analyzed',                label: 'Captured',                 codes: ['analyzed'] },
+  { key: 'saved',                   label: 'Saved',                    codes: ['saved'] },
+  { key: 'inProgressDraft',         label: 'In Progress · Draft',      codes: ['inProgressDraft'] },
+  { key: 'inProgressClickedApply',  label: 'In Progress · Clicked',    codes: ['inProgressClickedApply'] },
+  { key: 'applied',                 label: 'Applied',                  codes: ['applied'] },
+  { key: 'interviewing',            label: 'Interviewing',             codes: ['interviewing'] },
+  { key: 'scar',                    label: 'Scars',                    codes: ['archived', 'notMovingForward'] },
+];
+
 function renderJawboardStatusCounts(byStatus) {
   const el = els.jawboardStatusCounts;
   if (!el) return;
   el.innerHTML = '';
-  const nonZero = STATUS_ORDER.filter((s) => (byStatus[s] || 0) > 0);
-  if (!nonZero.length) return;
-  for (const s of nonZero) {
-    const row = h('span', { class: 'jc-status-counts__row', dataset: { status: s } },
-      h('span', { class: 'jc-status-counts__label' }, statusLabel(s)),
-      h('span', { class: 'jc-status-counts__count' }, String(byStatus[s])),
+  const rows = JAWBOARD_STATUS_DISPLAY
+    .map((entry) => ({ entry, count: entry.codes.reduce((n, c) => n + (byStatus[c] || 0), 0) }))
+    .filter((r) => r.count > 0);
+  if (!rows.length) return;
+  for (const { entry, count } of rows) {
+    const row = h('span', { class: 'jc-status-counts__row', dataset: { status: entry.key } },
+      h('span', { class: 'jc-status-counts__label' }, entry.label),
+      h('span', { class: 'jc-status-counts__count' }, String(count)),
     );
     el.appendChild(row);
   }
-}
-
-// Trim a string to at most 20 chars, adding a single-character ellipsis
-// when we chopped. Kept local — no other consumer of a 20-char cap.
-function truncate20(s) {
-  if (!s) return '';
-  return s.length > 20 ? s.slice(0, 20) + '…' : s;
 }
 
 // ---------- Top-level tabs ----------
@@ -865,13 +879,35 @@ function recentWhen(iso) {
   } catch { return ''; }
 }
 
-// ---------- Card toggle ----------
+// ---------- Analysis tabs ----------
+//
+// One pane of #analysisSection is visible at a time. Level and Flags
+// are derived from the Fit analysis, so they share its pane.
+const CARD_PANE = {
+  fitCard: 'fit', levelCard: 'fit', flagsCard: 'fit',
+  compCard: 'comp', prepCard: 'prep', resumeCard: 'resume', letterCard: 'letter', askCard: 'ask',
+};
+let activePane = 'fit'; // kept across jobs so comparing comp job-to-job stays on Comp
 
-document.querySelectorAll('.jc-card__head[data-card]').forEach((head) => {
-  head.addEventListener('click', () => {
-    const card = head.closest('.jc-card');
-    card.dataset.open = card.dataset.open === 'true' ? 'false' : 'true';
-  });
+function selectPane(pane) {
+  activePane = pane;
+  for (const [cardId, p] of Object.entries(CARD_PANE)) $(cardId).dataset.open = String(p === pane);
+  for (const tab of els.analysisTabs.children) {
+    const active = tab.dataset.pane === pane;
+    tab.dataset.active = String(active);
+    tab.setAttribute('aria-selected', String(active));
+  }
+}
+
+els.body.style.setProperty('--jc-tabs-h', `${els.jcTabs.offsetHeight}px`);
+els.analysisTabs.addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-pane]');
+  if (!tab) return;
+  selectPane(tab.dataset.pane);
+  // Bring the strip up to its pinned position so the pane gets the full
+  // panel height; the job header is one scroll-up away.
+  const pinLine = els.body.getBoundingClientRect().top + els.jcTabs.offsetHeight;
+  els.body.scrollTop += els.analysisSection.getBoundingClientRect().top - pinLine;
 });
 
 // ---------- Action bar (quick-access buttons above the job title) ----------
@@ -882,6 +918,7 @@ document.querySelectorAll('.jc-btn[data-action]').forEach((btn) => {
 
 async function runAction(action) {
   if (!currentJob) return;
+  if (Object.values(CARD_PANE).includes(action)) selectPane(action); // show where the result will land
   switch (action) {
     case 'fit': return els.analyzeFit.click();
     case 'comp': return els.analyzeComp.click();
@@ -936,7 +973,7 @@ function updateActionBarState(job) {
   // Dynamic primary in the Cast row: Fit is the recommended next click
   // until it's been run, then Comp becomes the recommended next click.
   // Only one of the two carries data-variant="primary" at a time.
-  const actionBar = document.getElementById('actionBar');
+  const actionBar = $('actionBar');
   if (actionBar) {
     const fitBtn = actionBar.querySelector('.jc-btn[data-action="fit"]');
     const compBtn = actionBar.querySelector('.jc-btn[data-action="comp"]');
@@ -968,6 +1005,14 @@ document.querySelectorAll('#letterToneTabs .jc-tab').forEach((tab) => {
 
 async function renderJob(job) {
   currentJob = job;
+  // Publish the currently-viewed jawb id to storage so the external
+  // ATS quick-fill toolbar (content/externalFill.js) knows which jawb
+  // an application draft should be logged against. Fire-and-forget —
+  // if the write races the user's click on Draft, worst case is the
+  // draft attaches to no jawb and only surfaces in the activity log.
+  if (job?.jobId) {
+    chrome.storage.local.set({ 'ui.activeApplicationJawbId': String(job.jobId) }).catch(() => {});
+  }
 
   if (job?.jobId && !String(job.jobId).startsWith('manual-')) {
     try {
@@ -1051,6 +1096,26 @@ function renderVerdict(job) {
     const alreadyConfirmed = confirmedLinkedIn.has(job.jobId);
     els.confirmOnLinkedIn.hidden = !inAppliedBand || alreadyConfirmed;
   }
+  // Network at company — LinkedIn People search filtered to 1st + 2nd
+  // degree connections whose profiles match the company as a keyword.
+  // Shown only for jawbs that have been saved-or-later (matches the
+  // user's stated intent: "for jobs I have saved"). Missing company
+  // hides the button — keywords= would be empty and the search would
+  // return the user's whole 1st+2nd degree list, which isn't useful.
+  if (els.networkAtCompany) {
+    const company = (job.posting?.company || '').trim();
+    const status = normalizeStatus(job.status);
+    const eligibleStatus = status && status !== 'analyzed';
+    if (company && eligibleStatus) {
+      const kw = encodeURIComponent(company);
+      const net = encodeURIComponent(JSON.stringify(['F', 'S']));
+      els.networkAtCompany.href =
+        `https://www.linkedin.com/search/results/people/?keywords=${kw}&network=${net}&origin=FACETED_SEARCH`;
+      els.networkAtCompany.hidden = false;
+    } else {
+      els.networkAtCompany.hidden = true;
+    }
+  }
   // Company gets its own span so the Details↗ open-full-view and 🗑 delete buttons
   // can sit inline with it. Location / workplace live in a separate span
   // that follows the buttons.
@@ -1100,7 +1165,7 @@ function renderVerdict(job) {
   // composite too. The comp gauge and source note are further gated
   // on the comp analysis existing (renderCompGauge decides).
   if (els.metaStrip) {
-    const fitScore = fit.fitScore ?? 0;
+    const fitScore = roundFitToTens(fit.fitScore ?? 0);
     const strength = computeStrengthScore(job, { compTargets, followMap });
     // Connections gauge — scale the 0–20 connections component up to a
     // 0–100 percentage so it reads on the same scale as fit/comp.
@@ -1182,10 +1247,34 @@ function huntStageIndex(status) {
   if (norm === 'saved') return 1;
   return 0;
 }
+// Statuses that end the pursuit — mini-hunt renders a full-width
+// terminal badge instead of the 3-stage window when the current status
+// is one of these. Labels come from lib/statuses.js so there's one
+// source of truth (e.g. renaming Not Moving Forward → Scar lands
+// everywhere by editing STATUS.notMovingForward.label).
+const TERMINAL_STATES = new Set(['archived', 'notMovingForward']);
+
 function renderMiniHunt(job) {
-  const el = document.getElementById('miniHunt');
+  const el = $('miniHunt');
   if (!el) return;
-  if (!job || !job.status) { el.hidden = true; el.innerHTML = ''; return; }
+  if (!job || !job.status) { el.hidden = true; el.innerHTML = ''; el.removeAttribute('data-terminal'); return; }
+  const norm = normalizeStatus(job.status);
+  const terminalLabel = TERMINAL_STATES.has(norm) ? statusLabel(norm) : null;
+  // Terminal states — the pursuit is closed. Instead of showing the
+  // 3-stage linear window (which would misleadingly render "Captured"
+  // as the current band since terminal states have no place in that
+  // progression), show a single terminal pill spanning the strip. The
+  // clickable-stage escape hatch is intentionally removed here — a
+  // click that force-sets 'analyzed' or 'saved' would silently undo
+  // the terminal decision. Users who want to un-archive can do so
+  // from Details.
+  if (terminalLabel) {
+    el.innerHTML = `<li class="mini-hunt__terminal" data-status="${norm}">${terminalLabel}</li>`;
+    el.dataset.terminal = norm;
+    el.hidden = false;
+    return;
+  }
+  el.removeAttribute('data-terminal');
   const cur = huntStageIndex(job.status);
   // Slide the 3-stage window so it always covers the current stage.
   // First stage → 0..2; last stage → last-2..last; anything in between
@@ -1215,34 +1304,6 @@ function renderMiniHunt(job) {
   el.hidden = false;
 }
 
-// Compact numeric summary of the people signal on a job. Renders a
-// single .jc-badge into verdictBadges; skipped entirely when the
-// derivePeople scorer surfaces nobody. Hover shows the same three
-// numbers spelled out — no names, per the "just stats" directive.
-function renderPeopleStatsBadge(job) {
-  if (!job) return;
-  const people = derivePeople(job, { followMap });
-  if (!people.length) return;
-  const atCo = people.filter((p) => p.degree === 1 && p.relationships?.companyConnection).length;
-  const hiring = people.filter((p) => {
-    const r = p.relationships || {};
-    return r.hiringManager || r.recruiter || r.interviewer || r.jobPoster || r.teamMember;
-  }).length;
-  const bits = [`People ${people.length}`];
-  if (atCo) bits.push(`at company ${atCo}`);
-  if (hiring) bits.push(`hiring team ${hiring}`);
-  const label = bits.join(' · ');
-  // Tone climbs with signal strength: pos when there's someone at the
-  // company or on the hiring team; caution when we just know there
-  // are people; info as a neutral fallback.
-  const tone = (atCo || hiring) ? 'pos' : 'caution';
-  els.verdictBadges.append(h('span', {
-    class: 'jc-badge people-stat-badge',
-    dataset: { tone },
-    title: `${people.length} people surfaced · ${atCo} 1st-degree at company · ${hiring} on hiring team`,
-  }, label));
-}
-
 
 function renderAnalysisSection(job) {
   if (!job) { els.analysisSection.hidden = true; return; }
@@ -1260,6 +1321,7 @@ function renderAnalysisSection(job) {
 
   updateActionBarState(job);
   updateCardStatuses(a);
+  selectPane(activePane);
 }
 
 // Map each collapsible card to a boolean "done" test against the analyses
@@ -1277,10 +1339,11 @@ const CARD_DONE_TESTS = {
 };
 function updateCardStatuses(analyses) {
   for (const [cardId, test] of Object.entries(CARD_DONE_TESTS)) {
-    const card = document.getElementById(cardId);
+    const card = $(cardId);
     if (!card) continue;
     card.dataset.status = test(analyses) ? 'done' : 'undone';
   }
+  for (const tab of els.analysisTabs.children) tab.dataset.status = $(`${tab.dataset.pane}Card`).dataset.status;
 }
 
 // ---------- Ask (freeform LLM prompt for this job) ----------
@@ -1353,34 +1416,94 @@ function renderFitCard(record) {
   els.fitMeta.textContent = `${fmtWhen(record.generatedAt)} · ${record.model}${record.usage ? ` · in ${record.usage.input_tokens} · out ${record.usage.output_tokens}` : ''}`;
   els.analyzeFit.textContent = 'Regenerate';
 
+  // Recovery-skeleton detection — the fit prompt (v8+) returns
+  // fitScore=0 plus a gap starting with "No job description was
+  // captured" when the scraped description looked like a search
+  // listing rather than a single posting. Short-circuit the normal
+  // card render and show a loud banner instead so the user isn't
+  // misled by an unusable analysis.
+  const isRecoverySkeleton = r.fitScore === 0
+    && Array.isArray(r.gaps)
+    && r.gaps.length === 1
+    && /^No job description was captured/i.test(r.gaps[0] || '');
+  if (isRecoverySkeleton) {
+    replaceGlance(els.fitGlance, h('span', { class: 'jc-badge', dataset: { tone: 'neg' } }, 'Not captured'));
+    const singleJobUrl = currentJob?.jobId
+      ? `https://www.linkedin.com/jobs/view/${encodeURIComponent(String(currentJob.jobId))}/`
+      : (currentJob?.url || null);
+    const banner = h('div', {
+      class: 'jc-notice',
+      dataset: { tone: 'neg' },
+      style: 'align-items: flex-start',
+    },
+      h('div', { class: 'jc-notice__body' },
+        h('span', { class: 'jc-notice__title' }, '⚠ Fit couldn\'t run — description wasn\'t captured cleanly'),
+        h('p', { class: 'jc-prose', style: 'margin-top: 4px' },
+          'This jawb was likely analyzed from LinkedIn\'s search-results view, which mixes multiple postings into one blob. Open the jawb in a single-job view (linkedin.com/jobs/view/...) and click ',
+          h('strong', {}, 'Regenerate'),
+          ' to get a real analysis.',
+        ),
+        singleJobUrl ? h('div', { style: 'margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap' },
+          h('a', {
+            class: 'jc-btn', 'data-variant': 'primary', 'data-size': 'sm',
+            href: singleJobUrl, target: '_blank', rel: 'noopener noreferrer',
+          }, 'Open jawb on LinkedIn ↗'),
+        ) : null,
+      ),
+    );
+    out.append(banner);
+    return; // skip verdict/remote/gaps/outreach — none of them are trustworthy on the skeleton
+  }
+
   const tier = scoreTier(r.fitScore);
   replaceGlance(els.fitGlance, h('span', { style: `color:var(--jc-${tier})` }, `${r.fitScore ?? '—'}/100`));
 
-  // Alignments and gaps — bullet lists, no prose. Users scan these.
-  if (r.alignments?.length) {
-    out.append(h('span', { class: 'jc-eyebrow' }, 'Alignments'));
-    out.append(h('ul', { class: 'jc-list' },
-      ...r.alignments.map((a) => h('li', {}, a)),
-    ));
+  // Top row — verdict pill + remote/location summary side-by-side. Both
+  // are optional. Alignments were dropped from this card per user
+  // feedback (only gaps carry actionable signal), so verdict + remote
+  // now lead the section as the at-a-glance takeaway; gaps follow.
+  const ra = r.remoteAuthenticity;
+  const hasRemote = ra && (ra.postedAs || ra.actualExpectation || ra.flag);
+  const hasVerdict = !!r.verdict;
+  if (hasVerdict || hasRemote) {
+    const topRow = h('div', { class: 'jc-fit-summary' });
+    if (hasVerdict) {
+      const rec = r.verdict.recommendation || '';
+      const recTone = rec === 'apply-now' ? 'pos' : rec === 'skip' ? 'neg' : 'caution';
+      const pillText = rec === 'apply-now' ? 'Apply' : rec === 'skip' ? 'Skip' : 'Apply if nothing better';
+      topRow.append(h('span', { class: 'jc-verdict-inline', dataset: { tone: recTone } }, pillText));
+    }
+    if (hasRemote) {
+      const tone = ra.flag ? 'neg' : (ra.matchesUserLocations === false ? 'caution' : 'pos');
+      const remoteSpan = h('span', { class: 'jc-fit-summary__remote', dataset: { tone } });
+      const parts = [];
+      if (ra.postedAs && ra.actualExpectation) {
+        parts.push(h('span', {}, h('strong', {}, 'Posted: '), ra.postedAs));
+        parts.push(h('span', {}, h('strong', {}, 'Actual: '), ra.actualExpectation));
+      } else if (ra.actualExpectation) {
+        parts.push(h('span', {}, h('strong', {}, 'Actual: '), ra.actualExpectation));
+      } else if (ra.postedAs) {
+        parts.push(h('span', {}, h('strong', {}, 'Posted: '), ra.postedAs));
+      }
+      if (ra.requiresLocation) parts.push(h('span', {}, `Constraint: ${ra.requiresLocation}`));
+      if (ra.flag) parts.push(h('strong', {}, ra.flag));
+      parts.forEach((p, i) => {
+        if (i > 0) remoteSpan.append(h('span', { class: 'jc-fit-summary__sep' }, '·'));
+        remoteSpan.append(p);
+      });
+      topRow.append(remoteSpan);
+    }
+    out.append(topRow);
   }
+
+  // Gaps — bullet list only. Alignments dropped per user request:
+  // scanners want the "what to address" list, not the "what's already
+  // strong" list.
   if (r.gaps?.length) {
     out.append(h('span', { class: 'jc-eyebrow' }, 'Gaps'));
     out.append(h('ul', { class: 'jc-list' },
       ...r.gaps.map((g) => h('li', {}, g)),
     ));
-  }
-
-  if (r.verdict) {
-    const rec = r.verdict.recommendation || '';
-    const recTone = rec === 'apply-now' ? 'pos' : rec === 'skip' ? 'neg' : 'caution';
-    const pillText = rec === 'apply-now' ? 'Apply' : rec === 'skip' ? 'Skip' : 'Apply if nothing better';
-    const verdictBox = h('div', { style: 'display:flex;flex-direction:column;gap:6px' },
-      h('span', { class: 'jc-eyebrow' }, 'Verdict'),
-      h('div', { style: 'display:flex;flex-wrap:wrap;align-items:center;gap:var(--jc-2)' },
-        h('span', { class: 'jc-verdict-inline', dataset: { tone: recTone } }, pillText),
-      ),
-    );
-    out.append(verdictBox);
   }
 
   // Outreach — LLM's recommended first-contact and messaging strategy.
@@ -1397,33 +1520,32 @@ function renderFitCard(record) {
         h('span', { class: 'jc-notice__title' }, `🔥 Message first: ${o.bestContact}`),
         o.why ? h('div', {}, o.why) : null,
         o.strategy ? h('p', { class: 'jc-prose', style: 'margin-top: 4px' }, o.strategy) : null,
+        ...renderOutreachDraft(),
       ),
     );
     out.append(box);
   }
+}
 
-  // Remote authenticity — LinkedIn's "Remote" tag lies constantly; surface
-  // what the description actually says vs what LinkedIn labels.
-  const ra = r.remoteAuthenticity;
-  if (ra && (ra.postedAs || ra.actualExpectation || ra.flag)) {
-    const tone = ra.flag ? 'neg' : (ra.matchesUserLocations === false ? 'caution' : 'pos');
-    const box = h('div', {
-      class: 'jc-notice',
-      dataset: { tone },
-      style: 'margin-top: var(--jc-2)',
+// Ready-to-paste message for the contact Fit recommends. Matt's own
+// wording with the role and company filled in — no model call, and the
+// user pastes it into LinkedIn themselves.
+function renderOutreachDraft() {
+  const p = currentJob?.posting || {};
+  const message = `The ${p.title || 'open'} opening at ${p.company || 'your company'} was brought to my attention and you were the first person I thought of.
+I have applied and I'd love your honest take. What's the team like day to day, and do you know who's hiring for the role?  If you feel it worthwhile I would appreciate anything you know to do to move my application to the top of the list.`;
+  const copy = h('button', {
+    class: 'jc-btn', 'data-variant': 'primary', 'data-size': 'sm', type: 'button',
+    onClick: async () => {
+      await navigator.clipboard.writeText(message);
+      copy.textContent = 'Copied';
+      setTimeout(() => { copy.textContent = 'Copy message'; }, 1200);
     },
-      h('div', { class: 'jc-notice__body' },
-        h('span', { class: 'jc-notice__title' }, 'Remote / location'),
-        ra.postedAs && ra.actualExpectation ? h('div', {},
-          h('strong', {}, 'Posted: '), ra.postedAs, ' · ',
-          h('strong', {}, 'Actual: '), ra.actualExpectation,
-        ) : null,
-        ra.requiresLocation ? h('div', { class: 'jc-footnote' }, `Constraint: ${ra.requiresLocation}`) : null,
-        ra.flag ? h('div', { style: 'font-weight:600' }, ra.flag) : null,
-      ),
-    );
-    out.append(box);
-  }
+  }, 'Copy message');
+  return [
+    h('p', { class: 'jc-prose jc-outreach-draft' }, message),
+    h('div', { class: 'jc-btn-row', style: 'margin-top: var(--jc-2)' }, copy),
+  ];
 }
 
 // ---------- Level signals ----------
@@ -1577,20 +1699,6 @@ function sourceHuman(src) {
   return 'Source unknown';
 }
 
-function makeCounterRow(label, current, recommend, reasoning, prefix = '') {
-  const row = h('div', { class: 'jc-counter-row' },
-    h('span', { class: 'jc-counter-row__label' }, label),
-    h('span', { class: 'jc-counter-row__from' },
-      current != null && current !== '' ? `${prefix}${typeof current === 'number' ? Number(current).toLocaleString() : current} →` : ''
-    ),
-    h('span', { class: 'jc-counter-row__to' },
-      recommend != null && recommend !== '' ? `${prefix}${typeof recommend === 'number' ? Number(recommend).toLocaleString() : recommend}` : '—'
-    ),
-  );
-  if (reasoning) row.append(h('div', { class: 'jc-counter-row__reason' }, reasoning));
-  return row;
-}
-
 function hydrateOfferForm(offer) {
   if (!els.offerBase) return; // form not in DOM (stale panel.html)
   const o = offer || {};
@@ -1651,18 +1759,6 @@ els.clearOffer?.addEventListener('click', async () => {
   els.offerStatus.textContent = 'Cleared.';
   setTimeout(() => { els.offerStatus.textContent = ''; }, 2000);
 });
-
-function makeCopyButton(text) {
-  return h('button', {
-    class: 'jc-btn', 'data-size': 'sm', type: 'button',
-    style: 'align-self:flex-start',
-    onClick: async (e) => {
-      await navigator.clipboard.writeText(text);
-      e.target.textContent = 'Copied';
-      setTimeout(() => (e.target.textContent = 'Copy'), 1200);
-    },
-  }, 'Copy');
-}
 
 // ---------- Question Prep ----------
 
@@ -1750,11 +1846,15 @@ function renderLetterCard(record) {
       setTimeout(() => (els.letterCopyTop.textContent = '📋 Copy'), 1200);
     };
   }
-  els.letterPdf.onclick = () => openPrintTab({
-    kind: 'CoverLetter',
-    company: (currentJob?.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, ''),
-    body: letterEl.innerText,
-  });
+  els.letterPdf.onclick = async () => {
+    const name = await getCandidateName();
+    await openPrintTab({
+      kind: 'CoverLetter',
+      company: (currentJob?.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, ''),
+      candidateName: name,
+      body: letterEl.innerText,
+    });
+  };
 }
 
 // ---------- Tailored resume ----------
@@ -1782,36 +1882,79 @@ function renderResumeCard(record) {
 
   const out = els.resumeOutput;
 
-  if (r.summaryParagraph) {
+  // v2 schema uses `summary`; v1 used `summaryParagraph`. Support both
+  // so already-archived resumes still render in the card.
+  const summaryText = r.summary || r.summaryParagraph;
+  if (summaryText) {
     out.append(h('span', { class: 'jc-eyebrow' }, 'Summary'));
-    out.append(h('p', { class: 'jc-prose' }, r.summaryParagraph));
+    out.append(h('p', { class: 'jc-prose' }, summaryText));
   }
 
-  for (const section of r.sections || []) {
-    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, section.heading || ''));
-    for (const entry of section.entries || []) {
-      out.append(h('div', { class: 'jc-resume-role' }, entry.role || ''));
+  // v2 shape: experience[] + earlierExperience[] + certifications[] + education[]
+  if (Array.isArray(r.experience) && r.experience.length) {
+    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Experience'));
+    for (const role of r.experience) {
+      const roleLine = [role.title, role.dates].filter(Boolean).join(' · ');
+      out.append(h('div', { class: 'jc-resume-role' }, roleLine));
+      const sub = [role.company, role.location].filter(Boolean).join(', ');
+      if (sub) out.append(h('div', { class: 'jc-footnote', style: 'margin-top:-2px' }, sub));
       const ul = h('ul');
-      for (const b of entry.bullets || []) {
-        const li = h('li', {}, b.text || '');
-        if (b.action) li.append(h('span', { class: 'jc-bullet-tag', dataset: { action: b.action } }, b.action));
-        ul.append(li);
+      for (const b of role.bullets || []) {
+        ul.append(h('li', {}, typeof b === 'string' ? b : (b?.text || '')));
       }
       out.append(ul);
     }
   }
-
-  if (r.cutBullets?.length) {
-    const details = h('details', { style: 'margin-top:var(--jc-3)' },
-      h('summary', { style: 'cursor:pointer;font-size:var(--jc-text-xs);color:var(--jc-text-2)' }, `Cut bullets (${r.cutBullets.length})`),
-    );
-    for (const c of r.cutBullets) {
-      details.append(h('div', { style: 'padding:6px 0;border-bottom:1px dashed var(--jc-border)' },
-        h('div', { class: 'jc-prose' }, c.text || ''),
-        h('div', { class: 'jc-footnote' }, `Reason: ${c.reason || ''}`),
-      ));
+  if (Array.isArray(r.earlierExperience) && r.earlierExperience.length) {
+    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Earlier Experience'));
+    const ul = h('ul');
+    for (const role of r.earlierExperience) {
+      const bits = [role.company, role.detail, role.location, role.dates].filter(Boolean);
+      ul.append(h('li', {}, `${role.title || ''}, ${bits.join(', ')}`));
     }
-    out.append(details);
+    out.append(ul);
+  }
+  if (Array.isArray(r.certifications) && r.certifications.length) {
+    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Certifications & Awards'));
+    const ul = h('ul');
+    for (const c of r.certifications) ul.append(h('li', {}, typeof c === 'string' ? c : (c?.text || '')));
+    out.append(ul);
+  }
+  if (Array.isArray(r.education) && r.education.length) {
+    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Education'));
+    const ul = h('ul');
+    for (const e of r.education) ul.append(h('li', {}, `${e.degree || ''}, ${e.school || ''}`));
+    out.append(ul);
+  }
+
+  // Legacy v1 shape fallback — only kicks in for already-archived resumes
+  // (new generations produce v2 and skip this entirely).
+  if (!r.summary && !r.experience && Array.isArray(r.sections)) {
+    for (const section of r.sections) {
+      out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, section.heading || ''));
+      for (const entry of section.entries || []) {
+        out.append(h('div', { class: 'jc-resume-role' }, entry.role || ''));
+        const ul = h('ul');
+        for (const b of entry.bullets || []) {
+          const li = h('li', {}, b.text || '');
+          if (b.action) li.append(h('span', { class: 'jc-bullet-tag', dataset: { action: b.action } }, b.action));
+          ul.append(li);
+        }
+        out.append(ul);
+      }
+    }
+    if (r.cutBullets?.length) {
+      const details = h('details', { style: 'margin-top:var(--jc-3)' },
+        h('summary', { style: 'cursor:pointer;font-size:var(--jc-text-xs);color:var(--jc-text-2)' }, `Cut bullets (${r.cutBullets.length})`),
+      );
+      for (const c of r.cutBullets) {
+        details.append(h('div', { style: 'padding:6px 0;border-bottom:1px dashed var(--jc-border)' },
+          h('div', { class: 'jc-prose' }, c.text || ''),
+          h('div', { class: 'jc-footnote' }, `Reason: ${c.reason || ''}`),
+        ));
+      }
+      out.append(details);
+    }
   }
 
   if (r.flags?.length) {
@@ -1823,76 +1966,92 @@ function renderResumeCard(record) {
     els.resumeCopy.textContent = 'Copied';
     setTimeout(() => (els.resumeCopy.textContent = 'Copy'), 1200);
   };
-  const doDownload = () => {
-    const company = (currentJob?.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, '');
-    downloadTextFile({
-      filename: `Burgess_${company}_Resume.md`,
-      mimeType: 'text/markdown;charset=utf-8',
-      body: resumeToMarkdown(r),
+  // Download now opens the print-to-PDF tab (same action the standalone
+  // PDF button used to perform). Markdown download has been retired —
+  // the goal is "customized PDF, fast" and shipping two different
+  // outputs just confused the choice. Keeping the ".md" fallback as a
+  // keyboard shortcut would be a nice-to-have; shift-click could do
+  // that later if asked.
+  const openPdf = async () => {
+    const [name, tagline, email, phone, location] = await Promise.all([
+      getCandidateName(), getCandidateTagline(),
+      getContactEmail(), getContactPhone(), getContactLocation(),
+    ]);
+    const isV2 = r.summary != null || Array.isArray(r.experience);
+    await openPrintTab({
+      kind: 'Resume',
+      company: (currentJob?.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, ''),
+      candidateName: name,
+      resume: isV2 ? r : null,
+      header: isV2 ? { name, tagline, email, phone, location } : null,
+      body: isV2 ? null : resumeToPlainText(r),
     });
   };
-  els.resumeDownload.onclick = () => {
-    doDownload();
-    els.resumeDownload.textContent = '✓ Downloaded';
+  els.resumeDownload.onclick = async () => {
+    await openPdf();
+    els.resumeDownload.textContent = '✓ Opened';
     setTimeout(() => (els.resumeDownload.textContent = '↓ Download'), 1500);
   };
   // Mirror on the top-of-sidebar Generate-row button so download is one click
   // away from the trigger, without scrolling down to the resume card.
   if (els.resumeDownloadTop) {
-    els.resumeDownloadTop.onclick = () => {
-      doDownload();
-      els.resumeDownloadTop.textContent = '✓ Downloaded';
-      setTimeout(() => (els.resumeDownloadTop.textContent = '↓ Download'), 1500);
+    els.resumeDownloadTop.onclick = async () => {
+      await openPdf();
+      els.resumeDownloadTop.textContent = '✓ Opened';
+      setTimeout(() => (els.resumeDownloadTop.textContent = '↓ Download resume'), 1500);
     };
   }
-  els.resumePdf.onclick = () => openPrintTab({
-    kind: 'Resume',
-    company: (currentJob?.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, ''),
-    body: resumeToPlainText(r),
-  });
-}
-
-// Markdown flavor of the resume — preserves section headings, role titles, and
-// bullet structure. Chosen over .txt because it round-trips cleanly through
-// pandoc → .docx/.pdf and is readable as-is in any editor.
-function resumeToMarkdown(r) {
-  const lines = [];
-  if (r.summaryParagraph) { lines.push('## Summary', '', r.summaryParagraph, ''); }
-  for (const s of r.sections || []) {
-    if (s.heading) lines.push(`## ${s.heading}`, '');
-    for (const entry of s.entries || []) {
-      if (entry.role) lines.push(`### ${entry.role}`, '');
-      for (const b of entry.bullets || []) lines.push(`- ${b.text || ''}`);
-      lines.push('');
-    }
-  }
-  return lines.join('\n');
-}
-
-// Trigger a browser download without needing the "downloads" permission by
-// using a blob URL + synthetic anchor click. Works in extension side panels.
-function downloadTextFile({ filename, mimeType, body }) {
-  const blob = new Blob([body], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  // Revoke on the next tick so the download has a chance to start first.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Standalone PDF button retired — Download now triggers the same
+  // flow. Hidden rather than removed from DOM so a cached v0.5.x build
+  // doesn't error on a missing element during the first render tick
+  // after upgrade; next release can delete the HTML too.
+  if (els.resumePdf) els.resumePdf.hidden = true;
 }
 
 function resumeToPlainText(r) {
   const lines = [];
-  if (r.summaryParagraph) { lines.push(r.summaryParagraph, ''); }
-  for (const s of r.sections || []) {
-    lines.push(s.heading || '', '');
-    for (const entry of s.entries || []) {
-      lines.push(entry.role || '');
-      for (const b of entry.bullets || []) lines.push(`• ${b.text}`);
+  // Legacy v1 shape
+  if (r.summaryParagraph || Array.isArray(r.sections)) {
+    if (r.summaryParagraph) { lines.push(r.summaryParagraph, ''); }
+    for (const s of r.sections || []) {
+      lines.push(s.heading || '', '');
+      for (const entry of s.entries || []) {
+        lines.push(entry.role || '');
+        for (const b of entry.bullets || []) lines.push(`• ${b.text}`);
+        lines.push('');
+      }
+    }
+    return lines.join('\n');
+  }
+  // v2 structured shape
+  if (r.summary) lines.push(r.summary, '');
+  if (Array.isArray(r.experience) && r.experience.length) {
+    lines.push('EXPERIENCE', '');
+    for (const role of r.experience) {
+      lines.push(`${role.title || ''} · ${role.dates || ''}`);
+      const sub = [role.company, role.location].filter(Boolean).join(', ');
+      if (sub) lines.push(sub);
+      for (const b of role.bullets || []) lines.push(`• ${typeof b === 'string' ? b : (b?.text || '')}`);
       lines.push('');
     }
+  }
+  if (Array.isArray(r.earlierExperience) && r.earlierExperience.length) {
+    lines.push('EARLIER EXPERIENCE', '');
+    for (const role of r.earlierExperience) {
+      const bits = [role.company, role.detail, role.location, role.dates].filter(Boolean);
+      lines.push(`${role.title || ''}, ${bits.join(', ')}`);
+    }
+    lines.push('');
+  }
+  if (Array.isArray(r.certifications) && r.certifications.length) {
+    lines.push('CERTIFICATIONS & AWARDS', '');
+    for (const c of r.certifications) lines.push(`• ${typeof c === 'string' ? c : (c?.text || '')}`);
+    lines.push('');
+  }
+  if (Array.isArray(r.education) && r.education.length) {
+    lines.push('EDUCATION', '');
+    for (const e of r.education) lines.push(`${e.degree || ''}, ${e.school || ''}`);
+    lines.push('');
   }
   return lines.join('\n');
 }
@@ -1948,14 +2107,27 @@ function noteAnalysisEnd(jobId, msgType) {
 // every job switch — so state never bleeds between jobs.
 function applyProgressForCurrentJob() {
   const jobId = currentJob?.jobId;
+  // `active` = work in flight for the CURRENT jawb. Used to drive
+  // button working-state + card processing shimmer, which are
+  // per-jawb concerns.
   const active = jobId ? (inFlightByJob.get(jobId) || []) : [];
-  const anyActive = active.length > 0;
+  // Global in-flight work across every jawb. Progress bar visibility
+  // tracks this — if the user kicks off a Bait and then navigates to
+  // another jawb/tab, the bar still indicates "work is happening in
+  // the background" instead of silently disappearing (and leaving
+  // users thinking the generation failed). Message prefers the
+  // current jawb's latest if any; otherwise falls back to the latest
+  // global.
+  let globalLatest = null;
+  for (const list of inFlightByJob.values()) {
+    if (list.length) globalLatest = list[list.length - 1];
+  }
+  const anyActiveGlobal = globalLatest != null;
 
-  // Progress bar visibility + message (latest push wins).
-  if (els.progressBar) els.progressBar.hidden = !anyActive;
+  if (els.progressBar) els.progressBar.hidden = !anyActiveGlobal;
   if (els.progressMessage) {
-    const latest = active[active.length - 1];
-    els.progressMessage.textContent = anyActive
+    const latest = active[active.length - 1] || globalLatest;
+    els.progressMessage.textContent = anyActiveGlobal
       ? (PROGRESS_MESSAGE[latest] || 'Working…')
       : '';
   }
@@ -1975,7 +2147,7 @@ function applyProgressForCurrentJob() {
     // Card processing shimmer follows the same activeSet.
     const cards = PROCESSING_CARDS[msgType] || [];
     for (const id of cards) {
-      const card = document.getElementById(id);
+      const card = $(id);
       if (!card) continue;
       if (working) card.dataset.processing = 'true';
       else delete card.dataset.processing;
@@ -2080,13 +2252,6 @@ async function runAnalysis(button, errorEl, msgType, payload, onSuccess) {
         currentJob = { ...currentJob, analyses: refreshed.data.analyses, warmth: refreshed.data.warmth ?? currentJob.warmth };
         renderVerdict(currentJob);
         renderAnalysisSection(currentJob);
-        // Auto-expand the just-finished card so the user sees the result
-        // without an extra click. Only for cards that render generated
-        // content; analysis-only cards keep the user's manual choice.
-        const AUTO_OPEN = { 'generate-letter': 'letterCard', 'generate-resume': 'resumeCard' };
-        const cardId = AUTO_OPEN[msgType];
-        const card = cardId && document.getElementById(cardId);
-        if (card) card.dataset.open = 'true';
       }
     }
   } catch (e) {
@@ -2150,11 +2315,19 @@ els.askSend?.addEventListener('click', async () => {
 
 // ---------- Print / PDF ----------
 
-async function openPrintTab({ kind, company, body }) {
-  const filename = `Burgess_${company}_${kind}.pdf`;
+async function openPrintTab({ kind, company, body, resume, header, candidateName }) {
+  // Filename prefix uses the candidate's last name when stored in
+  // Settings, falling back to "Candidate" so the download still works
+  // for a user who hasn't filled in the Resume Header fields yet.
+  const lastName = (candidateName || '').trim().split(/\s+/).pop() || 'Candidate';
+  const safeLast = lastName.replace(/[^A-Za-z0-9]+/g, '');
+  const filename = `${safeLast}_${company}_${kind}.pdf`;
   const url = chrome.runtime.getURL('print/print.html');
   const key = `print.${Date.now()}`;
-  await chrome.storage.session.set({ [key]: { kind, filename, body } });
+  // Payload: cover letters pass `body` only; resumes pass `resume` +
+  // `header` so print.js can render the structured layout. Both paths
+  // keep working through the same session-storage handoff.
+  await chrome.storage.session.set({ [key]: { kind, filename, body, resume, header } });
   chrome.tabs.create({ url: `${url}?k=${encodeURIComponent(key)}` });
 }
 
@@ -2213,20 +2386,8 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
-// Cached contact values for the floating quick-fill toolbar; refreshed on storage change.
-const cachedFill = { email: '', phone: '', linkedInUrl: '', location: '' };
-(async () => {
-  const [email, phone, linkedInUrl, location] = await Promise.all([
-    getContactEmail(), getContactPhone(), getLinkedInProfileUrl(), getContactLocation(),
-  ]);
-  Object.assign(cachedFill, { email, phone, linkedInUrl, location });
-})();
-attachQuickFill(document.body, () => cachedFill);
+initQuickFill();
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes['settings.linkedInProfileUrl']) cachedFill.linkedInUrl = changes['settings.linkedInProfileUrl'].newValue || '';
-  if (changes['settings.email']) cachedFill.email = changes['settings.email'].newValue || '';
-  if (changes['settings.phone']) cachedFill.phone = changes['settings.phone'].newValue || '';
-  if (changes['settings.location']) cachedFill.location = changes['settings.location'].newValue || '';
   // peopleFollowing changes when the user visits a LinkedIn profile.
   // The people-stats badge doesn't depend on the follow map (just
   // counts), so we cache the update but skip the re-render — the
@@ -2362,10 +2523,8 @@ async function init() {
     console.warn('windows.getCurrent failed:', e);
   }
 
-  const [_email, _phone, _linkedInUrl, _location] = await Promise.all([
-    getContactEmail(), getContactPhone(), getLinkedInProfileUrl(), getContactLocation(),
-  ]);
-  Object.assign(cachedFill, { email: _email, phone: _phone, linkedInUrl: _linkedInUrl, location: _location });
+  // Contact-cache load for the quick-fill toolbar is handled by
+  // initQuickFill() at module eval; no re-load needed here.
 
   // Load LinkedIn follow-state map so the recommended-follows widget in
   // renderVerdict can show ✓ Following markers without an async gap.
@@ -2437,7 +2596,7 @@ const TIP_SHARE_URL = 'https://github.com/mattburgess/aijobhuntingbrowserextensi
 const TIP_SHARE_TEXT = 'Jawbs — a browser extension that reads LinkedIn job postings, scores fit, and helps you prep. Local-first, no telemetry.';
 
 async function evaluateTipNudge() {
-  const wrap = document.getElementById('tipNudge');
+  const wrap = $('tipNudge');
   if (!wrap) return;
   const s = (await chrome.storage.local.get('tip')).tip || {};
   const now = Date.now();
@@ -2552,11 +2711,11 @@ async function patchTipState(patch) {
 
 // Delegated click handler — one listener catches every action button
 // rendered by either mode so re-renders don't leak listeners.
-document.getElementById('tipNudge')?.addEventListener('click', async (e) => {
+$('tipNudge')?.addEventListener('click', async (e) => {
   const target = e.target.closest('[data-tip-action]');
   if (!target) return;
   const action = target.dataset.tipAction;
-  const wrap = document.getElementById('tipNudge');
+  const wrap = $('tipNudge');
   const nowIso = new Date().toISOString();
   if (action === 'tip') {
     // Let the anchor open BMAC in a new tab. Mark tipped-optimistically —
@@ -2590,7 +2749,7 @@ document.querySelectorAll('#jcTabs [data-tab]').forEach((btn) => {
 });
 
 // Clear the auto-tracked recent-searches list from the Searches tab.
-document.getElementById('clearRecentSearches')?.addEventListener('click', async () => {
+$('clearRecentSearches')?.addEventListener('click', async () => {
   if (!confirm('Clear all recent unsaved searches? Saved searches are untouched.')) return;
   try {
     await send('clear-recent-searches');

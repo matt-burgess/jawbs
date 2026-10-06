@@ -1,62 +1,17 @@
-import { getLinkedInProfileUrl, getContactEmail, getContactPhone, getContactLocation, safeExternalUrl } from '../lib/store.js';
-import { attachQuickFill } from '../lib/linkedInFill.js';
+import { safeExternalUrl } from '../lib/store.js';
+import { initQuickFill } from '../lib/contactFill.js';
 import { normalizeStatus, statusLabel } from '../lib/statuses.js';
-import { derivePeople, relationshipTags, relationshipTone, primaryRelationshipLabel } from '../lib/people.js';
-
-const $ = (id) => document.getElementById(id);
-const els = new Proxy({}, { get: (_, id) => $(id) });
+import { derivePeople, relationshipTags, relationshipTone } from '../lib/people.js';
+import { roundFitToTens } from '../lib/strength.js';
+import { $, els, send, escapeHtml, fmtDate } from '../lib/pageBoot.js';
+import { h } from '../lib/h.js';
 
 const params = new URLSearchParams(location.search);
 const jobId = params.get('jobId');
 
 let job = null;
 
-const cachedFill = { email: '', phone: '', linkedInUrl: '', location: '' };
-attachQuickFill(document.body, () => cachedFill);
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes['settings.linkedInProfileUrl']) cachedFill.linkedInUrl = changes['settings.linkedInProfileUrl'].newValue || '';
-  if (changes['settings.email']) cachedFill.email = changes['settings.email'].newValue || '';
-  if (changes['settings.phone']) cachedFill.phone = changes['settings.phone'].newValue || '';
-  if (changes['settings.location']) cachedFill.location = changes['settings.location'].newValue || '';
-});
-Promise.all([getContactEmail(), getContactPhone(), getLinkedInProfileUrl(), getContactLocation()])
-  .then(([email, phone, linkedInUrl, location]) => Object.assign(cachedFill, { email, phone, linkedInUrl, location }));
-
-async function send(type, payload = {}) {
-  const response = await chrome.runtime.sendMessage({ type, ...payload });
-  if (!response) throw new Error('No response from service worker');
-  if (!response.ok) throw new Error(response.error || 'Unknown error');
-  return response;
-}
-
-function fmtDate(iso) {
-  if (!iso) return '—';
-  try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
-  catch { return iso; }
-}
-
-function daysAgo(iso) {
-  if (!iso) return null;
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
-  if (days < 0) return null;
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  return `${days} days ago`;
-}
-
-function h(tag, props = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (k === 'class') el.className = v;
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
-    else if (v != null) el.setAttribute(k, v);
-  }
-  for (const c of children) {
-    if (c == null || c === false) continue;
-    el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-  }
-  return el;
-}
+initQuickFill();
 
 async function load() {
   if (!jobId) {
@@ -126,6 +81,7 @@ function render() {
 
   renderFitReadout();
   renderCompReadout();
+  renderApplicationAnswers();
 
   // Documents
   const letter = job.analyses?.coverLetter?.result?.letter;
@@ -249,7 +205,7 @@ function renderRound(round) {
     fieldInput('Date', 'date', round.date || '', 'date'),
     fieldInput('Time', 'time', round.time || '', 'time'),
     fieldInput('Interviewer', 'interviewerName', round.interviewerName || '', 'text', 'Name'),
-    fieldInput('LinkedIn URL', 'interviewerLinkedIn', round.interviewerLinkedIn || '', 'url', 'https://linkedin.com/in/…'),
+    linkedInField(fieldInput('LinkedIn URL', 'interviewerLinkedIn', round.interviewerLinkedIn || '', 'url', 'https://linkedin.com/in/…')),
     // Round type is a free-text field the user owns — the voyage log
     // reads it directly and stops guessing from the topic. Default is
     // pre-filled by ordinal position (see defaultRoundType) but the
@@ -259,6 +215,13 @@ function renderRound(round) {
     fieldInput('Topic', 'topic', round.topic || '', 'text', 'e.g., technical deep-dive, exec fit', true),
     fieldTextarea('Your notes', 'notes', round.notes || '', 'Prep notes, expected panelists, any context'),
   );
+  // Recruiter rounds are always the initial-fit screen — fill the topic
+  // as the type is typed, without clobbering one the user already wrote.
+  grid.addEventListener('input', (e) => {
+    if (e.target.dataset.key !== 'type') return;
+    const topic = grid.querySelector('[data-key="topic"]');
+    if (!topic.value.trim()) topic.value = defaultTopicFor(e.target.value);
+  });
   details.append(grid);
 
   const actions = h('div', { class: 'round-card__actions' },
@@ -349,6 +312,26 @@ function fieldInput(label, key, value, type = 'text', placeholder = '', full = f
     h('span', {}, label),
     h('input', inputProps),
   );
+}
+
+// Adds a "Find on LinkedIn" link beside the LinkedIn URL label. Opens a
+// LinkedIn people search for whatever is typed in the Interviewer field
+// plus this job's company, so the profile URL is a click and a copy away.
+// Reads the name at click time — the round doesn't have to be saved first.
+function linkedInField(label) {
+  label.firstChild.append(' ', h('button', {
+    class: 'jc-linkbtn', type: 'button',
+    title: 'Search LinkedIn for this interviewer at this company',
+    onClick: (e) => {
+      e.preventDefault(); // don't let the enclosing <label> steal focus
+      const nameInput = label.closest('.round-card__grid').querySelector('[data-key="interviewerName"]');
+      const name = nameInput.value.trim();
+      if (!name) { nameInput.focus(); return; }
+      const keywords = [name, job?.posting?.company].filter(Boolean).join(' ');
+      window.open(`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`, '_blank', 'noopener');
+    },
+  }, 'Find on LinkedIn ↗'));
+  return label;
 }
 
 // Only :00, :15, :30, :45 are allowed for the Time field. Empty is fine
@@ -604,12 +587,16 @@ function defaultRoundType(existingCount) {
   return ROUND_TYPE_DEFAULTS[Math.min(existingCount, ROUND_TYPE_DEFAULTS.length - 1)];
 }
 
+function defaultTopicFor(type) {
+  return /^recruiter$/i.test(String(type).trim()) ? 'Initial Fit' : '';
+}
+
 els.addRound.addEventListener('click', async () => {
   const today = new Date().toISOString().slice(0, 10);
   const existing = (job.interviewRounds || []).length;
   await send('save-round', {
     jobId,
-    round: { date: today, topic: '', type: defaultRoundType(existing) },
+    round: { date: today, topic: defaultTopicFor(defaultRoundType(existing)), type: defaultRoundType(existing) },
   });
   await load();
 });
@@ -620,16 +607,9 @@ els.addRound.addEventListener('click', async () => {
 // on the right, and one-click status shortcuts below. Undoes the old
 // select+button pattern which took too many clicks to advance a job.
 
-const STATUS_TONE_MAP = {
-  analyzed: 'neutral', saved: 'info',
-  inProgressDraft: 'caution', inProgressClickedApply: 'caution',
-  applied: 'info', interviewing: 'pos',
-  archived: 'neutral', notMovingForward: 'neg',
-};
-
 function renderHero() {
   const fit = job.analyses?.fit?.result;
-  const score = typeof fit?.fitScore === 'number' ? fit.fitScore : null;
+  const score = typeof fit?.fitScore === 'number' ? roundFitToTens(fit.fitScore) : null;
   const scoreEl = els.heroScoreNum;
   scoreEl.textContent = score != null ? String(score) : '—';
   // Color the big score by tier
@@ -641,8 +621,22 @@ function renderHero() {
 
   // Hero badges intentionally left blank — verdict/status/applied-when/
   // reposted moved into the voyage-log strip above, so repeating them
-  // here just piled duplicated chips under the score.
+  // here just piled duplicated chips under the score. Exception:
+  // terminal states (archived / notMovingForward) get an explicit
+  // pill here because the voyage log's 5-stage progression has no
+  // native place to show "the pursuit is closed" — every stage just
+  // reads as 'past' otherwise, which visually implies "finished
+  // interviewing" instead of "closed early."
   els.heroBadges.innerHTML = '';
+  const heroNorm = normalizeStatus(job.status);
+  if (heroNorm === 'archived' || heroNorm === 'notMovingForward') {
+    els.heroBadges.append(h('span', {
+      class: 'jc-badge',
+      'data-tone': 'neg',
+      'data-terminal': heroNorm,
+      title: 'Scarred — this jawb is a battle you fought. Pursuit closed.',
+    }, statusLabel(heroNorm)));
+  }
 
   // One-click status shortcuts. Only show buttons for statuses that
   // represent a forward or terminal move from the current one. All
@@ -660,7 +654,7 @@ function renderHero() {
     shortcuts.push({ label: '→ Interviewing', status: 'interviewing' });
   }
   if (norm !== 'notMovingForward' && norm !== 'archived') {
-    shortcuts.push({ label: 'Not moving forward', status: 'notMovingForward' });
+    shortcuts.push({ label: 'Add scar', status: 'notMovingForward' });
   }
   if (shortcuts.length) {
     els.heroActions.append(h('span', { class: 'change-status-label' }, 'Change status:'));
@@ -678,9 +672,9 @@ function renderHero() {
 // with past/now/next state so users see where a jawb is at a glance.
 // Data pulled from job.timeline + normalized job.status.
 function renderVoyageLog() {
-  const wrap = document.getElementById('voyageLog');
-  const stagesEl = document.getElementById('voyageLogStages');
-  const ageEl = document.getElementById('voyageLogAge');
+  const wrap = $('voyageLog');
+  const stagesEl = $('voyageLogStages');
+  const ageEl = $('voyageLogAge');
   if (!wrap || !stagesEl) return;
   const STAGES = [
     { key: 'captured',     label: 'Captured' },
@@ -744,7 +738,7 @@ function statusChangeAt(targetStatus) {
   const target = normalizeStatus(targetStatus);
   for (const entry of job.timeline || []) {
     if (entry.type !== 'status-change') continue;
-    if (String(entry.note || '').toLowerCase().includes(target.toLowerCase())) return entry.at;
+    if (entry.to ? normalizeStatus(entry.to) === target : String(entry.note || '').toLowerCase().includes(target.toLowerCase())) return entry.at;
   }
   return null;
 }
@@ -943,6 +937,34 @@ function renderPersonName(name, profileUrl) {
   );
 }
 
+// Application answers — the Q&A trail from LLM-drafted textarea
+// responses on ATS forms. Meant for phone-screen recall ("what did I
+// say when they asked me why us?"). Hides the whole section when there
+// are none — a jawb the user has drafted zero answers for shouldn't
+// see a phantom empty box.
+function renderApplicationAnswers() {
+  const sec = $('sec-app-answers');
+  const box = $('applicationAnswersReadout');
+  if (!sec || !box) return;
+  const answers = Array.isArray(job.applicationAnswers) ? job.applicationAnswers : [];
+  if (!answers.length) { sec.hidden = true; box.innerHTML = ''; return; }
+  sec.hidden = false;
+  box.innerHTML = '';
+  // Newest first — recruiter's phone call most likely references the
+  // most recent submission.
+  const rows = [...answers].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  for (const entry of rows) {
+    const details = h('details', { class: 'application-answer' },
+      h('summary', {},
+        h('span', { class: 'application-answer__q' }, entry.question || '(untitled)'),
+        h('span', { class: 'application-answer__meta jc-footnote' }, fmtDate(entry.at)),
+      ),
+      h('pre', { class: 'doc-body application-answer__a' }, entry.answer || ''),
+    );
+    box.append(details);
+  }
+}
+
 // Following state is populated asynchronously — this cache is filled by
 // load() from the SW's peopleFollowing map. renderPeople reads it
 // synchronously when composing badges.
@@ -1098,11 +1120,5 @@ els.deleteJob.addEventListener('click', async () => {
     alert(`Failed: ${e.message}`);
   }
 });
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]));
-}
 
 load();

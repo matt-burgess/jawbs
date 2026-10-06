@@ -6,7 +6,8 @@
 // 'archive stale jobs' are injected via option callbacks so this
 // module never reaches into a caller's storage or reload logic.
 
-import { normalizeStatus, statusLabel, STATUS_ORDER, statusRank } from '../lib/statuses.js';
+import { normalizeStatus, STATUS_ORDER, statusRank } from '../lib/statuses.js';
+import { escapeHtml } from '../lib/pageBoot.js';
 
 
 // ---------- Analytics dashboard ----------
@@ -21,25 +22,6 @@ export const STATUS_TONE = {
   archived:               'var(--jc-text-3)',
   notMovingForward:       'var(--jc-neg)',
 };
-
-export function renderDashboard(jobsList) {
-  const dash = document.getElementById('dashboard');
-  if (!jobsList.length) { dash.hidden = true; return; }
-  dash.hidden = false;
-  // Priority order: funnel + voyage + aging are the most actionable, so
-  // they render first (top of the deck). Original 4 stay at the bottom.
-  renderStrikeFunnel(document.getElementById('funnelChart'), jobsList);
-  renderVoyageLog(document.getElementById('voyageChart'), jobsList);
-  renderLinesInWater(document.getElementById('agingChart'), jobsList);
-  renderCalibration(document.getElementById('calibrationChart'), jobsList);
-  renderCadence(document.getElementById('cadenceChart'), jobsList);
-  renderTrophyBoard(document.getElementById('trophyChart'), jobsList);
-  renderFirstBite(document.getElementById('firstBiteChart'), jobsList);
-  renderStatusPie(document.getElementById('statusChart'), jobsList);
-  renderCapturedLine(document.getElementById('capturedChart'), jobsList);
-  renderFitHistogram(document.getElementById('fitChart'), jobsList);
-  renderSalaryHistogram(document.getElementById('salaryChart'), jobsList);
-}
 
 // ================================================================
 //   Shared helpers for the pipeline-analytics charts
@@ -327,12 +309,6 @@ export function renderVoyageLog(container, jobsList, opts = {}) {
   container.innerHTML = `<div class="voyage">${swimlanes}</div>${mortalityHtml}`;
 }
 
-export function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]));
-}
-
 // ================================================================
 //   Chart 3 · Most-Cast Titles — what positions the user targets most
 // ================================================================
@@ -513,93 +489,6 @@ export function renderCalibration(container, jobsList) {
     </div>`;
 
   container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${axis}${bars}</svg>${legend}${callout}`;
-}
-
-// ================================================================
-//   Chart 5 · Cast Cadence vs. Bite Rate
-// ================================================================
-
-export function renderCadence(container, jobsList) {
-  // Weekly buckets — ISO week starting Monday. We chart apps-submitted
-  // (bars) with an overlaid line of interviews-landed shifted 2 weeks
-  // to reflect typical response lag.
-  const now = new Date();
-  const WEEKS = 12;
-  const weeks = [];
-  for (let i = WEEKS - 1; i >= 0; i--) {
-    const anchor = new Date(now);
-    anchor.setDate(anchor.getDate() - i * 7);
-    // Snap to Monday
-    const dow = (anchor.getDay() + 6) % 7;
-    anchor.setDate(anchor.getDate() - dow);
-    anchor.setHours(0, 0, 0, 0);
-    weeks.push({ start: anchor.getTime(), key: anchor.toISOString().slice(5, 10) });
-  }
-
-  const applyDates = jobsList.map((j) => statusChangeAt(j, 'applied')).filter(Boolean).map((s) => new Date(s).getTime());
-  const interviewDates = jobsList.map((j) => firstInterviewAt(j)).filter(Boolean).map((s) => new Date(s).getTime());
-  const saveDates = jobsList.map((j) => statusChangeAt(j, 'saved')).filter(Boolean).map((s) => new Date(s).getTime());
-
-  const bucket = (dates, offsetWeeks = 0) => weeks.map((w) => {
-    const start = w.start + offsetWeeks * 7 * 86400_000;
-    const end = start + 7 * 86400_000;
-    return dates.filter((t) => t >= start && t < end).length;
-  });
-  const applyCounts = bucket(applyDates, 0);
-  const interviewCounts = bucket(interviewDates, -2); // shift interviews 2 weeks earlier to align with the apply that triggered them
-  const saveCounts = bucket(saveDates, 0);
-  const maxCount = Math.max(1, ...applyCounts, ...interviewCounts, ...saveCounts);
-
-  if (applyCounts.every((v) => v === 0) && saveCounts.every((v) => v === 0)) {
-    container.innerHTML = '<div class="chart-empty">No weekly cadence yet — save or apply to some jobs</div>';
-    return;
-  }
-
-  const W = 320, H = 160, padL = 26, padR = 8, padT = 14, padB = 26;
-  const innerW = W - padL - padR;
-  const innerH = H - padT - padB;
-  const colW = innerW / WEEKS;
-
-  const bars = applyCounts.map((c, i) => {
-    const x = padL + i * colW + colW * 0.15;
-    const bw = colW * 0.7;
-    const h = (c / maxCount) * innerH;
-    return `<rect x="${x.toFixed(1)}" y="${(padT + innerH - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="#6ec6f0" opacity="0.75" />`;
-  }).join('');
-
-  const linePts = interviewCounts.map((c, i) => {
-    const x = padL + i * colW + colW / 2;
-    const y = padT + innerH - (c / maxCount) * innerH;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const dots = interviewCounts.map((c, i) => {
-    const x = padL + i * colW + colW / 2;
-    const y = padT + innerH - (c / maxCount) * innerH;
-    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="#6dd68a" />`;
-  }).join('');
-
-  const axis = `
-    <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#4a3b1a" />
-    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H - padB}" stroke="#4a3b1a" />
-    <text x="${padL - 4}" y="${padT + 4}" text-anchor="end" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="9">${maxCount}</text>
-    <text x="${padL - 4}" y="${H - padB}" text-anchor="end" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="9">0</text>
-    <text x="${padL}" y="${H - 6}" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="8">${weeks[0].key}</text>
-    <text x="${W - padR}" y="${H - 6}" text-anchor="end" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="8">${weeks[WEEKS - 1].key}</text>`;
-
-  // Callout: scouting-without-fishing detection
-  const recentSaves = saveCounts.slice(-4).reduce((a, b) => a + b, 0);
-  const recentApps = applyCounts.slice(-4).reduce((a, b) => a + b, 0);
-  const callout = recentSaves >= 5 && recentApps <= 1
-    ? `<div class="chart-callout" data-tone="caution">Saves are climbing (${recentSaves} in last 4wk) but apply rate is flat (${recentApps}). Scouting without fishing.</div>`
-    : '';
-
-  const legend = `
-    <div class="two-line-legend">
-      <span><span class="legend-swatch" style="background:#6ec6f0"></span>Applications</span>
-      <span><span class="legend-swatch" style="background:#6dd68a"></span>Interviews (2wk lag)</span>
-    </div>`;
-
-  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${axis}${bars}<polyline points="${linePts}" fill="none" stroke="#6dd68a" stroke-width="1.5" />${dots}</svg>${legend}${callout}`;
 }
 
 // ================================================================
@@ -797,7 +686,7 @@ export function statusChangeAt(job, targetStatus) {
     // Match on note text — mergeJobRecord writes 'Status → applied' etc.,
     // but LinkedIn Save/Apply flows write more human labels. Compare both.
     const note = String(entry.note || '').toLowerCase();
-    if (note.includes(target.toLowerCase())) return entry.at;
+    if (entry.to ? normalizeStatus(entry.to) === target : note.includes(target.toLowerCase())) return entry.at;
   }
   if (normalizeStatus(job.status) === target) return job.statusUpdatedAt;
   return null;

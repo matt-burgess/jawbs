@@ -76,6 +76,14 @@ export const SELECTORS = {
   ],
 
   description: [
+    // Newest rollout — jobId-baked id/componentkey. The specific
+    // #JobDetails_AboutTheJob_<jobId> match is tried FIRST in
+    // scrape.js's extractDetail() (before this list is consulted) so
+    // we pin to the currently-focused job. These entries catch the
+    // case where jobId isn't available or the specific match failed.
+    '[id^="JobDetails_AboutTheJob_"]',
+    '[componentkey^="JobDetails_AboutTheJob_"]',
+    // Older semantic-class rollouts, kept as fallbacks.
     '#job-details',
     '.jobs-description__content .jobs-box__html-content',
     '.jobs-description-content__text',

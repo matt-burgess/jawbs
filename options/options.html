@@ -119,6 +119,27 @@
 
             <section class="options-section">
               <div class="section-head">
+                <h2>Resume header</h2>
+                <p class="jc-footnote">Your name, positioning tagline, and contact line that render at the top of the generated resume PDF. Contact fields (email, phone, city) come from the Shortcuts section above.</p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:var(--jc-3);margin-bottom:var(--jc-3)">
+                <label style="display:flex;flex-direction:column;gap:4px">
+                  <span class="jc-footnote">Name</span>
+                  <input id="candidateName" class="jc-input" type="text" spellcheck="false" placeholder="e.g. Matt Burgess" />
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px">
+                  <span class="jc-footnote">Tagline</span>
+                  <input id="candidateTagline" class="jc-input" type="text" spellcheck="false" placeholder="e.g. Engineering Leader | Growth, Platform & Agentic AI" />
+                </label>
+              </div>
+              <div class="jc-btn-row">
+                <button id="saveCandidateHeader" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="candidateHeaderStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
                 <h2>Master resume</h2>
                 <p class="jc-footnote">Paste your comprehensive resume here. Every bullet the LLM writes for a tailored
                   resume must trace back to a bullet in this field. Click <em>Generate</em> to have Claude
@@ -641,8 +662,9 @@ sudo systemctl restart ollama
                 <option value="generate-resume">Tailored resume</option>
                 <option value="ask-llm">Ask LLM</option>
                 <option value="warmth-enrich">Warmth enrichment</option>
-                <option value="linkedin-save">LinkedIn Save</option>
-                <option value="linkedin-apply">LinkedIn Apply</option>
+                <option value="linkedin-signal">LinkedIn status signal</option>
+                <option value="linkedin-unmatched">LinkedIn click not recognized</option>
+                <option value="passive-tracker-sync">Tracker seen (passive)</option>
                 <option value="sync-tracker">Tracker sync (per-page)</option>
                 <option value="sync-linkedin">LinkedIn full sync</option>
                 <option value="enrich-job">Enrichment</option>

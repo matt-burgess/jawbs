@@ -1,24 +1,14 @@
 import { searchJobs } from '../lib/search.js';
-import { getLinkedInProfileUrl, getContactEmail, getContactPhone, getContactLocation, safeExternalUrl } from '../lib/store.js';
-import { attachQuickFill } from '../lib/linkedInFill.js';
-import { normalizeStatus, statusLabel, STATUS_ORDER, statusRank } from '../lib/statuses.js';
-import { derivePeople, primaryRelationshipLabel, relationshipTags, relationshipTone } from '../lib/people.js';
+import { safeExternalUrl } from '../lib/store.js';
+import { initQuickFill } from '../lib/contactFill.js';
+import { normalizeStatus, statusLabel } from '../lib/statuses.js';
+import { derivePeople, relationshipTags } from '../lib/people.js';
 import { trashSvg } from '../lib/icons.js';
-import { computeStrengthScore } from '../lib/strength.js';
+import { computeStrengthScore, computeCompGaugeScore, roundFitToTens } from '../lib/strength.js';
+import { $, els, send, fmtDate } from '../lib/pageBoot.js';
+import { h } from '../lib/h.js';
 
-const cachedFill = { email: '', phone: '', linkedInUrl: '', location: '' };
-attachQuickFill(document.body, () => cachedFill);
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes['settings.linkedInProfileUrl']) cachedFill.linkedInUrl = changes['settings.linkedInProfileUrl'].newValue || '';
-  if (changes['settings.email']) cachedFill.email = changes['settings.email'].newValue || '';
-  if (changes['settings.phone']) cachedFill.phone = changes['settings.phone'].newValue || '';
-  if (changes['settings.location']) cachedFill.location = changes['settings.location'].newValue || '';
-});
-Promise.all([getContactEmail(), getContactPhone(), getLinkedInProfileUrl(), getContactLocation()])
-  .then(([email, phone, linkedInUrl, location]) => Object.assign(cachedFill, { email, phone, linkedInUrl, location }));
-
-const $ = (id) => document.getElementById(id);
-const els = new Proxy({}, { get: (_, id) => $(id) });
+initQuickFill();
 
 let jobs = [];
 let followMap = {}; // profileUrl → { following, mode }
@@ -26,13 +16,6 @@ let compTargets = {}; // user's { floor, target } — loaded once per boot for s
 let sortKey = 'strengthScore';
 let sortDir = 'desc';
 const selectedIds = new Set();
-
-async function send(type, payload = {}) {
-  const response = await chrome.runtime.sendMessage({ type, ...payload });
-  if (!response) throw new Error('No response from service worker');
-  if (!response.ok) throw new Error(response.error || 'Unknown error');
-  return response;
-}
 
 async function load() {
   try {
@@ -84,7 +67,7 @@ async function load() {
     applyUrlFilters();
     // Grid-actions bar shows/hides based on whether the archive has
     // any jawbs — nothing to Thresh/Enrich on an empty archive.
-    const gridActions = document.getElementById('gridActions');
+    const gridActions = $('gridActions');
     if (gridActions) gridActions.hidden = jobs.length === 0;
     render();
     checkExportReminder();
@@ -108,14 +91,15 @@ function render() {
   const showArchived = !!els.showArchived?.checked;
 
   let rows = jobs.slice();
-  // Archived jawbs are hidden by default so the day-to-day list stays
-  // focused on active pipeline. The Show Archived checkbox opts back
-  // in. When the user explicitly picks Archived from the status
-  // dropdown, honor that regardless of the checkbox.
-  if (!showArchived && status !== 'archived') {
-    rows = rows.filter((j) => normalizeStatus(j.status) !== 'archived');
+  // Scars (LinkedIn Archived + Not Moving Forward) are hidden by
+  // default so the day-to-day list stays focused on active pipeline.
+  // The Show Archived checkbox opts back in. When the user explicitly
+  // picks Scars from the status dropdown, honor that regardless of
+  // the checkbox.
+  if (!showArchived && status !== 'scar') {
+    rows = rows.filter((j) => !isScarStatus(j.status));
   }
-  if (status) rows = rows.filter((j) => normalizeStatus(j.status) === status);
+  if (status) rows = rows.filter((j) => jobMatchesStage(j, status));
   // "Waters" filter — capture source. Records without a source field
   // (legacy) are treated as LinkedIn per jobSource() default.
   if (source) rows = rows.filter((j) => (j.source || 'linkedin') === source);
@@ -150,20 +134,40 @@ const PIPELINE_STAGES = [
   { key: 'inProgressClickedApply',  label: 'In Progress · Clicked' },
   { key: 'applied',                 label: 'Applied' },
   { key: 'interviewing',            label: 'Interviewing' },
-  { key: 'archived',                label: 'Archived' },
-  { key: 'notMovingForward',        label: 'Not Moving Forward' },
+  // Virtual "scar" stage — merges LinkedIn's Archived AND
+  // Not Moving Forward into one bucket since they're semantically the
+  // same (pursuit closed) to the user. Storage still tracks the two
+  // internal codes separately for LinkedIn sync fidelity; the
+  // jobMatchesStage() helper below expands "scar" into the two-code
+  // membership test.
+  { key: 'scar',                    label: 'Scars' },
 ];
+
+// True when the status is one of the two terminal codes we render as
+// Scar to the user. Used by filter and pipeline-count paths so the
+// merged Scars bucket picks up both underlying storage codes.
+function isScarStatus(status) {
+  const s = normalizeStatus(status);
+  return s === 'archived' || s === 'notMovingForward';
+}
+// Membership test for a stage — handles the virtual `scar` key that
+// expands to (archived OR notMovingForward). Every other stage key is
+// a direct normalizeStatus match.
+function jobMatchesStage(job, stageKey) {
+  if (stageKey === 'scar') return isScarStatus(job.status);
+  return normalizeStatus(job.status) === stageKey;
+}
 function renderPipelineStrip(rows) {
-  const strip = document.getElementById('pipelineStrip');
+  const strip = $('pipelineStrip');
   if (!strip) return;
-  // Counts are computed against ALL jobs (not the filtered rows) so
-  // the pipeline stays a stable overview even while the user filters.
+  // Counts computed against ALL jobs (not the filtered rows) so the
+  // pipeline stays a stable overview while the user filters. Uses
+  // jobMatchesStage so the virtual `scar` bucket picks up both
+  // underlying storage codes.
   const counts = {};
-  for (const j of jobs) {
-    const s = normalizeStatus(j.status);
-    counts[s] = (counts[s] || 0) + 1;
+  for (const stage of PIPELINE_STAGES) {
+    counts[stage.key] = jobs.reduce((n, j) => n + (jobMatchesStage(j, stage.key) ? 1 : 0), 0);
   }
-  // Hide the strip entirely when no jobs have any tracker-eligible status.
   const total = PIPELINE_STAGES.reduce((n, s) => n + (counts[s.key] || 0), 0);
   if (!total) { strip.hidden = true; strip.innerHTML = ''; return; }
   strip.hidden = false;
@@ -204,9 +208,9 @@ function renderPipelineStrip(rows) {
 // Board footer summary — "Showing N of M · sorted by X" plus a stale
 // nudge when any visible jawb hasn't seen movement in 21+ days.
 function renderBoardFoot(rows) {
-  const foot = document.getElementById('boardFoot');
-  const summary = document.getElementById('boardSummary');
-  const stale = document.getElementById('boardStale');
+  const foot = $('boardFoot');
+  const summary = $('boardSummary');
+  const stale = $('boardStale');
   if (!foot || !summary) return;
   if (!jobs.length) { foot.hidden = true; return; }
   foot.hidden = false;
@@ -241,31 +245,12 @@ const SORT_LABELS = {
 // imports from ./dashboardCharts.js directly).
 
 // Comp gauge score — top-of-range as a % of the user's Settings →
-// target salary. Same signal the Jawbar meta strip renders, and the
-// same numeric formula the LinkedIn-card decorator uses (kept in sync
-// with service-worker's computeCompGaugeScore + panel.js's renderCompGauge).
-// Returns null when we have neither a comp range nor a vsTarget verdict.
-function computeCompGaugeScore(job) {
-  const comp = job?.analyses?.comp?.result;
-  if (!comp) return null;
-  const salary = comp.salary;
-  const low  = salary?.base?.low  ?? comp.marketEstimate?.baseLow  ?? null;
-  const high = salary?.base?.high ?? comp.marketEstimate?.baseHigh ?? null;
-  const target = Number(compTargets?.target) || null;
-  const floor  = Number(compTargets?.floor)  || null;
-  const vsTarget = salary?.vsTargets?.vsTarget || comp.vsTargets?.vsTarget;
-  const hasRange = high != null || low != null;
-  if (!hasRange && !vsTarget) return null;
-  const anchor = high ?? low;
-  if (target && anchor) return Math.min(100, Math.round((anchor / target) * 100));
-  if (vsTarget) {
-    return vsTarget === 'above' ? 100
-         : vsTarget === 'at'    ? 80
-         : vsTarget === 'below' ? 30
-         : 50;
-  }
-  if (floor && anchor) return Math.min(100, Math.round((anchor / floor) * 60));
-  return 50;
+// Local wrapper that reads the module-level compTargets. The heavy
+// lifting is done by computeCompGaugeScore in lib/strength.js — kept
+// aligned with the Jawbar meta strip, the SW badge decorator, and the
+// strength scorer.
+function compGaugeForJob(job) {
+  return computeCompGaugeScore(job?.analyses?.comp?.result, compTargets);
 }
 
 function extractSortValue(job, key) {
@@ -299,42 +284,12 @@ function extractSortValue(job, key) {
   }
 }
 
-function fitScoreTier(score) {
-  if (score == null) return 'none';
-  if (score >= 70) return 'pos';
-  if (score >= 40) return 'caution';
-  return 'neg';
-}
-
 function fmtK(n) {
   if (n == null || Number.isNaN(n)) return null;
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1000) return `$${Math.round(n / 1000)}K`;
   return `$${Math.round(n).toLocaleString()}`;
 }
-
-function fmtDate(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch { return iso; }
-}
-
-function h(tag, props = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (k === 'class') el.className = v;
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
-    else if (v != null) el.setAttribute(k, v);
-  }
-  for (const c of children) {
-    if (c == null || c === false) continue;
-    el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-  }
-  return el;
-}
-
 
 // Compact People cell — leads with the highest-priority relationship
 // (e.g. "Hiring Mgr", "1st at co."), followed by the total count and a
@@ -401,8 +356,9 @@ function renderStrengthCell(job) {
     `Comp:        ${Math.round(b.comp.score)}/${b.comp.max}   ${b.comp.note}`,
     `Connections: ${Math.round(b.connections.score)}/${b.connections.max}   ${b.connections.note}`,
   ].join('\n');
-  const fitRaw = job?.analyses?.fit?.result?.fitScore;
-  const compRaw = computeCompGaugeScore(job);
+  const fitRawUnrounded = job?.analyses?.fit?.result?.fitScore;
+  const fitRaw = typeof fitRawUnrounded === 'number' ? roundFitToTens(fitRawUnrounded) : null;
+  const compRaw = compGaugeForJob(job);
   // Connections gauge normalizes the raw connections component (0-20
   // per the rebalanced weights) up to a 0-100 scale so it reads on
   // the same axis as Fit and Comp. `null` when no connections signal
@@ -781,20 +737,20 @@ function visibleJobIds() {
 }
 
 function updateSelectionUi() {
-  const btn = document.getElementById('deleteSelected');
-  const count = document.getElementById('selectedCount');
+  const btn = $('deleteSelected');
+  const count = $('selectedCount');
   if (btn && count) {
     btn.hidden = selectedIds.size === 0;
     count.textContent = selectedIds.size;
   }
   // Also update the sticky bulk bar
-  const bar = document.getElementById('bulkBar');
-  const bulkCount = document.getElementById('bulkCount');
+  const bar = $('bulkBar');
+  const bulkCount = $('bulkCount');
   if (bar && bulkCount) {
     bar.hidden = selectedIds.size === 0;
     bulkCount.textContent = selectedIds.size;
   }
-  const master = document.getElementById('selectAll');
+  const master = $('selectAll');
   if (master) {
     const rows = visibleJobIds();
     const allSelected = rows.length > 0 && rows.every(({ cb }) => cb.checked);
@@ -804,7 +760,7 @@ function updateSelectionUi() {
   }
 }
 
-document.getElementById('selectAll')?.addEventListener('click', (e) => {
+$('selectAll')?.addEventListener('click', (e) => {
   const check = e.target.checked;
   // Iterate current filtered/rendered rows only — select-all shouldn't
   // touch jobs the user has filtered out of view.
@@ -820,7 +776,7 @@ document.getElementById('selectAll')?.addEventListener('click', (e) => {
     const query = els.search.value.trim();
     const status = els.statusFilter.value;
     let rows = jobs.slice();
-    if (status) rows = rows.filter((j) => normalizeStatus(j.status) === status);
+    if (status) rows = rows.filter((j) => jobMatchesStage(j, status));
     if (query) rows = searchJobs(rows, query).map((r) => r.job);
     for (const j of rows) selectedIds.add(j.jobId);
   }
@@ -828,21 +784,21 @@ document.getElementById('selectAll')?.addEventListener('click', (e) => {
 });
 
 // Sticky bulk-bar buttons mirror the toolbar Delete
-document.getElementById('bulkDeselect')?.addEventListener('click', () => {
+$('bulkDeselect')?.addEventListener('click', () => {
   selectedIds.clear();
   els.tbody.querySelectorAll('.row-select').forEach((cb) => { cb.checked = false; });
   updateSelectionUi();
 });
 
-document.getElementById('bulkDelete')?.addEventListener('click', () => {
-  document.getElementById('deleteSelected')?.click();
+$('bulkDelete')?.addEventListener('click', () => {
+  $('deleteSelected')?.click();
 });
 
-document.getElementById('deleteSelected')?.addEventListener('click', async () => {
+$('deleteSelected')?.addEventListener('click', async () => {
   const count = selectedIds.size;
   if (!count) return;
   if (!confirm(`Delete ${count} jawb${count === 1 ? '' : 's'} from the archive?\n\nThis removes analyses, offer details, interview rounds, and timeline. Cannot be undone (except via re-import from a JSON backup).`)) return;
-  const btn = document.getElementById('deleteSelected');
+  const btn = $('deleteSelected');
   // The button holds an SVG + a text span (id=selectedCount inside a
   // wrapper span). Update just the label span so the trash icon stays
   // in place through the delete cycle.
@@ -1016,7 +972,7 @@ function renderReconcileReview(diff) {
       current: m.currentStatus,
       right: 'not on LinkedIn',
       choices: [
-        { value: 'accept-linkedin', label: 'Mark Not Moving Forward' },
+        { value: 'accept-linkedin', label: 'Add Scar' },
         { value: 'keep-local', label: 'Keep local' },
         { value: 'delete', label: 'Delete' },
         { value: 'skip', label: 'Skip' },

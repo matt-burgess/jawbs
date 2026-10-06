@@ -113,6 +113,10 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 .jc-jb-pipeline__seg[data-stage="interviewing"]            { --_bar: #7EB4E4; }
 .jc-jb-pipeline__seg[data-stage="archived"]                { --_bar: #7D9490; }
 .jc-jb-pipeline__seg[data-stage="notMovingForward"]        { --_bar: #E9BFB9; }
+/* Virtual Scars stage — merges Archived + Not Moving Forward. Uses
+   the red-tinted bar to signal "battle-scar" rather than the neutral
+   grey previously reserved for LinkedIn's Archived bucket. */
+.jc-jb-pipeline__seg[data-stage="scar"]                    { --_bar: #E9BFB9; }
 
 /* Compact "JT" button in row actions — LinkedIn icon + "JT" label
    packed tight so the row action cell stays narrow. */

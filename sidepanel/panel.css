@@ -62,8 +62,10 @@ body { background: var(--jc-bg); }
   border-bottom: 1px solid var(--jc-border-strong);
   margin: 0 calc(-1 * var(--jc-4)) var(--jc-3);
   padding: 0;
-  position: sticky; top: 0;
-  z-index: 2;
+  /* Negative top cancels .jc__body's top padding so the strip pins flush
+     to the header instead of leaving a gap that content scrolls through. */
+  position: sticky; top: calc(-1 * var(--jc-4));
+  z-index: 3;
 }
 .jc-tab {
   appearance: none;
@@ -608,7 +610,7 @@ body { background: var(--jc-bg); }
 .jc-jobcard__actions .jc-btn-row--secondary {
   margin-top: 6px;
 }
-.jc-jobcard__actions .jc-btn-row--secondary:has(> [hidden]) { display: none; }
+.jc-jobcard__actions .jc-btn-row--secondary:not(:has(.jc-btn:not([hidden]))) { display: none; }
 
 /* Header row — company on the left, mini hunt strip + delete icon on
    the right. Matches the mockup's "top-right chrome" layout. */
@@ -638,6 +640,24 @@ body { background: var(--jc-bg); }
    users discover they're actionable. Non-clickable stages (Offer, which
    has no matching internal status) stay static. */
 .mini-hunt__step[data-status] { cursor: pointer; }
+/* Scar pill — replaces the 3-stage window when the jawb has hit a
+   terminal state (archived on LinkedIn or notMovingForward, both of
+   which read as "Scar" to the user). Full-width so it visually says
+   "this pursuit is closed" rather than "we're on step N".
+   Red-tinted per the Jaws / scarring theme — this is a battle-scar
+   record, not a neutral bookkeeping state. */
+.mini-hunt__terminal {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 6px 12px;
+  border-radius: var(--jc-radius-sm);
+  background: var(--jc-neg-weak, #F9E4DE);
+  color: var(--jc-neg, #B54528);
+  font: 700 var(--jc-text-xs)/1 var(--jc-font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border: 1px solid var(--jc-neg-line, #E9BFAF);
+}
 .mini-hunt__step[data-status]:hover .mini-hunt__label {
   color: var(--jaw-red);
   text-decoration: underline;
@@ -1114,6 +1134,37 @@ body { background: var(--jc-bg); }
   background-image: none;
 }
 
+/* Analysis tabs (#analysisTabs) — same look as the top-level strip, one
+   step quieter. A tab shows every card in its pane; the rest are removed
+   from the flow, so nothing has to be scrolled past. Card heads stay as
+   static title + glance rows. Pinned directly under .jc-tabs (JS sets
+   --jc-tabs-h on #body); the job header above is NOT pinned in the sidebar — at
+   ~450px it left too little room to read an analysis. */
+.jc__verdict { position: static; }
+.jc-subtabs {
+  display: flex; gap: 0;
+  position: sticky; top: calc(var(--jc-tabs-h, 47px) - var(--jc-4)); z-index: 2;
+  margin: 0 calc(-1 * var(--jc-4)) var(--jc-1);
+  background: var(--jc-surface-3);
+  border-block: 1px solid var(--jc-border);
+}
+.jc-subtabs .jc-tab { padding: 10px 4px; letter-spacing: .06em; border-radius: 0; }
+.jc-subtabs .jc-tab[data-status='done']::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--jc-pos);
+}
+#analysisSection .jc-card[data-open='false'] { display: none; }
+#analysisSection .jc-card__head { cursor: default; }
+#analysisSection .jc-card__chev { display: none; }
+
+/* Outreach message — keep its line break, set it apart
+   from the surrounding advice. */
+.jc-outreach-draft {
+  white-space: pre-wrap;
+  margin-top: var(--jc-2); padding: var(--jc-2) var(--jc-3);
+  background: var(--jc-bg); border: 1px solid var(--jc-border); border-radius: var(--jc-radius-sm);
+  color: var(--jc-text);
+}
+
 /* Open cards get a subtle background boost so it's obvious what's expanded */
 .jc-card[data-open='true'] { background: var(--jc-surface-1); border-color: var(--jc-border-strong); }
 .jc-card[data-open='true'] > .jc-card__head { background: var(--jc-surface-2); border-bottom: 1px solid var(--jc-border); }
@@ -1150,6 +1201,34 @@ body { background: var(--jc-bg); }
 .jc-verdict-inline[data-tone='pos']     { color: var(--jc-pos);     background: var(--jc-pos-weak);     border-color: var(--jc-pos-line); }
 .jc-verdict-inline[data-tone='caution'] { color: var(--jc-caution); background: var(--jc-caution-weak); border-color: var(--jc-caution-line); }
 .jc-verdict-inline[data-tone='neg']     { color: var(--jc-neg);     background: var(--jc-neg-weak);     border-color: var(--jc-neg-line); }
+
+/* Fit-card summary row — verdict pill + remote/location text on one
+   line. Wraps to a second line only when the sidepanel is narrow
+   enough that neither piece would fit. The remote text takes its
+   tone color (pos/caution/neg) via a data-tone attribute so a flagged
+   listing reads red inline without needing its own notice box. */
+.jc-fit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--jc-2) var(--jc-3);
+  margin-bottom: var(--jc-3);
+}
+.jc-fit-summary__remote {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+  font: 500 var(--jc-text-2xs)/1.4 var(--jc-font);
+  color: var(--jc-text-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.jc-fit-summary__remote strong { font-weight: 600; }
+.jc-fit-summary__remote[data-tone='pos']     { color: var(--jc-pos);     }
+.jc-fit-summary__remote[data-tone='caution'] { color: var(--jc-caution); }
+.jc-fit-summary__remote[data-tone='neg']     { color: var(--jc-neg);     }
+.jc-fit-summary__sep { color: var(--jc-text-3); font-weight: 400; }
 
 /* ------------------------------------------------------------
    DOCUMENTS SECTION
@@ -1268,28 +1347,6 @@ body { background: var(--jc-bg); }
   display: flex; flex-direction: column; gap: var(--jc-3);
 }
 .jc-counter .jc-eyebrow { color: var(--jc-pos); margin-bottom: 0; }
-.jc-counter-row {
-  display: grid; grid-template-columns: 1fr auto auto; gap: var(--jc-2);
-  align-items: baseline;
-  padding: 8px 0;
-  border-top: 1px solid var(--jc-pos-line);
-}
-.jc-counter-row:first-of-type { border-top: none; padding-top: 4px; }
-.jc-counter-row__label { font-size: var(--jc-text-sm); color: var(--jc-text); font-weight: 500; }
-.jc-counter-row__from {
-  font-family: var(--jc-font-mono); font-variant-numeric: tabular-nums;
-  font-size: var(--jc-text-xs); color: var(--jc-text-3);
-}
-.jc-counter-row__to {
-  font-family: var(--jc-font-mono); font-variant-numeric: tabular-nums;
-  font-size: var(--jc-text-md); font-weight: 700; color: var(--jc-pos);
-}
-.jc-counter-row__reason {
-  grid-column: 1 / -1;
-  font-size: var(--jc-text-xs); color: var(--jc-text-2);
-  padding: 4px 0 0;
-  line-height: var(--jc-leading-snug);
-}
 .jc-counter-total {
   padding-top: var(--jc-3);
   margin-top: var(--jc-1);

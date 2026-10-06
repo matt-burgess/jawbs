@@ -1,7 +1,9 @@
 (async () => {
   const { SELECTORS, extractJobId } = await import(chrome.runtime.getURL('content/selectors.js'));
 
-  // Auto-open the side panel on the FIRST user gesture on any LinkedIn page.
+  // Auto-open the side panel on the FIRST user gesture on a LinkedIn jobs page.
+  // (This script loads on all of linkedin.com so it's present after SPA
+  // navigation into Jobs; the panel should still only open there.)
   // MV3 requires user activation for sidePanel.open(); a navigation/tab-
   // activation event does not qualify. Piggybacking on any pointerdown /
   // keydown DOES, and the click bubble through sendMessage → SW.open() is
@@ -9,12 +11,12 @@
   // we don't spam open() on every scroll or click.
   let sidePanelOpenRequested = false;
   function requestSidePanelOpen() {
-    if (sidePanelOpenRequested) return;
+    if (sidePanelOpenRequested || !/^\/(jobs|jobs-tracker|my-items)(\/|$)/.test(location.pathname)) return;
     sidePanelOpenRequested = true;
     try { chrome.runtime.sendMessage({ type: 'open-side-panel' }); } catch {}
   }
-  window.addEventListener('pointerdown', requestSidePanelOpen, { capture: true, once: true });
-  window.addEventListener('keydown', requestSidePanelOpen, { capture: true, once: true });
+  window.addEventListener('pointerdown', requestSidePanelOpen, { capture: true });
+  window.addEventListener('keydown', requestSidePanelOpen, { capture: true });
 
   const BACKFILL_BUTTON_ID = 'jc-backfill-btn';
   const TOAST_ID = 'jc-toast';
@@ -24,6 +26,9 @@
 
   let lastJobId = null;
   let lastTrackerFingerprint = '';
+  let pendingTrackerFingerprint = '';   // seen once, waiting for a second matching pass
+  let lastTrackerSent = null;           // { stage, ids:Set } of the last list reported
+  let trackerRetick = null;
   // Auto-confirm-click state — set from the sidepanel's "Transition to
   // Applied on LinkedIn" button via chrome.storage.local. On the tracker
   // page, we walk the DOM until we find the specific jawb row and click
@@ -56,8 +61,8 @@
   // doesn't fire duplicate reports on every tick of the same page.
   let lastReportedSearchUrl = null;
   let extractTimer = null;
-  const observedButtons = new WeakSet(); // save/apply buttons we already attached a MutationObserver to
-  const firedThisSession = new Set();    // per-jobId keys like 'save:12345' to avoid re-firing
+  const firedThisSession = new Set();    // once-per-page-load keys like 'automatch:12345'
+  let lastUrlChangeAt = 0;               // SPA nav timestamp — page state isn't trusted until it settles
 
   const isJobDetailUrl = (url) => /\/jobs\/(view|search|collections|search-results)/.test(url);
   const isTrackerUrl = (url) => /\/(jobs-tracker|my-items)/.test(url);
@@ -163,13 +168,43 @@
     let node = h1.parentElement;
     let best = null;
     while (node && node.tagName !== 'BODY') {
-      const len = (node.innerText || '').length;
+      const text = node.innerText || '';
+      const len = text.length;
       if (len > 800 && len < 15000) {
-        if (!best || len > best.len) best = { node, len };
+        // Reject candidates that read like a search-results listing.
+        // Otherwise the fit/comp LLM gets fed a page of 50 unrelated
+        // job cards and produces "this is not a real posting" style
+        // findings instead of a real analysis.
+        if (!looksLikeSearchListing(text)) {
+          if (!best || len > best.len) best = { node, len };
+        }
       }
       node = node.parentElement;
     }
     return best?.node || null;
+  }
+
+  // Heuristic: does this text look like a scraped search-results listing
+  // (multiple job cards) rather than a single job's description?
+  // A single posting mentions "applicants" 0-1 times and "hours/days ago"
+  // 0-1 times. A listing page repeats those phrases per card, so a count
+  // >= 3 is a strong bleedover signal. Also flags on repeated
+  // "Easy Apply" / "Promoted" / "1st degree" markers which are job-card
+  // decorations, not description prose.
+  function looksLikeSearchListing(text) {
+    if (!text || typeof text !== 'string') return false;
+    const applicantHits = (text.match(/\bapplicants?\b/gi) || []).length;
+    const agoHits = (text.match(/\b\d+\s*(?:hours?|days?|weeks?|months?)\s+ago\b/gi) || []).length;
+    const easyApplyHits = (text.match(/Easy\s*Apply/gi) || []).length;
+    const promotedHits = (text.match(/\bPromoted\b/g) || []).length;
+    const degreeHits = (text.match(/\b(?:1st|2nd|3rd)\b/g) || []).length;
+    // Any two markers hitting 3+ separately, or a single marker hitting
+    // 6+, treat as listing bleed.
+    const heavy = [applicantHits, agoHits, easyApplyHits, promotedHits, degreeHits]
+      .filter((n) => n >= 3).length;
+    if (heavy >= 2) return true;
+    if (applicantHits >= 6 || agoHits >= 6 || easyApplyHits >= 6) return true;
+    return false;
   }
 
   function extractDetail() {
@@ -186,7 +221,21 @@
     const dPosted = firstMatch(SELECTORS.postedDate);
     const dApplicants = firstMatch(SELECTORS.applicantCount);
     const dSalary = firstMatch(SELECTORS.salary);
-    const dDescription = firstMatch(SELECTORS.description);
+    // Description — try the jobId-specific #JobDetails_AboutTheJob_<id>
+    // container first. LinkedIn's search-results-with-detail-pane
+    // rollout uses this id shape and drops the older #job-details /
+    // .jobs-description__content classes entirely. Falling back to
+    // SELECTORS.description handles other layouts (single-job view,
+    // legacy rollouts) and picks up the generic id-prefix pattern.
+    let dDescription = null;
+    if (jobId) {
+      const specific = document.getElementById(`JobDetails_AboutTheJob_${jobId}`);
+      const txt = specific ? (specific.innerText || '').trim() : '';
+      if (txt && txt.length > 200) {
+        dDescription = { text: txt.slice(0, DESC_MAX), source: 'job-details-id' };
+      }
+    }
+    if (!dDescription) dDescription = firstMatch(SELECTORS.description);
     const dRecruiter = firstMatch(SELECTORS.recruiter);
 
     const source = {};
@@ -228,20 +277,31 @@
 
     let descriptionText = null;
     let descriptionSource = null;
-    if (dDescription?.text) {
+    // Primary DOM selector — the ground truth when LinkedIn ships it.
+    // Still validated against the listing-bleed detector because some
+    // rollouts land `#job-details` on a wrapper that includes adjacent
+    // search-results content in the detail column.
+    if (dDescription?.text && !looksLikeSearchListing(dDescription.text)) {
       descriptionText = dDescription.text;
       descriptionSource = 'primary';
     } else if (jsonLd?.description) {
+      // JSON-LD is per-focused-job by LinkedIn's own schema markup, so
+      // it's safe from listing bleed. Prefer it over inferred DOM
+      // scoping whenever the primary selector missed or looked polluted.
       descriptionText = htmlToText(jsonLd.description);
       descriptionSource = 'jsonld';
     } else {
       const inferred = inferJobPane();
       if (inferred) {
-        descriptionText = (inferred.innerText || '').trim().slice(0, DESC_MAX);
-        descriptionSource = 'h1-inferred';
-      } else {
+        const inferredText = (inferred.innerText || '').trim().slice(0, DESC_MAX);
+        if (!looksLikeSearchListing(inferredText)) {
+          descriptionText = inferredText;
+          descriptionSource = 'h1-inferred';
+        }
+      }
+      if (!descriptionText) {
         const container = firstMatch(SELECTORS.container);
-        if (container?.text) {
+        if (container?.text && !looksLikeSearchListing(container.text)) {
           descriptionText = container.text.slice(0, DESC_MAX);
           descriptionSource = 'container-fallback';
         }
@@ -1103,6 +1163,9 @@
 
     const noteAnchor = (jobId, el) => {
       if (!jobId || !/^\d+$/.test(jobId)) return;
+      // Recommendation rails and page chrome aren't part of the stage
+      // list — a job linked from there must not inherit the tab's status.
+      if (el.closest('aside, header, footer, nav')) return;
       if (!anchors.has(jobId)) anchors.set(jobId, el);
     };
 
@@ -1219,8 +1282,11 @@
   function detectTrackerStage() {
     try {
       const u = new URL(location.href);
-      const stage = u.searchParams.get('stage');
+      // /jobs-tracker/ uses ?stage=, the older /my-items/saved-jobs/ uses
+      // ?cardType=SAVED|IN_PROGRESS|APPLIED|ARCHIVED (default SAVED).
+      const stage = u.searchParams.get('stage') || u.searchParams.get('cardType');
       if (stage) return stage;
+      if (/^\/my-items\/saved-jobs\/?$/.test(u.pathname)) return 'saved';
       // LinkedIn's /jobs-tracker/ root URL (no query param) shows the
       // Saved list by default. Treat it the same as ?stage=saved so syncs
       // from the root land jobs in the correct status.
@@ -1359,7 +1425,10 @@
       if (!/\b(save|saved|unsave)\b/.test(label)) continue;
       // Reject buttons that look like they're inside a list card (aria-label
       // usually then references a job title). Prefer generic Save-like labels.
-      if (/^(save|saved|unsave)(\s+this\s+job)?$/i.test(label)) return b;
+      // Accepted phrasings observed across LinkedIn rollouts:
+      //   "Save" / "Saved" / "Unsave"
+      //   "Save this job" / "Save the job" / "Unsave the job" / "Saved job"
+      if (/^(save|saved|unsave)(\s+(this|the)\s+job|\s+job)?$/i.test(label)) return b;
       // Otherwise accept if it's inside the top card region (h1 sibling area)
       const h1 = document.querySelector('main h1, h1');
       if (h1 && b.closest('*')?.contains(h1) === false) {
@@ -1375,13 +1444,36 @@
     const candidates = document.querySelectorAll('button, a[role="button"]');
     for (const b of candidates) {
       if (!b.offsetParent) continue;
-      const label = (b.getAttribute('aria-label') || '').toLowerCase();
-      const text = (b.innerText || '').trim().toLowerCase();
-      if (/^(easy apply|apply)(\s|$)/.test(label) || /^(easy apply|apply)$/.test(text)) {
-        return b;
-      }
+      if (looksLikeApplyButton(b)) return b;
     }
     return null;
+  }
+
+  // Predicate mirroring looksLikeSaveButton — used both by findApplyButton
+  // (for the MutationObserver / retroactive path) and the global click
+  // delegator below. Deliberately strict enough to skip "Apply filters",
+  // "Apply date", "Apply promo code", etc. by requiring either an exact
+  // text match or an aria-label that references the job.
+  function looksLikeApplyButton(el) {
+    if (!el) return false;
+    // Accept <button>, role=button divs, AND plain <a> tags — LinkedIn's
+    // newer rollouts render "Apply on company website" as a link that
+    // opens the corp site in a new tab, not a button.
+    const tag = el.tagName;
+    const roleButton = el.getAttribute('role') === 'button';
+    if (tag !== 'BUTTON' && tag !== 'A' && !roleButton) return false;
+    const label = (el.getAttribute('aria-label') || '').trim();
+    // Exact common phrasings across LinkedIn rollouts:
+    //   "Apply" / "Easy Apply"
+    //   "Apply to the job" / "Apply to this job" / "Apply to <company>'s job"
+    //   "Easy Apply to the job" / "Easy Apply to this job"
+    //   "Apply on company site" / "Apply on Company Website"
+    if (/^(easy\s+)?apply$/i.test(label)) return true;
+    if (/^(easy\s+)?apply\s+(to|on|for)\b/i.test(label) && /\b(job|role|company|position|website|site)\b/i.test(label)) return true;
+    // Visible text — exact "Apply" or "Easy Apply" (rejects "Apply filters", etc.).
+    const text = (el.innerText || el.textContent || '').trim();
+    if (/^(easy\s+)?apply$/i.test(text)) return true;
+    return false;
   }
 
   function isSaved(btn) {
@@ -1390,33 +1482,58 @@
     const label = (btn.getAttribute('aria-label') || '').toLowerCase();
     if (/^unsave/.test(label) || /\bsaved\b/.test(label)) return true;
     const text = (btn.innerText || '').trim().toLowerCase();
-    if (text === 'saved') return true;
+    if (text === 'saved' || text === 'unsave') return true;
+    return false;
+  }
+
+  // Predicate for the global click delegator. Recognizes a Save/Unsave
+  // button by its visible text OR its aria-label OR its SVG icon id.
+  // Deliberately strict — a plain "Save" text label wins, but "Save
+  // search" / "Save profile" / "Save preferences" do not match. This is
+  // what carries us through LinkedIn's periodic DOM overhauls that
+  // strip aria-label but keep the visible label inside nested spans.
+  function looksLikeSaveButton(el) {
+    if (!el) return false;
+    if (el.tagName !== 'BUTTON' && el.getAttribute('role') !== 'button') return false;
+    const label = (el.getAttribute('aria-label') || '').trim();
+    // Accepted phrasings across LinkedIn rollouts:
+    //   "Save" / "Saved" / "Unsave"
+    //   "Save this job" / "Save the job" / "Unsave the job" / "Saved job"
+    if (/^(save|saved|unsave)( (this|the) job| job)?$/i.test(label)) return true;
+    // Some aria-labels take the form "Save Senior Engineer at Acme, job"
+    // — accept when the label opens with save/unsave AND references
+    // a job-role token, so we don't false-match "Save search".
+    if (/^(save|unsave)\b/i.test(label) && /\b(job|role|position)\b/i.test(label)) return true;
+    const text = (el.innerText || el.textContent || '').trim();
+    if (/^(save|saved|unsave)$/i.test(text)) return true;
+    // SVG icon fallback for icon-only buttons — LinkedIn's bookmark glyph
+    // ships as an inline svg with id like "ribbon-*" / "bookmark-*".
+    const svg = el.querySelector('svg[id]');
+    if (svg && /^(ribbon|bookmark|save)-/i.test(svg.id)) return true;
     return false;
   }
 
   function isApplied() {
     // "Applied" indicator in the top-card area. LinkedIn's phrasings observed:
-    //   "Applied · 5 minutes ago" / "Applied · 2w ago"
-    //   "Applied on Jan 5"
-    //   "Applied to this job"
-    //   "You applied to this job"
-    //   Standalone "Applied" pill/label
-    //   "Application submitted"
+    //   "Applied · 5 minutes ago" / "Applied 2w ago" / "Applied on Jan 5"
+    //   "You applied to this job" / "Application submitted"
+    //   Standalone "Applied" pill
+    // Matched per line, skipping the title line itself, so "Applied
+    // Scientist" or "Applied Materials" never reads as an application.
     const h1 = document.querySelector('main h1, h1');
     if (!h1) return false;
     const topContainer = h1.closest('[componentkey], section, div');
     if (!topContainer) return false;
-    const scoped = (topContainer.innerText || '').toLowerCase();
+    const scoped = topContainer.innerText || '';
     if (scoped.length > 5000) return false;
-    if (/\bapplied\b\s*(·|\||—|-|\.|,)/.test(scoped)) return true;
-    if (/\bapplied\s+(on|to|\d+|ago|now|just|about|earlier|today|yesterday|last)/i.test(scoped)) return true;
-    if (/you\s+applied\b/i.test(scoped)) return true;
-    if (/application\s+(submitted|sent|received)/i.test(scoped)) return true;
-    // Standalone "Applied" as its own line — LinkedIn sometimes uses a pill
-    // that renders as just the word on its own visual row.
-    const lines = scoped.split(/\n+/).map((l) => l.trim());
-    if (lines.some((l) => l === 'applied' || l === '✓ applied')) return true;
-    return false;
+    const title = (h1.innerText || '').trim().toLowerCase();
+    return scoped.split(/\n+/).map((l) => l.trim().toLowerCase()).some((l) =>
+      l && l !== title && l.length < 80 && (
+        /^(✓\s*)?applied$/.test(l)
+        || /^applied\s*(·|\||—|-)?\s*(on\s+\w+\s+\d|\d+\s*\w+\s+ago|just now|today|yesterday|\d+\s*(m|h|d|w|mo|yr)\b)/.test(l)
+        || /\byou applied\b/.test(l)
+        || /^application (was )?(submitted|sent|received)/.test(l)
+      ));
   }
 
   function showToast(text) {
@@ -1441,95 +1558,107 @@
     }, 2500);
   }
 
-  function fireSave({ silent }) {
-    const data = extractDetail();
-    if (!data) return;
-    const key = `save:${data.jobId}`;
-    if (firedThisSession.has(key)) return;
-    firedThisSession.add(key);
-    chrome.runtime.sendMessage({ type: 'save-clicked', data }).catch(() => {});
-    if (!silent) showToast('✓ Saved to Jawbs Jawboard');
-  }
+  // ---------- Status signals → service worker ----------
+  //
+  // Everything status-relevant becomes one 'linkedin-signal' message; the
+  // service worker (lib/statuses.js#resolveTransition) decides what it
+  // means. `explicit` = the user just clicked; otherwise it's state we
+  // noticed on the page, which is weaker evidence.
 
-  function fireApply({ silent }) {
-    const data = extractDetail();
-    if (!data) return;
-    const key = `apply:${data.jobId}`;
-    if (firedThisSession.has(key)) {
-      console.info('[Jawbs] Apply fire skipped (already fired this session for', data.jobId, ')');
-      return;
+  const recentExplicit = new Map(); // `${kind}:${jobId}` → ts
+  let lastApplyClick = null;        // { jobId, at } — attributes a later confirmation
+
+  function sendSignal(kind, jobId, { explicit = true, stage, data } = {}) {
+    if (!jobId) return;
+    const key = `${kind}:${explicit}:${jobId}`;
+    if (explicit && kind !== 'apply-confirmed') {
+      // Collapse double-fires (click + keyboard, nested buttons) but let a
+      // real save → unsave → save sequence through.
+      if (Date.now() - (recentExplicit.get(key) || 0) < 3000) return;
+      recentExplicit.set(key, Date.now());
+    } else {
+      if (firedThisSession.has(key)) return;
+      firedThisSession.add(key);
     }
-    firedThisSession.add(key);
-    firedThisSession.add(`save:${data.jobId}`);
-    console.info('[Jawbs] Apply fire for', data.jobId, silent ? '(silent)' : '(with toast)');
-    chrome.runtime.sendMessage({ type: 'apply-clicked', data }).catch((e) => console.warn('[Jawbs] apply-clicked send failed:', e));
-    if (!silent) showToast('✓ Applied — logged to Jawbs Jawboard');
+    chrome.runtime.sendMessage({ type: 'linkedin-signal', kind, jobId, explicit, stage, data })
+      .then((r) => {
+        console.info('[Jawbs] signal', kind, jobId, explicit ? '' : '(observed)', stage || '', '→', r);
+        if (r?.changed) showToast(`✓ Jawbs: ${r.label}`);
+      })
+      .catch((e) => console.warn('[Jawbs] signal send failed:', kind, jobId, e));
   }
 
-  // Fire when the user unsaves a job on LinkedIn while viewing its
-  // detail page. We don't downgrade status — an unsave is not the
-  // same as "abandon this pursuit" (user may have applied elsewhere,
-  // still interviewing, etc.). Instead we log it in the timeline and
-  // surface it through the Reconcile flow so the user can decide.
-  function fireUnsave() {
-    const data = extractDetail();
-    if (!data?.jobId) return;
-    const key = `unsave:${data.jobId}`;
-    if (firedThisSession.has(key)) return;
-    firedThisSession.add(key);
-    // Allow re-firing a save later if the user toggles it back on.
-    firedThisSession.delete(`save:${data.jobId}`);
-    chrome.runtime.sendMessage({
-      type: 'linkedin-status-changed',
-      jobId: data.jobId, action: 'unsave',
-    }).catch(() => {});
-    showToast('· Unsaved on LinkedIn — logged for reconcile');
+  // A status-looking click we couldn't act on. Goes to the activity log
+  // (Options → Activity) so a LinkedIn wording change is findable.
+  const reportedUnmatched = new Set();
+  function reportUnmatched(why, el) {
+    const text = (el?.getAttribute?.('aria-label') || el?.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+    const note = `${why} · "${text}" · ${location.pathname}${location.search.slice(0, 60)}`;
+    if (reportedUnmatched.has(note)) return;
+    reportedUnmatched.add(note);
+    console.info('[Jawbs] unmatched status click:', note, el?.outerHTML?.slice(0, 500));
+    chrome.runtime.sendMessage({ type: 'linkedin-signal-unmatched', note }).catch(() => {});
   }
 
-  function attachSaveWatcher() {
-    const btn = findSaveButton();
-    if (!btn || observedButtons.has(btn)) return;
-    observedButtons.add(btn);
-    let lastState = isSaved(btn);
-    if (lastState) fireSave({ silent: true }); // already saved on page load → capture retroactively, no toast
-    const obs = new MutationObserver(() => {
-      const nowState = isSaved(btn);
-      if (nowState && !lastState) fireSave({ silent: false }); // user clicked Save during session
-      else if (!nowState && lastState) fireUnsave();           // user clicked Unsave during session
-      lastState = nowState;
-    });
-    obs.observe(btn, { attributes: true, attributeFilter: ['aria-label', 'aria-pressed', 'class'] });
-  }
-
-  function checkAppliedState() {
-    // Every time this runs (page load, DOM mutations, URL changes), check the
-    // top-card text for an "Applied" indicator. This is the main path — the
-    // Easy Apply modal completes and LinkedIn updates the top card, then our
-    // page-level MutationObserver retriggers this.
-    if (isApplied()) {
-      console.info('[Jawbs] isApplied() returned true — attempting to fire apply capture');
-      fireApply({ silent: false });
+  function jobIdsIn(el) {
+    const ids = new Set();
+    const add = (v) => { if (v && /^\d+$/.test(v)) ids.add(v); };
+    const nodes = [el, ...el.querySelectorAll('[data-job-id], [data-occludable-job-id], a[href*="/jobs/view/"], a[href*="currentJobId="]')];
+    for (const n of nodes) {
+      add(n.getAttribute('data-job-id'));
+      add(n.getAttribute('data-occludable-job-id'));
+      const href = n.getAttribute('href') || '';
+      add(href.match(/\/jobs\/view\/(\d+)/)?.[1]);
+      add(href.match(/currentJobId=(\d+)/)?.[1]);
     }
+    return ids;
+  }
 
-    // Also observe the Apply button directly, for the case where the button
-    // changes state in-place before the top-card re-renders.
-    const btn = findApplyButton();
-    if (!btn || observedButtons.has(btn)) return;
-    observedButtons.add(btn);
-    let lastState = isApplyButtonInAppliedState(btn);
-    if (lastState) fireApply({ silent: true });
-    const obs = new MutationObserver(() => {
-      const nowState = isApplyButtonInAppliedState(btn) || isApplied();
-      if (nowState && !lastState) {
-        console.info('[Jawbs] Apply button state transitioned to applied');
-        fireApply({ silent: false });
-      }
-      lastState = nowState;
-    });
-    obs.observe(btn, {
-      attributes: true, subtree: true, characterData: true, childList: true,
-      attributeFilter: ['aria-label', 'disabled', 'class'],
-    });
+  // Which job does this control belong to? The nearest ancestor that
+  // names exactly one job is its card (list row, tracker row, similar-job
+  // tile). If we reach the detail pane's heading or a container holding
+  // several jobs first, it belongs to the job open in the detail pane.
+  function jobForElement(el) {
+    const h1 = document.querySelector('main h1, h1');
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      const ids = jobIdsIn(n);
+      if (ids.size === 1) return { jobId: [...ids][0], card: n };
+      if (ids.size > 1 || (h1 && n.contains(h1))) break;
+    }
+    return { jobId: extractJobId(location.href), card: null };
+  }
+
+  // Payload for a signal that may create an archive record: the full
+  // scrape when it's the open job, otherwise a title guess from the card.
+  function signalData(jobId, card) {
+    if (jobId === extractJobId(location.href)) {
+      const d = extractDetail();
+      if (d) return d;
+    }
+    const link = card?.querySelector('a[href*="/jobs/view/"], a[href*="currentJobId="]');
+    const title = cleanFirstLine(link?.getAttribute('aria-label') || link?.innerText || '');
+    return { url: `https://www.linkedin.com/jobs/view/${jobId}/`, guess: title ? { title } : undefined };
+  }
+
+  // State visible on the open job's page, as opposed to something the
+  // user just did. Skipped right after SPA navigation: LinkedIn reuses
+  // the previous job's buttons for a beat, and reading them then would
+  // credit job A's saved/applied state to job B.
+  function checkObservedState(data) {
+    if (Date.now() - lastUrlChangeAt < 1500) return;
+    const jobId = data.jobId;
+    if (isSaved(findSaveButton())) sendSignal('save', jobId, { explicit: false, data });
+
+    // Easy Apply's "Your application was sent" dialog — the user just
+    // finished applying, so this one counts as explicit.
+    const sent = [...document.querySelectorAll('[role="dialog"]')]
+      .some((d) => /\b(your )?application (was )?(sent|submitted)\b/i.test(d.innerText || ''));
+    if (sent) {
+      const fresh = lastApplyClick && Date.now() - lastApplyClick.at < 30 * 60_000;
+      sendSignal('apply-confirmed', fresh ? lastApplyClick.jobId : jobId, { data: fresh && lastApplyClick.jobId !== jobId ? undefined : data });
+    } else if (isApplied() || isApplyButtonInAppliedState(findApplyButton())) {
+      sendSignal('apply-confirmed', jobId, { explicit: false, data });
+    }
   }
 
   // ---------- LinkedIn Premium "high match" auto-trigger ----------
@@ -1579,10 +1708,10 @@
 
   function isApplyButtonInAppliedState(btn) {
     if (!btn) return false;
-    if (btn.disabled) return true;
-    const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+    // Not `btn.disabled` — closed postings disable the button too.
+    const label = (btn.getAttribute('aria-label') || '').trim().toLowerCase();
     const text = (btn.innerText || '').trim().toLowerCase();
-    return /applied/.test(label) || /^applied$/.test(text);
+    return /^applied\b/.test(label) || /^applied$/.test(text);
   }
 
   // Fin-swim nudge lives in content/fin.js — it runs on every
@@ -1822,33 +1951,6 @@
     notMovingForward:       { bg: '#7F1D1D', fg: '#FFFFFF' },
     analyzed:               { bg: '#374151', fg: '#FFFFFF' },
   };
-  const STRENGTH_TIER_COLORS = {
-    'great-white': '#F59320',
-    'tiger':       '#FCA311',
-    'bull':        '#EAB308',
-    'mako':        '#A3A3A3',
-    'nurse':       '#6B7280',
-    'pygmy':       '#4B5563',
-  };
-  const fitTierColor = (score) => {
-    if (score == null) return '#6B7280';
-    if (score >= 70) return '#059669';
-    if (score >= 40) return '#D97706';
-    return '#B91C1C';
-  };
-  const fmtMoneyShort = (n) => {
-    if (n == null || Number.isNaN(n)) return null;
-    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1000) return `$${Math.round(n / 1000)}K`;
-    return `$${Math.round(n)}`;
-  };
-  const compRangeText = (low, high) => {
-    if (low == null && high == null) return null;
-    const l = fmtMoneyShort(low);
-    const h = fmtMoneyShort(high);
-    if (l && h) return `${l}–${h}`;
-    return l || h;
-  };
   // Weak / fair / strong band palette — same tokens the Jawbar meta
   // strip uses, so the mini gauges in LinkedIn cards read identically
   // to the ones in the sidepanel.
@@ -1907,7 +2009,10 @@
     text.setAttribute('font-family', 'system-ui, -apple-system, sans-serif');
     text.setAttribute('font-size', '9');
     text.setAttribute('font-weight', '600');
-    text.textContent = String(Math.round(n));
+    // Display the RAW score (uncapped) — the arc still fills to the
+    // clamped `n`, but the number in the middle tells the user the
+    // true value even when it exceeds 100 (comp above target case).
+    text.textContent = String(Math.round(Number(score) || 0));
     svg.appendChild(text);
     return svg;
   }
@@ -2203,19 +2308,34 @@
         // the same intent now.
         const stale = document.getElementById('jc-launch-btn');
         if (stale) stale.remove();
-        attachSaveWatcher();
-        checkAppliedState();
+        checkObservedState(data);
         if (detectPremiumHighMatch()) fireAutoAnalyze();
       }
     } else if (isTrackerUrl(url)) {
       const jobs = scrapeTrackerList();
-      // Fingerprint by the exact set of jobIds — catches pagination even
-      // when the count stays the same across pages.
-      const fingerprint = jobs.map((j) => j.jobId).sort().join(',');
+      const stage = detectTrackerStage();
+      // Fingerprint by stage + the exact set of jobIds — catches
+      // pagination even when the count stays the same across pages.
+      const fingerprint = `${stage}|${jobs.map((j) => j.jobId).sort().join(',')}`;
       if (fingerprint !== lastTrackerFingerprint) {
-        lastTrackerFingerprint = fingerprint;
-        const stage = detectTrackerStage();
-        chrome.runtime.sendMessage({ type: 'tracker-list', jobs, url, stage }).catch(() => {});
+        // The tab a job is listed under now sets its status, so a list must
+        // never be credited to the wrong tab. On a tab switch the URL
+        // changes before LinkedIn swaps the rows; hold off until (a) no
+        // row is left over from the previously reported tab and (b) two
+        // consecutive passes agree.
+        const staleRows = lastTrackerSent && lastTrackerSent.stage !== stage
+          && jobs.some((j) => lastTrackerSent.ids.has(j.jobId));
+        if (staleRows || fingerprint !== pendingTrackerFingerprint) {
+          pendingTrackerFingerprint = fingerprint;
+          clearTimeout(trackerRetick);
+          // Rows that never clear (10s) mean the job really is listed under
+          // both tabs — leave it to a full sync rather than guess.
+          if (!staleRows || Date.now() - lastUrlChangeAt < 10_000) trackerRetick = setTimeout(runNow, 900);
+        } else {
+          lastTrackerFingerprint = fingerprint;
+          lastTrackerSent = { stage, ids: new Set(jobs.map((j) => j.jobId)) };
+          chrome.runtime.sendMessage({ type: 'tracker-list', jobs, url, stage }).catch(() => {});
+        }
       }
       // Sidepanel's "Transition to Applied on LinkedIn" workflow — if
       // a pending auto-confirm signal targets a jobId visible on the
@@ -2744,6 +2864,18 @@
       row.style.outline = '3px solid #F59320';
       setTimeout(() => { try { row.style.outline = ''; } catch {} }, 3200);
     }
+    // Tab title flash — if the user switched to another tab while the
+    // walker was searching, they'll notice the tracker tab's title
+    // change in the browser tab bar. Restored after 6 seconds unless
+    // LinkedIn's SPA has since replaced the title (indicating a nav).
+    try {
+      const original = document.title;
+      const flagged = `✓ Found — ${original}`;
+      document.title = flagged;
+      setTimeout(() => {
+        if (document.title === flagged) document.title = original;
+      }, 6000);
+    } catch { /* title write blocked — no-op */ }
   }
 
   // Which pagination page number is currently selected? LinkedIn
@@ -2819,54 +2951,6 @@
     return null;
   }
 
-  // Try every advancement strategy. Returns true if any control was
-  // engaged (even if it didn't produce new content — verification
-  // happens in the caller).
-  async function tryAdvance(log) {
-    // 1. Scroll every scrollable container to its bottom. Also scroll
-    //    the window — many LinkedIn layouts have both.
-    const scrollables = findScrollableContainers();
-    for (const el of scrollables) {
-      el.scrollTop = el.scrollHeight;
-    }
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
-    // Brief pause so any resulting hydration renders before we look for
-    // pagination controls.
-    await new Promise((r) => setTimeout(r, 300));
-
-    // 2. Show-more / Load-more.
-    const showMore = findShowMoreButton();
-    if (showMore && !showMore.disabled) {
-      log('clicking Show/Load more:', outer(showMore));
-      simulateClick(showMore);
-      return true;
-    }
-
-    // 3. Numbered pagination — try Next anchor first (nav is reliable),
-    //    then Next button.
-    const nextAnchor = findNextPageAnchor();
-    if (nextAnchor) {
-      log('advancing via <a>:', nextAnchor.href);
-      try { nextAnchor.scrollIntoView({ block: 'end', behavior: 'auto' }); } catch {}
-      // Full click sequence + pushState fallback.
-      simulateClick(nextAnchor);
-      try {
-        history.pushState({}, '', nextAnchor.href);
-        window.dispatchEvent(new PopStateEvent('popstate'));
-      } catch {}
-      return true;
-    }
-    const nextBtn = findNextPageButton();
-    if (nextBtn) {
-      log('clicking Next button:', outer(nextBtn));
-      try { nextBtn.scrollIntoView({ block: 'end', behavior: 'auto' }); } catch {}
-      simulateClick(nextBtn);
-      return true;
-    }
-
-    return false;
-  }
-
   // Compact outerHTML sample for logs — cap at 240 chars.
   function outer(el) {
     const s = el?.outerHTML || '';
@@ -2917,130 +3001,6 @@
     try { el.dispatchEvent(new PointerEvent('pointerup', opts)); } catch {}
     try { el.dispatchEvent(new MouseEvent('mouseup', opts)); } catch {}
     try { el.dispatchEvent(new MouseEvent('click', opts)); } catch {}
-  }
-
-  function findNextPageAnchor() {
-    const selectors = [
-      'a.artdeco-pagination__button--next',
-      'a[aria-label="View next page"]',
-      'a[aria-label*="Next page" i]',
-      'a[aria-label*="Next" i][href*="jobs-tracker"]',
-      'a[href*="jobs-tracker"][aria-current="false"]',
-    ];
-    for (const s of selectors) {
-      const el = document.querySelector(s);
-      if (el && el.getAttribute('aria-disabled') !== 'true' && el.href) return el;
-    }
-    return null;
-  }
-
-  function findNextPageButton() {
-    const selectors = [
-      'button.artdeco-pagination__button--next',
-      'button.jobs-search-pagination__button--next',
-      'button[aria-label="View next page"]',
-      'button[aria-label*="Next page" i]',
-      'button[aria-label*="Next" i]',
-      '[data-test-pagination-page-btn][aria-label*="next" i]',
-      // Icon-only pagination — LinkedIn sometimes uses this pattern.
-      'button[type="button"]:has(svg[aria-label*="Next" i])',
-    ];
-    for (const s of selectors) {
-      let btn;
-      try { btn = document.querySelector(s); } catch { continue; }
-      if (!btn) continue;
-      if (btn.disabled) continue;
-      if (btn.getAttribute('aria-disabled') === 'true') continue;
-      return btn;
-    }
-    return null;
-  }
-
-  // Harvest every anchor href on the page that looks like a
-  // pagination sibling of the current URL. LinkedIn's tracker
-  // presents pages as `<a href="…">1 2 3 Next</a>` under the job
-  // list; whatever URL scheme they use (`start=N`, `page=N`, opaque
-  // params, whatever), the anchor href itself is the canonical
-  // destination. Extract them all and let the SW navigate through.
-  //
-  // Rules:
-  //   - Anchor must live in the same site path family (jobs-tracker,
-  //     jobs/search, my-items, etc.).
-  //   - Must differ from location.href.
-  //   - If the current URL has a `stage` param, only match anchors
-  //     with the same stage — pagination is per-stage.
-  //   - Deduped, ordered by their numeric page indicator when we can
-  //     extract one; alphabetical fallback.
-  function discoverPaginationUrls() {
-    const here = new URL(location.href);
-    const currentStage = here.searchParams.get('stage');
-    const currentPathBase = here.pathname.replace(/\/$/, '');
-    const seen = new Set([here.toString()]);
-    const found = [];
-
-    // Params LinkedIn uses (across older/newer views) as pagination
-    // offsets. Presence of any one of these on a same-path anchor is
-    // treated as a positive pagination signal.
-    const PAGE_PARAMS = ['start', 'page', 'pageNum', 'position', 'offset', 'currentPage'];
-
-    for (const a of document.querySelectorAll('a[href]')) {
-      let u;
-      try { u = new URL(a.href, location.origin); } catch { continue; }
-      if (u.origin !== here.origin) continue;
-
-      // Accept exact-path OR nested paginated variants like
-      // /jobs-tracker/page/2/. Trim trailing slash for the compare.
-      const otherPathBase = u.pathname.replace(/\/$/, '');
-      const samePath = otherPathBase === currentPathBase
-        || otherPathBase.startsWith(currentPathBase + '/page/');
-      if (!samePath) continue;
-
-      // Stage lock — pagination is per-stage.
-      if (currentStage && u.searchParams.get('stage') !== currentStage) continue;
-
-      const canonical = u.toString();
-      if (seen.has(canonical)) continue;
-
-      // POSITIVE signal required — anchor must look like pagination.
-      const order = extractPageOrder(u, a, PAGE_PARAMS);
-      if (order == null) continue;
-
-      seen.add(canonical);
-      found.push({ url: canonical, order });
-    }
-    // Numeric order — page 2 before page 3, etc.
-    found.sort((a, b) => a.order - b.order);
-    return found.map((f) => f.url);
-  }
-
-  // Numeric ordering AND the pagination-signal gate rolled into one.
-  // Returns null when the anchor doesn't look like pagination.
-  function extractPageOrder(u, a, pageParams) {
-    // Query-string offset params — most reliable signal.
-    for (const k of pageParams) {
-      const v = u.searchParams.get(k);
-      if (v && /^\d+$/.test(v)) {
-        // Treat `start=N` (LinkedIn's offset scheme) directly; treat
-        // `page=N` (1-indexed) as N*25 for ordering only.
-        const n = parseInt(v, 10);
-        return (k === 'page' || k === 'pageNum' || k === 'currentPage') ? n * 25 : n;
-      }
-    }
-    // Path segment: /page/2/
-    const pathM = u.pathname.match(/\/page\/(\d+)/);
-    if (pathM) return parseInt(pathM[1], 10) * 25;
-    // aria-label like "Page 3" or "Next page"
-    const label = (a.getAttribute('aria-label') || '').toLowerCase();
-    const labelM = label.match(/\bpage\s+(\d+)/i);
-    if (labelM) return parseInt(labelM[1], 10) * 25;
-    // Anchor text — LinkedIn often wraps the number in a span; use
-    // the innermost text and strip whitespace.
-    const text = (a.textContent || '').replace(/\s+/g, ' ').trim();
-    if (/^\d+$/.test(text)) return parseInt(text, 10) * 25;
-    // "Next" text or aria — order it at the end (Infinity - 1 so it
-    // still comes before URLs we couldn't order at all).
-    if (label.includes('next') || /^next$/i.test(text)) return Number.MAX_SAFE_INTEGER;
-    return null;
   }
 
   // Scrape the per-stage job counts LinkedIn shows in its tab bar
@@ -3121,15 +3081,6 @@
     return counts;
   }
 
-  function findShowMoreButton() {
-    return document.querySelector(
-      'button.scaffold-finite-scroll__load-button, ' +
-      'button[aria-label*="Show more" i], ' +
-      'button[aria-label*="Load more" i], ' +
-      'button[aria-label*="See more" i]'
-    );
-  }
-
   // When the walker gives up, dump the pagination-area DOM so the
   // user (or a future debugging session) can identify LinkedIn's
   // actual pagination controls and add their selectors here.
@@ -3161,6 +3112,7 @@
   setInterval(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
+      lastUrlChangeAt = Date.now();
       lastTrackerFingerprint = '';
       lastJobId = null; // force a re-emit even if jobId matches a stale value
       scheduleWorkImmediate();
@@ -3170,7 +3122,113 @@
   const observer = new MutationObserver(() => scheduleWork());
   observer.observe(document.body, { childList: true, subtree: true });
 
-  window.addEventListener('popstate', () => scheduleWorkImmediate());
+  window.addEventListener('popstate', () => { lastUrlChangeAt = Date.now(); scheduleWorkImmediate(); });
+
+  // ---------- Click delegation: the user's own LinkedIn actions ----------
+  //
+  // One capture-phase listener (LinkedIn stops propagation on some
+  // row-level controls). Each branch resolves WHICH job the control
+  // belongs to before anything else — a Save on a list row is about that
+  // row's job, not the one open in the detail pane.
+
+  // Tracker row actions. LinkedIn's wording isn't pinned down, so this is
+  // deliberately text-driven: a menu item / button naming a stage moves
+  // the row's job there. A wrong guess self-corrects the next time the
+  // job is seen under its real tab.
+  const ACTION_STAGES = [
+    [/not moving forward/i, 'not-moving-forward'],
+    [/\binterview/i, 'interview'],
+    [/\bin progress\b/i, 'clicked_apply'],
+    [/\bapplied\b/i, 'applied'],
+    [/\barchived?\b/i, 'archived'],
+    [/\bsaved?\b/i, 'saved'],
+  ];
+  let lastTrackerRow = null; // { jobId, at } — row menus render in a portal, detached from the row
+
+  function trackerActionStage(el) {
+    const text = (el.getAttribute('aria-label') || el.innerText || '').trim().replace(/\s+/g, ' ');
+    if (!text || text.length > 60) return null;
+    // Only menu entries or "Move to …"-style wording count — a row's title
+    // link reading "Applied Scientist" is not an action.
+    const inMenu = !!el.closest('[role="menu"], [role="listbox"], [role="menuitem"], [role="option"]');
+    const phrased = /^(move(d)? to|mark(ed)? as|change (status )?to|add to)\b/i.test(text) || /^archive( job)?$/i.test(text);
+    if (!inMenu && !phrased) return null;
+    if (/^(unsave|remove)\b/i.test(text)) return { kind: 'unsave' };
+    // Un-archive doesn't say where the job goes; the next tracker sighting will.
+    if (/^(un-?archive|restore|undo)\b/i.test(text)) return {};
+    const hit = ACTION_STAGES.find(([re]) => re.test(text));
+    return hit ? { kind: 'tracker', stage: hit[1] } : null;
+  }
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target?.closest?.('button, [role="button"], [role="menuitem"], [role="option"], a[href]');
+    if (!btn) return;
+    const onTracker = isTrackerUrl(location.href);
+
+    // "Did you apply?" / "Did you finish applying?" → Yes. Appears on the
+    // job page after an external apply and on In Progress tracker rows.
+    if (/^yes$/i.test((btn.innerText || '').trim())) {
+      for (let n = btn.parentElement, d = 0; n && d < 8; n = n.parentElement, d++) {
+        const t = n.innerText || '';
+        if (t.length > 800) break;
+        if (/did you (finish )?apply|finish(ed)? applying/i.test(t)) {
+          let { jobId } = jobForElement(btn);
+          if (!jobId && lastApplyClick) jobId = lastApplyClick.jobId;
+          if (jobId) sendSignal('apply-confirmed', jobId);
+          else reportUnmatched('applied-confirm with no job', btn);
+          return;
+        }
+      }
+    }
+
+    if (onTracker) {
+      const { jobId, card } = jobForElement(btn);
+      // Stage tabs and pagination are navigation, not row actions.
+      if (!btn.closest('[role="tablist"], nav') && !/[?&](stage|cardType|page|start)=/.test(btn.getAttribute('href') || '')) {
+        const action = trackerActionStage(btn);
+        if (action) {
+          const target = card ? jobId : (lastTrackerRow && Date.now() - lastTrackerRow.at < 60_000 ? lastTrackerRow.jobId : null);
+          if (action.kind && target) sendSignal(action.kind, target, { stage: action.stage });
+          else reportUnmatched(action.kind ? 'tracker action with no row' : 'tracker action not understood', btn);
+          return;
+        }
+      }
+      if (card) lastTrackerRow = { jobId, at: Date.now() };
+    }
+
+    if (looksLikeApplyButton(btn)) {
+      const { jobId, card } = jobForElement(btn);
+      if (!jobId) return;
+      lastApplyClick = { jobId, at: Date.now() };
+      // LinkedIn files an Apply click under "In Progress"; Applied only
+      // comes from a confirmation (see checkObservedState and the Yes
+      // prompt above).
+      sendSignal('apply-clicked', jobId, { data: signalData(jobId, card) });
+      return;
+    }
+
+    if (looksLikeSaveButton(btn)) {
+      const { jobId, card } = jobForElement(btn);
+      if (!jobId) return; // "Save" on a feed post, a search, etc.
+      const data = signalData(jobId, card);
+      const preSaved = isSaved(btn);
+      // LinkedIn's handler runs after ours; read the result once it settles.
+      setTimeout(() => {
+        // React may have replaced the node. For the open job we can
+        // re-find it; for a list card, a replaced button means it toggled.
+        const live = btn.isConnected ? btn : (card ? null : findSaveButton());
+        const postSaved = live ? isSaved(live) : !preSaved;
+        if (postSaved !== preSaved) sendSignal(postSaved ? 'save' : 'unsave', jobId, { data });
+        else reportUnmatched(`save click, no state change (saved=${preSaved})`, btn);
+      }, 800);
+      return;
+    }
+
+    const label = `${btn.getAttribute('aria-label') || ''} ${(btn.innerText || '').slice(0, 60)}`;
+    if ((onTracker || isJobDetailUrl(location.href)) && btn.tagName !== 'A' && /\b(unsave|save job|save this|bookmark|easy apply|archive|not moving forward)\b/i.test(label)) {
+      reportUnmatched('status-like click not recognized', btn);
+    }
+  }, { capture: true });
 
   scheduleWorkImmediate();
 })();

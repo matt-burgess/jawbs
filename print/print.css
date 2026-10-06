@@ -1,6 +1,11 @@
-/* Print view intentionally uses a light theme with serif type for the
-   printed body — ATS-friendly. Toolbar borrows design system chrome so
-   it feels like the same product. */
+/* Resume PDF layout — matches the user's target design:
+   - Centered name + tagline + contact header
+   - ALL CAPS section titles in brand blue with horizontal rule under
+   - Role: bold title + right-aligned dates on top row; italic company+location on second row
+   - Bullets: real HTML lists, tight line-height, left-aligned
+   - Earlier Experience: compact one-line role entries
+   - Education: bold degree + school on same line, no year (ageism avoidance)
+   ATS-friendly: real selectable text, single column, no icons. */
 
 html, body { margin: 0; }
 body { background: #EDEDEF; }
@@ -16,27 +21,114 @@ body { background: #EDEDEF; }
 }
 .toolbar .hint { color: var(--jc-text-3); font-size: var(--jc-text-2xs); }
 
+/* Resume page itself — serif-free, like the user's target. The target
+   uses Calibri; we fall back through system sans-serif stacks so the
+   PDF renders consistently without bundling fonts. */
 main {
   max-width: 7.5in;
-  min-height: 9in;
+  min-height: 10.5in;
   margin: 24px auto;
-  padding: 0.75in 0.85in;
+  padding: 0.55in 0.65in;
   background: white;
-  color: #111;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 11.5pt;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
+  color: #1a1a1a;
+  font-family: Calibri, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.35;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
+
+/* Fallback text body (used by cover letters that pass raw text). */
+.rz-body-text { white-space: pre-wrap; word-break: break-word; }
+
+/* Header block — centered name + tagline + contact. */
+.rz-header { text-align: center; margin: 0 0 14pt 0; }
+.rz-name {
+  font-size: 24pt;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 2pt 0;
+  letter-spacing: 0.2pt;
+}
+.rz-tagline {
+  font-size: 11pt;
+  color: #333;
+  margin: 0 0 2pt 0;
+}
+.rz-contact {
+  font-size: 10pt;
+  color: #333;
+  margin: 0;
+}
+.rz-contact a { color: inherit; text-decoration: none; }
+
+/* Section headers — ALL CAPS in brand blue, underlined. */
+.rz-section-head {
+  font-size: 10.5pt;
+  font-weight: 700;
+  color: #2d4a7a;
+  letter-spacing: 0.8pt;
+  text-transform: uppercase;
+  margin: 10pt 0 4pt 0;
+  padding-bottom: 2pt;
+  border-bottom: 0.8pt solid #2d4a7a;
+}
+
+/* Summary paragraph just under its heading. */
+.rz-summary { margin: 0 0 6pt 0; }
+
+/* Experience entry — title+dates row then company+location italic. */
+.rz-role { margin: 6pt 0 2pt 0; }
+.rz-role__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12pt;
+  font-weight: 700;
+  font-size: 10.5pt;
+}
+.rz-role__title { flex: 1 1 auto; }
+.rz-role__dates { flex: 0 0 auto; font-weight: 700; }
+.rz-role__sub {
+  font-style: italic;
+  color: #333;
+  font-size: 10pt;
+  margin: 0;
+}
+.rz-role ul {
+  margin: 2pt 0 0 0;
+  padding-left: 16pt;
+  list-style: disc outside;
+}
+.rz-role li { margin: 1pt 0; }
+
+/* Earlier Experience — compact one-liners: title bold, rest plain. */
+.rz-earlier-item {
+  margin: 2pt 0;
+  font-size: 10pt;
+  line-height: 1.4;
+}
+.rz-earlier-item strong { font-weight: 700; }
+
+/* Certifications — tight bulleted list. */
+.rz-cert-list { margin: 2pt 0 0 0; padding-left: 16pt; list-style: disc outside; }
+.rz-cert-list li { margin: 1pt 0; font-size: 10pt; }
+
+/* Education — bold degree, plain school. No year. */
+.rz-edu-item {
+  margin: 2pt 0;
+  font-size: 10pt;
+}
+.rz-edu-item strong { font-weight: 700; }
 
 @media print {
   body { background: white; }
   .no-print { display: none !important; }
   main {
-    margin: 0; padding: 0.6in 0.75in;
+    margin: 0; padding: 0.55in 0.65in;
     max-width: none; min-height: auto; box-shadow: none;
   }
-  @page { size: letter; margin: 0.6in 0.75in; }
+  @page { size: letter; margin: 0.5in 0.6in; }
+  /* Keep role entries from splitting across pages when possible. */
+  .rz-role { break-inside: avoid-page; }
+  .rz-section-head { break-after: avoid-page; }
 }

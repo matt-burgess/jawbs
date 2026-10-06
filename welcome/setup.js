@@ -20,7 +20,8 @@ import {
   getPrepQuestions, setPrepQuestions,
   getCompTargets, setCompTargets,
 } from '../lib/store.js';
-import { PROMPTS } from '../lib/onboardingPrompts.js';
+import { initPromptModal } from '../lib/onboardingPrompts.js';
+import { $ } from '../lib/pageBoot.js';
 import { DEFAULT_PROFILE, DEFAULT_COMP_TARGETS, DEFAULT_PREP_QUESTIONS } from '../lib/defaults.js';
 
 // ---------- Step definitions ----------
@@ -139,8 +140,6 @@ async function saveResumeIdx(i) {
 }
 
 // ---------- Rendering ----------
-
-const $ = (id) => document.getElementById(id);
 
 async function renderStep(idx) {
   currentIdx = Math.max(0, Math.min(idx, STEPS.length - 1));
@@ -487,40 +486,7 @@ async function skip() { await renderStep(currentIdx + 1); }
 
 // ---------- Prompt modal ----------
 
-function openPromptModal(key) {
-  const preset = PROMPTS[key];
-  if (!preset) return;
-  const modal = $('promptModal');
-  $('promptModalTitle').textContent = preset.title;
-  $('promptModalIntro').textContent = preset.intro;
-  const body = $('promptModalBody');
-  body.value = preset.body;
-  $('promptCopyStatus').textContent = '';
-  modal.hidden = false;
-  setTimeout(() => { body.focus(); body.select(); }, 30);
-}
-function closePromptModal() { $('promptModal').hidden = true; }
-
-document.addEventListener('click', (e) => {
-  const trigger = e.target.closest('[data-prompt-key]');
-  if (trigger) { openPromptModal(trigger.dataset.promptKey); return; }
-  if (e.target.closest('[data-modal-close]')) closePromptModal();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closePromptModal();
-});
-$('promptCopy')?.addEventListener('click', async () => {
-  const body = $('promptModalBody');
-  const status = $('promptCopyStatus');
-  try {
-    await navigator.clipboard.writeText(body.value);
-    status.textContent = 'Copied — paste into your AI.';
-    setTimeout(() => { status.textContent = ''; }, 4000);
-  } catch {
-    body.focus(); body.select();
-    status.textContent = 'Press ⌘/Ctrl+C to copy.';
-  }
-});
+initPromptModal();
 
 // ---------- Wire ----------
 

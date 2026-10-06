@@ -246,6 +246,16 @@
                   <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
                   <span>Transition to 'Applied' on LinkedIn</span>
                 </a>
+                <!-- Network at company — opens LinkedIn People search
+                     filtered to 1st + 2nd degree connections whose
+                     keywords match the company name. Shown only for
+                     saved (or later-stage) jawbs so the primary
+                     Analyzed-only path isn't cluttered with
+                     already-you-should-be-networking affordances. -->
+                <a id="networkAtCompany" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" aria-label="Find 1st and 2nd degree connections at this company on LinkedIn" title="Find your 1st and 2nd degree LinkedIn connections at this company." hidden>
+                  <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
+                  <span>Network</span>
+                </a>
               </div>
               <span id="jobMetaRest" class="jc-job-meta__rest"></span>
             </div>
@@ -280,7 +290,7 @@
               <div class="action-row action-row--outputs">
                 <span class="action-row__label" aria-hidden="true"></span>
                 <button id="letterCopyTop" class="jc-btn" data-size="sm" type="button" title="Copy the generated cover letter" hidden>📋 Copy cover letter</button>
-                <button id="resumeDownloadTop" class="jc-btn" data-size="sm" type="button" title="Download the tailored resume as Markdown" hidden>↓ Download resume</button>
+                <button id="resumeDownloadTop" class="jc-btn" data-size="sm" type="button" title="Open the tailored resume as a formatted PDF — the browser's print dialog opens automatically with 'Save as PDF' preselected." hidden>↓ Download resume</button>
               </div>
             </div>
             <!-- Comp source note + one-line fit summary retired — the
@@ -361,6 +371,17 @@
 
         <!-- Analysis cards -->
         <div id="analysisSection" class="jc-group" hidden>
+          <!-- Analysis tabs — one pane shows at a time. The strip pins
+               under the top-level tabs while the pane scrolls, so every
+               analysis stays one click away. -->
+          <nav class="jc-subtabs" id="analysisTabs" role="tablist" aria-label="Analysis">
+            <button type="button" class="jc-tab" data-pane="fit" role="tab">Fit</button>
+            <button type="button" class="jc-tab" data-pane="comp" role="tab">Comp</button>
+            <button type="button" class="jc-tab" data-pane="prep" role="tab">Prep</button>
+            <button type="button" class="jc-tab" data-pane="resume" role="tab">Resume</button>
+            <button type="button" class="jc-tab" data-pane="letter" role="tab">Letter</button>
+            <button type="button" class="jc-tab" data-pane="ask" role="tab">Chat</button>
+          </nav>
 
           <!-- Career fit -->
           <div class="jc-card jc-card--tone" data-category="fit" id="fitCard" data-open="false">
@@ -476,7 +497,9 @@
                 <div class="jc-btn-row">
                   <button id="generateResume" class="jc-btn" data-variant="primary" data-size="sm" type="button">Generate</button>
                   <button id="resumeCopy" class="jc-btn" data-size="sm" type="button" hidden>Copy</button>
-                  <button id="resumeDownload" class="jc-btn" data-variant="primary" data-size="sm" type="button" hidden>↓ Download</button>
+                  <button id="resumeDownload" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Open the tailored resume as a formatted PDF — the browser's print dialog opens automatically with 'Save as PDF' preselected." hidden>↓ Download</button>
+                  <!-- resumePdf retained hidden for backward compat; Download now
+                       triggers the PDF flow directly. See panel.js. -->
                   <button id="resumePdf" class="jc-btn" data-size="sm" type="button" hidden>PDF</button>
                 </div>
                 <div id="resumeOutput"></div>

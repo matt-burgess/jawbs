@@ -2,22 +2,44 @@ import { callAnthropic, extractText } from './lib/anthropic.js';
 import { callAI } from './lib/aiRouter.js';
 import { callJsonAnthropic } from './lib/json.js';
 import {
-  getApiKey, getModels,
-  getProfile, getMasterResume, getCompTargets, getWritingSamples,
+  getModels,
+  getProfile,
+  getMasterResume,
+  getCompTargets,
+  getWritingSamples,
   getAutoAnalyzeEnabled,
-  getWorkLocations, getWorkPreferences,
-  getKnowledgeBase, getLocalModelSettings,
-  addUsage, getUsage, getDailyUsage,
-  logActivity, getActivity, clearActivity,
-  upsertJob, getJob, listJobs, bulkGetJobsByIds, deleteJob, countJobs,
-  setJobAnalysis, updateJobStatus, addTimelineEntry,
-  bulkUpsertJobsWith, mergeJobRecord,
+  getLocalModelSettings,
+  addUsage,
+  getUsage,
+  getDailyUsage,
+  logActivity,
+  getActivity,
+  clearActivity,
+  upsertJob,
+  getJob,
+  listJobs,
+  bulkGetJobsByIds,
+  deleteJob,
+  countJobs,
+  setJobAnalysis,
+  updateJobStatus,
+  addTimelineEntry,
+  bulkUpsertJobsWith,
+  mergeJobRecord,
   findProbableDuplicate,
   getContextSettings,
-  getSavedSearches, addSavedSearch, deleteSavedSearch,
-  addRecentSearch, getRecentSearchesFiltered, clearRecentSearches, markSavedSearchRun,
+  getSavedSearches,
+  addSavedSearch,
+  deleteSavedSearch,
+  addRecentSearch,
+  getRecentSearchesFiltered,
+  clearRecentSearches,
+  markSavedSearchRun,
   getNegativeKeywords,
-  exportAll, importAll, setLastExportAt, getLastExportAt,
+  exportAll,
+  importAll,
+  setLastExportAt,
+  getLastExportAt,
 } from './lib/store.js';
 import { MODEL_IDS } from './lib/models.js';
 import { FIT_SYSTEM, FIT_PROMPT_VERSION, buildFitUserMessage } from './lib/prompts/fit.js';
@@ -34,8 +56,8 @@ import {
   PROFILE_SYSTEM, buildProfileUserMessage,
   KB_SYSTEM, buildKbUserMessage,
 } from './lib/prompts/bootstrap.js';
-import { upgradeStatus, normalizeTrackerStage, statusLabel, normalizeStatus, STATUS_ORDER } from './lib/statuses.js';
-import { computeStrengthScore } from './lib/strength.js';
+import { upgradeStatus, resolveTransition, stageOf, normalizeTrackerStage, statusLabel, normalizeStatus, STATUS_ORDER } from './lib/statuses.js';
+import { computeStrengthScore, computeCompGaugeScore, roundFitToTens } from './lib/strength.js';
 import { ROUND_SYSTEM, ROUND_PROMPT_VERSION, buildRoundUserMessage } from './lib/prompts/interviewRound.js';
 import { FOLLOWUP_SYSTEM, FOLLOWUP_PROMPT_VERSION, buildFollowUpUserMessage } from './lib/prompts/followUpEmail.js';
 import { fetchJobDetail } from './lib/enrich.js';
@@ -126,9 +148,10 @@ const handlers = {
   'clear-activity': () => clearActivity().then(() => ({ ok: true })),
   'job-detected': (msg, sender) => handleJobDetected(msg.data, sender?.tab?.id),
   'recall-active': (msg, sender) => handleRecallActive(msg.jobId, sender?.tab?.id),
-  'save-clicked': (msg) => handleSaveClicked(msg.data),
-  'apply-clicked': (msg) => handleApplyClicked(msg.data),
-  'linkedin-status-changed': (msg) => handleLinkedInStatusChanged(msg.jobId, msg.action),
+  'linkedin-signal': (msg) => handleLinkedInSignal(msg),
+  'linkedin-signal-unmatched': (msg) => logActivity({
+    type: 'linkedin-unmatched', ok: false, note: String(msg.note || '').slice(0, 300),
+  }).then(() => ({ ok: true })),
   'auto-analyze-fit': (msg) => handleAutoAnalyzeFit(msg.data),
   'get-current-job': getCurrentJob,
   'get-recent-jobs': getRecentJobs,
@@ -136,7 +159,15 @@ const handlers = {
   'get-tracker-state': getTrackerState,
   'backfill': (msg) => handleBackfill(msg.jobs, msg.stage),
   'sync-linkedin': () => runSyncLinkedIn(),
-  'sync-linkedin-cancel': async () => { await setSyncCancelled(true); return { ok: true }; },
+  // Cancel BOTH signals the walker (which will exit its next tick) AND
+  // pre-clears the in-flight flag so the user can start a new sync
+  // immediately. If the walker was still running, its own finally block
+  // will call setSyncInFlight(false) again — idempotent, no harm done.
+  'sync-linkedin-cancel': async () => {
+    await setSyncCancelled(true);
+    await setSyncInFlight(false);
+    return { ok: true };
+  },
   'find-on-tracker': (msg) => runFindOnTracker(msg.jobId),
   'reconcile-linkedin': () => runReconcileLinkedIn(),
   'get-reconciliation-diff': getReconciliationDiff,
@@ -197,6 +228,7 @@ const handlers = {
   'enrich-job': (msg) => runEnrich(msg.jobId),
   'save-round': (msg) => handleSaveRound(msg.jobId, msg.round),
   'delete-round': (msg) => handleDeleteRound(msg.jobId, msg.roundId),
+  'draft-application-answer': (msg) => handleDraftApplicationAnswer(msg),
   'generate-round-prep': (msg) => runRoundPrep(msg.jobId, msg.roundId),
   'generate-round-followup': (msg) => runRoundFollowUp(msg.jobId, msg.roundId),
   'open-recall': (msg) => handleOpenRecall(msg.jobId, msg.data),
@@ -574,40 +606,42 @@ async function handleTrackerList(jobs, stage, url) {
   return { ok: true };
 }
 
-// Upgrade-only, existing-only status sweep. Runs on every SPA nav
-// through LinkedIn's tracker so status changes made outside the
-// extension surface in the archive automatically. Never demotes and
-// never creates new archive records — that's what Thresh is for.
+// Existing-only status sweep. Runs on every SPA nav through LinkedIn's
+// tracker so status changes made outside the extension surface in the
+// archive automatically. The tab a job sits in is LinkedIn's own record,
+// so it can move a status in either direction (see resolveTransition for
+// the two cases where it doesn't). Never creates new archive records —
+// that's what Thresh is for.
 async function passiveBackfill(jobs, stage) {
   if (!Array.isArray(jobs) || !jobs.length) return;
   const target = normalizeTrackerStage(stage);
-  if (target === 'unknown' || !STATUS_ORDER.includes(target)) return;
+  if (!target) return;
   const now = new Date().toISOString();
-  const ids = jobs.map((j) => String(j.jobId));
+  const moves = [];
 
-  // bulkUpsertJobsWith fetches every candidate record in one shot and
-  // calls the callback with (id, existing|null). We only return a
-  // record when: (a) existing already lived in the archive, AND
-  // (b) upgradeStatus would change its status.
-  const records = await bulkUpsertJobsWith(ids, (id, existing) => {
+  const records = await bulkUpsertJobsWith(jobs.map((j) => String(j.jobId)), (id, existing) => {
     if (!existing) return null;
-    const newStatus = upgradeStatus(existing.status, target);
-    if (newStatus === existing.status) return null;
+    const from = normalizeStatus(existing.status);
+    const next = resolveTransition(existing, { kind: 'tracker', explicit: false, status: target });
+    const changed = next.status !== from;
+    if (!changed && next.linkedInStage === existing.linkedInStage && next.manualLock === !!existing.manualLock) return null;
+    if (changed) moves.push(`${id} ${from}→${next.status}`);
     return mergeJobRecord(id, existing, {
-      status: newStatus,
-      statusUpdatedAt: now,
-    }, {
+      linkedInStage: next.linkedInStage,
+      manualLock: next.manualLock,
+      ...(changed ? { status: next.status, statusUpdatedAt: now } : {}),
+    }, changed ? {
       appendTimeline: [{
-        at: now, type: 'synced',
-        note: `Passive tracker sync (${stage}) · ${existing.status || 'new'} → ${newStatus}`,
+        at: now, type: 'status-change', from, to: next.status, source: 'linkedin:tracker-seen',
+        note: `Seen on LinkedIn tracker (${stage}) · ${from} → ${next.status}`,
       }],
-    });
+    } : {});
   });
-  if (records.length) {
+  if (moves.length) {
     chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
     await logActivity({
       type: 'passive-tracker-sync', ok: true,
-      note: `stage=${stage} · ${records.length} status↑`,
+      note: `stage=${stage} · ${moves.length} of ${records.length} changed · ${moves.slice(0, 8).join(', ')}`,
     });
   }
 }
@@ -620,7 +654,9 @@ async function getTrackerState() {
 async function handleBackfill(jobs, stage) {
   const now = new Date().toISOString();
   // Map LinkedIn's tracker-stage strings ("Saved", "Applied", "Archived",
-  // "In Progress", etc.) into our canonical status vocabulary.
+  // "In Progress", etc.) into our canonical status vocabulary. An
+  // unrecognized stage carries no status information: existing records
+  // keep theirs, new ones land as saved (they're on the tracker).
   const target = normalizeTrackerStage(stage);
 
   // Overwrite existing title/company from the fresh sync when the stored value:
@@ -641,8 +677,11 @@ async function handleBackfill(jobs, stage) {
   const records = await bulkUpsertJobsWith(jobs.map((j) => j.jobId), (id, existing) => {
     const j = byId.get(id);
     if (!j) return null;
-    const newStatus = upgradeStatus(existing?.status, target);
-    const statusChanged = existing?.status !== newStatus;
+    const next = target
+      ? resolveTransition(existing, { kind: 'tracker', explicit: false, status: target })
+      : { status: existing ? normalizeStatus(existing.status) : 'saved', linkedInStage: existing?.linkedInStage, manualLock: !!existing?.manualLock };
+    const newStatus = next.status;
+    const statusChanged = (existing ? normalizeStatus(existing.status) : null) !== newStatus;
     if (!existing) created++;
     else if (statusChanged) upgraded++;
 
@@ -661,6 +700,8 @@ async function handleBackfill(jobs, stage) {
       captureSource: existing ? existing.captureSource : 'bulk-import',
       status: newStatus,
       statusUpdatedAt: statusChanged ? now : (existing?.statusUpdatedAt || now),
+      linkedInStage: next.linkedInStage,
+      manualLock: next.manualLock,
       posting: { title: nextTitle, company: nextCompany },
       cardText: j.cardText,
       // Hint for the "Find on LinkedIn" row action so it can jump
@@ -670,18 +711,16 @@ async function handleBackfill(jobs, stage) {
       ...(j.pageIndex ? { linkedInTracker: { stage, page: j.pageIndex, seenAt: now } } : {}),
     };
     const ops = {
-      appendTimeline: [{
-        at: now, type: 'synced',
-        note: statusChanged
-          ? `Synced from tracker (${stage}) · ${existing?.status || 'new'} → ${newStatus}`
-          : `Synced from tracker (${stage}) · status unchanged`,
-      }],
+      appendTimeline: [statusChanged
+        ? { at: now, type: 'status-change', from: existing?.status || null, to: newStatus, source: 'linkedin:sync',
+            note: `Synced from tracker (${stage}) · ${existing?.status || 'new'} → ${newStatus}` }
+        : { at: now, type: 'synced', note: `Synced from tracker (${stage}) · status unchanged` }],
     };
     return mergeJobRecord(id, existing, updates, ops);
   });
 
   chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
-  await logActivity({ type: 'sync-tracker', ok: true, note: `stage=${stage} · ${records.length} synced (${created} new, ${upgraded} status↑)` });
+  await logActivity({ type: 'sync-tracker', ok: true, note: `stage=${stage} · ${records.length} synced (${created} new, ${upgraded} status changed)` });
   return { ok: true, count: records.length, created, upgraded };
 }
 
@@ -712,12 +751,36 @@ const SYNC_STAGES = [
 // in the wrong state).
 const SYNC_IN_FLIGHT_KEY = 'syncInFlight';
 const SYNC_CANCELLED_KEY = 'syncCancelled';
+const SYNC_STARTED_AT_KEY = 'syncStartedAt';
+// A sync flag that's been sitting for longer than this is presumed
+// crashed — a service-worker restart mid-sync, an unhandled exception
+// past our try/finally, a tab being closed while the walker was mid-
+// pagination. Callers auto-clear so the user isn't blocked forever
+// behind a ghost sync.
+const SYNC_STALE_MS = 20 * 60 * 1000;
+
 async function isSyncInFlight() {
-  const r = await chrome.storage.session.get(SYNC_IN_FLIGHT_KEY);
-  return !!r[SYNC_IN_FLIGHT_KEY];
+  const r = await chrome.storage.session.get([SYNC_IN_FLIGHT_KEY, SYNC_STARTED_AT_KEY]);
+  if (!r[SYNC_IN_FLIGHT_KEY]) return false;
+  const startedAt = Number(r[SYNC_STARTED_AT_KEY]) || 0;
+  if (startedAt && Date.now() - startedAt > SYNC_STALE_MS) {
+    // Stale — clear it silently so the caller can start fresh.
+    await chrome.storage.session.remove([
+      SYNC_IN_FLIGHT_KEY, SYNC_STARTED_AT_KEY, SYNC_CANCELLED_KEY,
+    ]);
+    return false;
+  }
+  return true;
 }
 async function setSyncInFlight(v) {
-  await chrome.storage.session.set({ [SYNC_IN_FLIGHT_KEY]: !!v });
+  if (v) {
+    await chrome.storage.session.set({
+      [SYNC_IN_FLIGHT_KEY]: true,
+      [SYNC_STARTED_AT_KEY]: Date.now(),
+    });
+  } else {
+    await chrome.storage.session.remove([SYNC_IN_FLIGHT_KEY, SYNC_STARTED_AT_KEY]);
+  }
 }
 async function isSyncCancelled() {
   const r = await chrome.storage.session.get(SYNC_CANCELLED_KEY);
@@ -927,8 +990,8 @@ async function runSyncLinkedIn() {
         console.warn(`[sync-linkedin] ${s.key}: ${auditNote}`);
       }
 
-      // Apply upgrades only — handleBackfill uses upgradeStatus which never
-      // regresses status and now respects terminal states (archived, notMovingForward).
+      // handleBackfill runs each job through resolveTransition — the
+      // stage LinkedIn lists a job under can move its status either way.
       let bf = { count: 0, created: 0, upgraded: 0 };
       if (jobs.length) bf = await handleBackfill(jobs, s.key);
       summary[s.key] = {
@@ -1181,6 +1244,8 @@ async function applyReconciliation(resolutions) {
         patch = {
           status: mismatch.linkedInStatus,
           statusUpdatedAt: now,
+          linkedInStage: stageOf(mismatch.linkedInStatus),
+          manualLock: false,
           timeline: [
             ...(existing.timeline || []),
             { at: now, type: 'reconcile', note: `Accepted LinkedIn: ${existing.status || 'analyzed'} → ${mismatch.linkedInStatus}` },
@@ -1238,27 +1303,6 @@ async function getReconciliationDiff() {
 // the Jawbar uses so LinkedIn-card gauges and the sidepanel agree. If
 // there's no target, fall back to the LLM's vsTarget verdict; if only
 // a floor is set, anchor "matches floor exactly" at 60/100.
-function computeCompGaugeScore(comp, compTargets) {
-  const salary = comp?.salary;
-  const low  = salary?.base?.low  ?? comp?.marketEstimate?.baseLow  ?? null;
-  const high = salary?.base?.high ?? comp?.marketEstimate?.baseHigh ?? null;
-  const target = Number(compTargets?.target) || null;
-  const floor  = Number(compTargets?.floor)  || null;
-  const vsTarget = salary?.vsTargets?.vsTarget || comp?.vsTargets?.vsTarget;
-  const hasRange = high != null || low != null;
-  if (!hasRange && !vsTarget) return null;
-  const anchor = high ?? low;
-  if (target && anchor) return Math.min(100, Math.round((anchor / target) * 100));
-  if (vsTarget) {
-    return vsTarget === 'above' ? 100
-         : vsTarget === 'at'    ? 80
-         : vsTarget === 'below' ? 30
-         : 50;
-  }
-  if (floor && anchor) return Math.min(100, Math.round((anchor / floor) * 60));
-  return 50;
-}
-
 async function getListingDecorations(jobIds) {
   if (!Array.isArray(jobIds) || !jobIds.length) return { ok: true, decorations: {} };
   const [records, compTargets, followMap] = await Promise.all([
@@ -1274,7 +1318,7 @@ async function getListingDecorations(jobIds) {
     decorations[id] = {
       status: job.status || null,
       statusLabel: job.status ? statusLabel(job.status) : null,
-      fitScore: typeof fit?.fitScore === 'number' ? fit.fitScore : null,
+      fitScore: typeof fit?.fitScore === 'number' ? roundFitToTens(fit.fitScore) : null,
       compLow:  comp?.salary?.base?.low  ?? comp?.marketEstimate?.baseLow  ?? null,
       compHigh: comp?.salary?.base?.high ?? comp?.marketEstimate?.baseHigh ?? null,
       compScore: computeCompGaugeScore(comp, compTargets),
@@ -1309,90 +1353,60 @@ async function handleCheckJobsKnown(jobIds) {
   };
 }
 
-async function handleSaveClicked(data) {
-  const now = new Date().toISOString();
-  const existing = await getJob(data.jobId);
-  const newStatus = upgradeStatus(existing?.status, 'saved');
-  const statusChanged = existing?.status !== newStatus;
-  await logActivity({ type: 'linkedin-save', jobId: data.jobId, ok: true, note: `${existing?.status || 'new'} → ${newStatus}` });
-  const record = await upsertJob(data.jobId, {
-    url: data.url,
-    posting: data.posting,
-    captureSource: existing ? existing.captureSource : 'save-click',
-    status: newStatus,
-    statusUpdatedAt: statusChanged ? now : existing?.statusUpdatedAt,
-    timeline: [
-      ...(existing?.timeline || []),
-      { at: now, type: 'saved', note: statusChanged
-        ? `LinkedIn Save clicked (${existing?.status || 'new'} → saved)`
-        : 'LinkedIn Save clicked (status unchanged — already advanced)' },
-    ],
-  });
-  chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
-  return { ok: true, record };
-}
+const SIGNAL_LABEL = {
+  'save': 'LinkedIn Save',
+  'unsave': 'LinkedIn Unsave',
+  'apply-clicked': 'LinkedIn Apply clicked',
+  'apply-confirmed': 'LinkedIn application confirmed',
+  'tracker': 'LinkedIn tracker move',
+};
 
-async function handleApplyClicked(data) {
-  const now = new Date().toISOString();
-  const existing = await getJob(data.jobId);
-  const newStatus = upgradeStatus(existing?.status, 'applied');
-  const statusChanged = existing?.status !== newStatus;
-  await logActivity({ type: 'linkedin-apply', jobId: data.jobId, ok: true, note: `${existing?.status || 'new'} → ${newStatus}` });
-  const record = await upsertJob(data.jobId, {
-    url: data.url,
-    posting: data.posting,
-    captureSource: existing?.captureSource || 'apply-click',
-    status: newStatus,
-    statusUpdatedAt: statusChanged ? now : existing?.statusUpdatedAt,
-    timeline: [
-      ...(existing?.timeline || []),
-      { at: now, type: 'applied', note: statusChanged
-        ? `LinkedIn Apply clicked (${existing?.status || 'new'} → applied)`
-        : 'LinkedIn Apply clicked (status unchanged)' },
-    ],
-  });
-  chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
-  return { ok: true, record };
-}
+// Every status-relevant thing the content script sees on LinkedIn lands
+// here: Save/Unsave, Apply click, application confirmed, tracker row
+// moved. lib/statuses.js#resolveTransition decides what it means; this
+// just persists the result and leaves an audit trail.
+//   explicit  true = the user just did it, false = state seen on the page
+//   stage     LinkedIn tracker stage, for kind 'tracker'
+//   data      { url, posting } from the detail pane, or { url, guess }
+//             when the action was on a list card we haven't scraped
+async function handleLinkedInSignal({ jobId, kind, explicit = true, stage, data }) {
+  const id = String(jobId || '');
+  if (!/^\d+$/.test(id) || !SIGNAL_LABEL[kind]) return { ok: false, error: 'bad signal' };
+  const target = kind === 'tracker' ? normalizeTrackerStage(stage) : undefined;
+  if (kind === 'tracker' && !target) return { ok: true, skipped: 'unknown-stage' };
 
-// Real-time on-device signal that the user changed a job's LinkedIn
-// state (unsaved it, moved it to Not Moving Forward, etc.) from the
-// job detail page. Adds a timeline entry every time so drift is
-// auditable. For explicit terminal actions ('not-moving-forward',
-// 'archived') we DO apply the status directly, bypassing the upgrade-
-// only guard — this is user intent, not silent sync. Unsave logs but
-// doesn't touch status; the Reconcile flow surfaces it for review.
-async function handleLinkedInStatusChanged(jobId, action) {
-  if (!jobId) return { ok: false, error: 'jobId required' };
-  const existing = await getJob(jobId);
-  if (!existing) return { ok: true, skipped: 'not-in-archive' };
+  const existing = await getJob(id);
+  // Only a Save or an Apply puts a new job in the archive.
+  if (!existing && (kind === 'unsave' || kind === 'tracker')) return { ok: true, skipped: 'not-in-archive' };
+
+  const from = existing ? normalizeStatus(existing.status) : null;
+  const next = resolveTransition(existing, { kind, explicit, status: target });
+  const changed = next.status !== from;
+  // Seeing the same state again (page reload on an already-saved job) is
+  // not news — no write, no log line.
+  if (!changed && !explicit && existing) return { ok: true, changed: false, status: next.status };
+
   const now = new Date().toISOString();
-  const noteMap = {
-    'unsave': 'Unsaved on LinkedIn (status unchanged — reconcile to resolve)',
-    'not-moving-forward': 'Moved to Not Moving Forward on LinkedIn',
-    'archived': 'Archived on LinkedIn',
-  };
-  const timelineNote = noteMap[action] || `LinkedIn state changed: ${action}`;
+  const label = `${SIGNAL_LABEL[kind]}${stage ? ` (${stage})` : ''}`;
   const patch = {
-    timeline: [
-      ...(existing.timeline || []),
-      { at: now, type: 'linkedin-status', note: timelineNote },
-    ],
+    linkedInStage: next.linkedInStage,
+    manualLock: next.manualLock,
+    ...(data?.url ? { url: data.url } : {}),
+    ...(data?.posting ? { posting: data.posting } : (!existing && data?.guess ? { posting: data.guess } : {})),
+    ...(existing ? {} : { captureSource: `${kind}-click` }),
+    ...(changed ? { status: next.status, statusUpdatedAt: now } : {}),
   };
-  // Explicit terminal transitions replace status directly; the
-  // upgrade-only guard doesn't apply here because this is user intent
-  // captured on-device, not passive sync noise.
-  if (action === 'not-moving-forward') {
-    patch.status = 'notMovingForward';
-    patch.statusUpdatedAt = now;
-  } else if (action === 'archived') {
-    patch.status = 'archived';
-    patch.statusUpdatedAt = now;
-  }
-  const record = await upsertJob(jobId, patch);
-  await logActivity({ type: 'linkedin-status', jobId, ok: true, note: `${action}` });
-  chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
-  return { ok: true, record };
+  const record = await upsertJob(id, patch, {
+    appendTimeline: [changed
+      ? { at: now, type: 'status-change', from, to: next.status, source: `linkedin:${kind}`, note: `${label} · ${from || 'new'} → ${next.status}` }
+      : { at: now, type: 'linkedin-signal', source: `linkedin:${kind}`, note: `${label} · status unchanged (${next.status})` }],
+  });
+  await logActivity({
+    type: 'linkedin-signal', jobId: id, ok: true,
+    note: `${kind}${explicit ? '' : ' (observed)'}${stage ? ` ${stage}` : ''} · ${changed ? `${from || 'new'} → ${next.status}` : `unchanged (${next.status})`}`,
+  });
+  if (changed) chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
+  return { ok: true, changed, status: next.status, label: statusLabel(next.status), record };
 }
 
 async function handleAutoAnalyzeFit(data) {
@@ -1903,7 +1917,31 @@ async function handleSaveRound(jobId, round) {
     round.id = `round-${Date.now()}`;
     rounds.push(round);
   }
-  const updated = await upsertJob(jobId, { interviewRounds: rounds });
+  // Auto-promote to Interviewing when a round is added. Uses upgradeStatus
+  // so already-interviewing jawbs stay put (idempotent), and terminal
+  // states (Scar) are preserved — if the user later realizes they ARE
+  // interviewing after all, they can un-scar via the mini-hunt or
+  // Recall's status shortcuts. Only appends the timeline note when the
+  // status actually moves, so editing an existing round doesn't spam
+  // duplicate "promoted to Interviewing" entries.
+  const now = new Date().toISOString();
+  const newStatus = upgradeStatus(job.status, 'interviewing');
+  const statusChanged = newStatus !== job.status;
+  const patch = { interviewRounds: rounds };
+  if (statusChanged) {
+    patch.status = newStatus;
+    patch.statusUpdatedAt = now;
+    patch.manualLock = true; // tracker sightings don't undo this — see resolveTransition
+  }
+  const ops = statusChanged ? {
+    appendTimeline: [{
+      at: now,
+      type: 'status-auto',
+      note: `Interview round added — status promoted (${job.status || 'new'} → ${newStatus})`,
+    }],
+  } : {};
+  const updated = await upsertJob(jobId, patch, ops);
+  if (statusChanged) chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
   return { ok: true, record: updated };
 }
 
@@ -1913,6 +1951,119 @@ async function handleDeleteRound(jobId, roundId) {
   const rounds = (job.interviewRounds || []).filter((r) => r.id !== roundId);
   const updated = await upsertJob(jobId, { interviewRounds: rounds });
   return { ok: true, record: updated };
+}
+
+// Draft an answer to an open-ended application question. Called from
+// the quick-fill toolbar on ATS pages when the user clicks the "Draft"
+// pill above a focused textarea. Grounds the LLM strictly in the
+// user's resume + profile + (if a jawb is active) the JD, and logs
+// the Q&A to job.applicationAnswers so it can be recalled later when
+// the recruiter phones.
+async function handleDraftApplicationAnswer({ question, url, jobId }) {
+  if (typeof question !== 'string' || !question.trim()) {
+    return { ok: false, error: 'Question text required' };
+  }
+  const trimmedQuestion = question.trim().slice(0, 1000);
+  // Resolve which jawb this application belongs to. Explicit arg wins,
+  // then the sidepanel's active-jawb hint written on renderJob, else null.
+  let effectiveJobId = jobId;
+  if (!effectiveJobId) {
+    const r = await chrome.storage.local.get('ui.activeApplicationJawbId');
+    effectiveJobId = r?.['ui.activeApplicationJawbId'] || null;
+  }
+  const [profile, resume, samples] = await Promise.all([
+    getProfile(), getMasterResume(), getWritingSamples(),
+  ]);
+  let job = null;
+  if (effectiveJobId) {
+    try { job = await getJob(effectiveJobId); } catch { /* jawb gone, draft without context */ }
+  }
+  const systemLines = [
+    'You are drafting an answer to a job application question.',
+    '',
+    'HARD RULES:',
+    '- Ground your answer STRICTLY in the resume and profile provided below.',
+    '- Never invent employers, dates, years of experience, titles, salary numbers, or specific projects that are not in the source material.',
+    '- If the question requires a specific fact you cannot ground in the resume, leave a "[TODO: <what is missing>]" placeholder in your answer instead of making one up.',
+    '- Return ONLY the answer text. No preamble ("Here is my answer:"), no meta-commentary, no bullet-point outline unless the question explicitly asks for one.',
+    '',
+    'STYLE BANS (these read as machine-written and undercut authenticity):',
+    '- NO em-dashes. Use a comma, semicolon, parentheses, or split into two sentences instead. Compound-word hyphens (e.g. "hands-on") are fine.',
+    '- NO en-dashes for the same reason.',
+    '- Do NOT use the word "intersection" (as in "at the intersection of X and Y") anywhere in the answer.',
+    '- If you reach for either of the above, rewrite the sentence.',
+    '',
+    'VOICE: match the writing samples below if present. Otherwise write first-person, professional-but-warm.',
+    '',
+    'LENGTH: default to 150-250 words. Match the implied scope of the question. Short-answer prompts get a couple of sentences; essay-style prompts get 200-300 words.',
+    '',
+  ];
+  if (profile) systemLines.push('=== USER PROFILE ===', profile, '');
+  if (resume) systemLines.push('=== RESUME ===', resume, '');
+  if (samples) systemLines.push('=== WRITING SAMPLES ===', samples, '');
+  if (job?.posting) {
+    systemLines.push('=== JOB CONTEXT ===');
+    if (job.posting.title) systemLines.push(`Title: ${job.posting.title}`);
+    if (job.posting.company) systemLines.push(`Company: ${job.posting.company}`);
+    if (job.posting.descriptionText) {
+      systemLines.push('Description:');
+      systemLines.push(String(job.posting.descriptionText).slice(0, 8000));
+    }
+    systemLines.push('');
+  }
+  systemLines.push('=== APPLICATION QUESTION ===');
+  systemLines.push(trimmedQuestion);
+  const system = systemLines.join('\n');
+
+  const started = performance.now();
+  const r = await callAI({
+    system,
+    messages: [{ role: 'user', content: 'Please draft this answer now.' }],
+    maxTokens: 1500,
+  });
+  const durationMs = Math.round(performance.now() - started);
+  const answer = (r.text || '').trim();
+  if (!answer) return { ok: false, error: 'LLM returned an empty draft' };
+
+  // Persist the Q&A on the jawb record if we have one. Cap the array so
+  // a runaway loop can't balloon storage. Timeline gets a short note so
+  // the Recall page's voyage log surfaces "drafted answer on X" alongside
+  // status changes.
+  if (effectiveJobId && job) {
+    const now = new Date().toISOString();
+    const entry = {
+      id: `qa-${Date.now()}`,
+      question: trimmedQuestion,
+      answer,
+      at: now,
+      url: typeof url === 'string' ? url.slice(0, 500) : null,
+      source: 'ai-drafted',
+      model: r.model,
+      provider: r.provider,
+    };
+    const nextAnswers = [...(job.applicationAnswers || []), entry].slice(-100);
+    await upsertJob(effectiveJobId, { applicationAnswers: nextAnswers }, {
+      appendTimeline: [{
+        at: now,
+        type: 'application-answer',
+        note: `Drafted answer for: ${trimmedQuestion.length > 80 ? trimmedQuestion.slice(0, 80) + '…' : trimmedQuestion}`,
+      }],
+    });
+    chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
+  }
+  await addUsage({ model: r.model, usage: r.usage || null });
+  await logActivity({
+    type: 'draft-application-answer',
+    jobId: effectiveJobId,
+    ok: true,
+    model: r.model,
+    provider: r.provider,
+    inputTokens: r.usage?.input_tokens || 0,
+    outputTokens: r.usage?.output_tokens || 0,
+    durationMs,
+  });
+  chrome.runtime.sendMessage({ type: 'usage-updated' }).catch(() => {});
+  return { ok: true, answer, jobId: effectiveJobId };
 }
 
 // Shared skeleton for any per-round LLM job (prep, follow-up email, …).
