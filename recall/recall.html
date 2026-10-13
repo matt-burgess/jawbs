@@ -25,136 +25,161 @@
         </div>
       </header>
 
-      <!-- Voyage log — horizontal timeline of the hunt stages for this
-           jawb. Populated by recall.js from the job's status + captured
-           timestamps. Renders even for early-stage jawbs so users can
-           see what's next. -->
-      <section id="voyageLog" class="voyage-log" hidden>
-        <div class="voyage-log__head">
-          <span class="voyage-log__title">The hunt</span>
-          <span class="voyage-log__age" id="voyageLogAge"></span>
-        </div>
-        <ol class="voyage-log__stages" id="voyageLogStages"></ol>
-      </section>
+      <!-- Two panes under the toolbar. The rail pins what this jawb is
+           and where it stands (hero, what's next, voyage log, links);
+           the body shows one section at a time behind the tab strip, so
+           a long section never pushes the others out of reach. Below
+           1100px the rail stacks on top and scrolls with the page. -->
+      <div class="recall-layout">
+        <aside class="recall-rail" aria-label="Jawb summary">
+          <div id="postingArchivedBanner" class="jc-notice" data-tone="caution" hidden>
+            <div class="jc-notice__body">
+              <span class="jc-notice__title">Posting archived</span>
+              <span>Live posting is no longer reachable. Working from the archived copy.</span>
+            </div>
+          </div>
 
-      <div id="postingArchivedBanner" class="jc-notice" data-tone="caution" style="margin: var(--jc-3) var(--jc-5)" hidden>
-        <div class="jc-notice__body">
-          <span class="jc-notice__title">Posting archived</span>
-          <span>Live posting is no longer reachable. Working from the archived copy.</span>
-        </div>
+          <!-- Hero: score-dominant. Fit score, title/meta, a terminal-state
+               pill, and one-click status shortcuts. This is the "what is
+               this job and what should I do about it right now" answer. -->
+          <section class="recall-hero recall-hero--v2">
+            <div class="recall-hero__score" id="heroScore">
+              <span class="recall-hero__score-num" id="heroScoreNum">—</span>
+              <span class="recall-hero__score-den">/100</span>
+              <span class="recall-hero__score-lbl">FIT</span>
+            </div>
+            <div class="recall-hero__body">
+              <div class="recall-hero__badges" id="heroBadges"></div>
+              <h1 id="jobTitle">Loading…</h1>
+              <div id="metaLine" class="jc-job-meta"></div>
+              <div class="recall-hero__actions" id="heroActions"></div>
+            </div>
+          </section>
+
+          <!-- What's next: next scheduled round countdown. Auto-hides
+               when there's nothing pressing. -->
+          <div id="whatsNext" class="whats-next" hidden></div>
+
+          <!-- Voyage log — timeline of the hunt stages for this jawb.
+               Populated by recall.js from the job's status + captured
+               timestamps. Renders even for early-stage jawbs so users
+               can see what's next. -->
+          <section id="voyageLog" class="voyage-log" hidden>
+            <div class="voyage-log__head">
+              <span class="voyage-log__title">The hunt</span>
+              <span class="voyage-log__age" id="voyageLogAge"></span>
+            </div>
+            <ol class="voyage-log__stages" id="voyageLogStages"></ol>
+          </section>
+
+          <!-- Job links — open the live posting or search the company's
+               own career site for the same role. -->
+          <section id="sec-job-links" class="job-links">
+            <a id="jobUrl" href="#" target="_blank" rel="noopener" class="jc-btn" hidden>Open live posting<img class="jc-li-icon" src="../assets/linkedin.svg" alt="LinkedIn" width="14" height="14"></a>
+            <a id="corpSiteSearch" href="#" target="_blank" rel="noopener" class="jc-btn" hidden>Find on Corp Career Site<span class="jc-ext-icon" aria-hidden="true">↗</span></a>
+          </section>
+        </aside>
+
+        <main class="recall-body">
+
+          <!-- Section tabs. data-tab is also the deep-link hash
+               (recall.html?jobId=…#s=rounds). recall.js fills each badge
+               with a count (or ✓) so empty sections read as empty
+               before the click. -->
+          <div id="recallTabs" class="jc-tabs" role="tablist" aria-label="Jawb sections">
+            <button class="jc-tab" type="button" role="tab" id="tab-timeline" data-tab="timeline" aria-controls="sec-timeline" aria-selected="false" tabindex="-1">Timeline<span class="jc-tab__badge"></span></button>
+            <button class="jc-tab" type="button" role="tab" id="tab-rounds" data-tab="rounds" aria-controls="sec-rounds" aria-selected="false" tabindex="-1">Rounds<span class="jc-tab__badge"></span></button>
+            <button class="jc-tab" type="button" role="tab" id="tab-notes" data-tab="notes" aria-controls="sec-notes" aria-selected="false" tabindex="-1">Notes<span class="jc-tab__badge"></span></button>
+            <button class="jc-tab" type="button" role="tab" id="tab-fit" data-tab="fit" aria-controls="sec-analyses" aria-selected="false" tabindex="-1">Fit &amp; Comp<span class="jc-tab__badge"></span></button>
+            <button class="jc-tab" type="button" role="tab" id="tab-docs" data-tab="docs" aria-controls="sec-docs" aria-selected="false" tabindex="-1">Assets<span class="jc-tab__badge"></span></button>
+            <button class="jc-tab" type="button" role="tab" id="tab-answers" data-tab="answers" aria-controls="sec-app-answers" aria-selected="false" tabindex="-1" hidden>Answers<span class="jc-tab__badge"></span></button>
+            <button class="jc-tab" type="button" role="tab" id="tab-people" data-tab="people" aria-controls="sec-people" aria-selected="false" tabindex="-1">People<span class="jc-tab__badge"></span></button>
+            <button class="jc-tab" type="button" role="tab" id="tab-description" data-tab="description" aria-controls="sec-posting" aria-selected="false" tabindex="-1">Description<span class="jc-tab__badge"></span></button>
+          </div>
+
+          <!-- The running log of what has happened on this job. -->
+          <section id="sec-timeline" class="recall-panel recall-tabpanel" role="tabpanel" data-panel="timeline" aria-labelledby="tab-timeline">
+            <span class="jc-eyebrow">Timeline &amp; contacts</span>
+            <div class="log-contact">
+              <input id="contactNote" class="jc-input" type="text" placeholder="Log a contact: e.g., recruiter emailed re: next round" />
+              <button id="logContact" class="jc-btn" data-size="sm" type="button">Log</button>
+            </div>
+            <ol id="timeline" class="timeline"></ol>
+          </section>
+
+          <!-- Working area — this is why you opened Recall. Wrapped in a
+               bordered box so the rounds list reads as a self-contained
+               working surface rather than free-floating cards. -->
+          <section id="sec-rounds" class="recall-panel recall-tabpanel" role="tabpanel" data-panel="rounds" aria-labelledby="tab-rounds">
+            <div class="section-head-row">
+              <span class="jc-eyebrow">Interview rounds</span>
+              <button id="addRound" class="jc-btn" data-variant="primary" data-size="sm" type="button">+ Add round</button>
+            </div>
+            <div id="roundsList" class="rounds-list"></div>
+          </section>
+
+          <section id="sec-notes" class="recall-panel recall-tabpanel" role="tabpanel" data-panel="notes" aria-labelledby="tab-notes">
+            <span class="jc-eyebrow">Notes</span>
+            <textarea id="notes" class="jc-textarea" placeholder="Personal notes on this role — autosaves"></textarea>
+            <div class="jc-btn-row">
+              <span id="notesStatus" class="jc-footnote"></span>
+            </div>
+          </section>
+
+          <!-- Reference material — fit + comp side-by-side. -->
+          <div id="sec-analyses" class="recall-two-col recall-tabpanel" role="tabpanel" data-panel="fit" aria-labelledby="tab-fit">
+            <section id="sec-fit" class="recall-panel">
+              <span class="jc-eyebrow">Cast: Fit Analysis</span>
+              <div id="fitReadout" class="recall-box"></div>
+            </section>
+
+            <section id="sec-comp" class="recall-panel">
+              <span class="jc-eyebrow">Cast: Compensation Analysis</span>
+              <div id="compReadout" class="recall-box"></div>
+            </section>
+          </div>
+
+          <section id="sec-docs" class="recall-panel recall-tabpanel" role="tabpanel" data-panel="docs" aria-labelledby="tab-docs">
+            <span class="jc-eyebrow">Baited Assets</span>
+            <div id="documentsReadout" class="recall-box"></div>
+          </section>
+
+          <!-- Application answers — Q&A drafted via the ATS quick-fill
+               toolbar, kept here so a phone-screen call can pull up
+               "what did I say when they asked me about X?". Section and
+               tab are both hidden when no answers have been drafted for
+               this jawb. -->
+          <section id="sec-app-answers" class="recall-panel recall-tabpanel" role="tabpanel" data-panel="answers" aria-labelledby="tab-answers" hidden>
+            <span class="jc-eyebrow">Application answers</span>
+            <div id="applicationAnswersReadout" class="recall-box"></div>
+          </section>
+
+          <section id="sec-people" class="recall-panel recall-tabpanel" role="tabpanel" data-panel="people" aria-labelledby="tab-people">
+            <span class="jc-eyebrow">People</span>
+            <div id="panelList" class="recall-box"></div>
+          </section>
+
+          <!-- The posting itself: excerpt, then the full archived copy.
+               The <details> starts open — it has the tab to itself, so
+               there is nothing below it to keep in reach. -->
+          <div id="sec-posting" class="recall-stack recall-tabpanel" role="tabpanel" data-panel="description" aria-labelledby="tab-description">
+            <section id="sec-summary" class="recall-panel">
+              <span class="jc-eyebrow">Summary excerpt</span>
+              <p id="summary" class="jc-prose"></p>
+            </section>
+
+            <section id="sec-description" class="recall-panel">
+              <details open>
+                <summary style="cursor:pointer;font: 500 var(--jc-text-xs)/1 var(--jc-font-mono);color:var(--jc-text-3);text-transform:uppercase;letter-spacing:.08em">
+                  Full archived description (<span id="descLen">0</span> chars)
+                </summary>
+                <pre id="description" class="desc-body"></pre>
+              </details>
+            </section>
+          </div>
+
+        </main>
       </div>
-
-      <!-- Hero: score-dominant. Big fit score on the left, title/meta on the
-           right, plus a verdict pill, status pill, and one-click status
-           shortcuts. This is the "what is this job and what should I do
-           about it right now" answer, above the fold. -->
-      <section class="recall-hero recall-hero--v2">
-        <div class="recall-hero__score" id="heroScore">
-          <span class="recall-hero__score-num" id="heroScoreNum">—</span>
-          <span class="recall-hero__score-den">/100</span>
-          <span class="recall-hero__score-lbl">FIT</span>
-        </div>
-        <div class="recall-hero__body">
-          <div class="recall-hero__badges" id="heroBadges"></div>
-          <h1 id="jobTitle">Loading…</h1>
-          <div id="metaLine" class="jc-job-meta"></div>
-          <div class="recall-hero__actions" id="heroActions"></div>
-        </div>
-      </section>
-
-      <!-- What's next: next scheduled round countdown, or aging warning if
-           this Applied job hasn't heard back. Auto-hides when there's
-           nothing pressing. -->
-      <div id="whatsNext" class="whats-next" hidden></div>
-
-      <main class="recall-body">
-
-        <!-- Job links — open the live posting or search the company's own
-             career site for the same role. Sits above Interview rounds so
-             it's the first thing in the working area. -->
-        <section id="sec-job-links" class="job-links">
-          <a id="jobUrl" href="#" target="_blank" rel="noopener" class="jc-btn" hidden>Open live posting<img class="jc-li-icon" src="../assets/linkedin.svg" alt="LinkedIn" width="14" height="14"></a>
-          <a id="corpSiteSearch" href="#" target="_blank" rel="noopener" class="jc-btn" hidden>Find on Corp Career Site<span class="jc-ext-icon" aria-hidden="true">↗</span></a>
-        </section>
-
-        <!-- Timeline sits above Interview rounds so the running log of
-             what has happened on this job is the first working-area
-             surface after the job links. -->
-        <section id="sec-timeline" class="recall-panel">
-          <span class="jc-eyebrow">Timeline &amp; contacts</span>
-          <div class="log-contact">
-            <input id="contactNote" class="jc-input" type="text" placeholder="Log a contact: e.g., recruiter emailed re: next round" />
-            <button id="logContact" class="jc-btn" data-size="sm" type="button">Log</button>
-          </div>
-          <ol id="timeline" class="timeline"></ol>
-        </section>
-
-        <!-- Working area — this is why you opened Recall. Wrapped in a
-             bordered box so the rounds list reads as a self-contained
-             working surface rather than free-floating cards. -->
-        <section id="sec-rounds" class="recall-panel">
-          <div class="section-head-row">
-            <span class="jc-eyebrow">Interview rounds</span>
-            <button id="addRound" class="jc-btn" data-variant="primary" data-size="sm" type="button">+ Add round</button>
-          </div>
-          <div id="roundsList" class="rounds-list"></div>
-        </section>
-
-        <section id="sec-notes" class="recall-panel">
-          <span class="jc-eyebrow">Notes</span>
-          <textarea id="notes" class="jc-textarea" placeholder="Personal notes on this role — autosaves"></textarea>
-          <div class="jc-btn-row">
-            <span id="notesStatus" class="jc-footnote"></span>
-          </div>
-        </section>
-
-        <!-- Reference material — fit + comp side-by-side (below fold). -->
-        <div class="recall-two-col">
-          <section id="sec-fit" class="recall-panel">
-            <span class="jc-eyebrow">Cast: Fit Analysis</span>
-            <div id="fitReadout" class="recall-box"></div>
-          </section>
-
-          <section id="sec-comp" class="recall-panel">
-            <span class="jc-eyebrow">Cast: Compensation Analysis</span>
-            <div id="compReadout" class="recall-box"></div>
-          </section>
-        </div>
-
-        <section id="sec-docs" class="recall-panel">
-          <span class="jc-eyebrow">Baited Assets</span>
-          <div id="documentsReadout" class="recall-box"></div>
-        </section>
-
-        <!-- Application answers — Q&A drafted via the ATS quick-fill
-             toolbar, kept here so a phone-screen call can pull up
-             "what did I say when they asked me about X?". Hidden
-             entirely when no answers have been drafted for this jawb. -->
-        <section id="sec-app-answers" class="recall-panel" hidden>
-          <span class="jc-eyebrow">Application answers</span>
-          <div id="applicationAnswersReadout" class="recall-box"></div>
-        </section>
-
-        <section id="sec-people" class="recall-panel">
-          <span class="jc-eyebrow">People</span>
-          <div id="panelList" class="recall-box"></div>
-        </section>
-
-        <section id="sec-summary" class="recall-panel">
-          <span class="jc-eyebrow">Summary excerpt</span>
-          <p id="summary" class="jc-prose"></p>
-        </section>
-
-        <section id="sec-description" class="recall-panel">
-          <details>
-            <summary style="cursor:pointer;font: 500 var(--jc-text-xs)/1 var(--jc-font-mono);color:var(--jc-text-3);text-transform:uppercase;letter-spacing:.08em">
-              Full archived description (<span id="descLen">0</span> chars)
-            </summary>
-            <pre id="description" class="desc-body"></pre>
-          </details>
-        </section>
-
-      </main>
     </div>
 
     <script src="recall.js" type="module"></script>

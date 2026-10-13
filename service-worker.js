@@ -69,6 +69,8 @@ import {
 } from './lib/ollamaClient.js';
 
 import { matchInbound } from './lib/search.js';
+import { postingAgeDays, applicantCount } from './lib/freshness.js';
+import { sharedTerms, verifyResume } from './lib/keywords.js';
 
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
@@ -218,11 +220,20 @@ const handlers = {
   }),
   'update-job-status': (msg) => updateJobStatus(msg.jobId, msg.status, msg.note),
   'add-timeline': (msg) => addTimelineEntry(msg.jobId, msg.entryType, msg.note),
+  // The user says they messaged the contact Fit recommended (or takes it
+  // back). Recorded so outcomes can be compared with and without outreach.
+  'mark-outreach-sent': async (msg) => {
+    const now = new Date().toISOString();
+    const record = await upsertJob(msg.jobId,
+      { outreach: msg.sent ? { sentAt: now, contact: String(msg.contact || '').slice(0, 200) } : null },
+      { appendTimeline: [{ at: now, type: 'outreach', note: msg.sent ? `Messaged ${msg.contact || 'contact'}` : 'Outreach un-marked' }] });
+    return { ok: true, data: record.outreach };
+  },
   'analyze-fit': (msg) => instrumentAnalysis('analyze-fit', msg.jobId, () => runFit(msg.jobId)),
   'analyze-comp': (msg) => instrumentAnalysis('analyze-comp', msg.jobId, () => runComp(msg.jobId)),
   'build-brief': (msg) => instrumentAnalysis('build-brief', msg.jobId, () => runBrief(msg.jobId)),
   'generate-letter': (msg) => instrumentAnalysis('generate-letter', msg.jobId, () => runLetter(msg.jobId, msg.tone)),
-  'generate-resume': (msg) => instrumentAnalysis('generate-resume', msg.jobId, () => runResume(msg.jobId)),
+  'generate-resume': (msg) => instrumentAnalysis('generate-resume', msg.jobId, () => runResume(msg.jobId, msg.mustInclude)),
   'ask-llm': (msg) => instrumentAnalysis('ask-llm', msg.jobId, () => runAsk(msg.jobId, msg.prompt, msg.provider)),
   'get-chats': (msg) => getChats(msg.jobId),
   'enrich-job': (msg) => runEnrich(msg.jobId),
@@ -1369,7 +1380,7 @@ const SIGNAL_LABEL = {
 //   stage     LinkedIn tracker stage, for kind 'tracker'
 //   data      { url, posting } from the detail pane, or { url, guess }
 //             when the action was on a list card we haven't scraped
-async function handleLinkedInSignal({ jobId, kind, explicit = true, stage, data }) {
+async function handleLinkedInSignal({ jobId, kind, explicit = true, stage, data, method }) {
   const id = String(jobId || '');
   if (!/^\d+$/.test(id) || !SIGNAL_LABEL[kind]) return { ok: false, error: 'bad signal' };
   const target = kind === 'tracker' ? normalizeTrackerStage(stage) : undefined;
@@ -1396,6 +1407,23 @@ async function handleLinkedInSignal({ jobId, kind, explicit = true, stage, data 
     ...(existing ? {} : { captureSource: `${kind}-click` }),
     ...(changed ? { status: next.status, statusUpdatedAt: now } : {}),
   };
+  // The facts about HOW and WHEN this application went in — the columns
+  // of a job-search spreadsheet, captured at the moment they're true.
+  // Only from things the user just did: a page that merely shows
+  // "Applied" says nothing about when or how. First value wins, so a
+  // second Apply click days later doesn't rewrite history.
+  if (explicit && (kind === 'apply-clicked' || kind === 'apply-confirmed')) {
+    const posting = data?.posting || existing?.posting || {};
+    const prev = existing?.application || {};
+    patch.application = {
+      method: prev.method || method || null,                 // 'easy-apply' | 'company-site'
+      clickedAt: prev.clickedAt || (kind === 'apply-clicked' ? now : null),
+      appliedAt: prev.appliedAt || (next.status === 'applied' ? now : null),
+      postingAgeDays: prev.postingAgeDays ?? postingAgeDays(posting.postedDate),
+      applicants: prev.applicants ?? applicantCount(posting.applicantCount),
+      reposted: prev.reposted ?? (posting.isReposted ?? null),
+    };
+  }
   const record = await upsertJob(id, patch, {
     appendTimeline: [changed
       ? { at: now, type: 'status-change', from, to: next.status, source: `linkedin:${kind}`, note: `${label} · ${from || 'new'} → ${next.status}` }
@@ -1854,12 +1882,20 @@ async function runLetter(jobId, tone = 'warm') {
   return { ok: true, record };
 }
 
-async function runResume(jobId) {
+// mustInclude — terms the last draft's keyword check found missing; the
+// "Regenerate including these" button passes them back.
+async function runResume(jobId, mustInclude) {
   const ctx = await loadContext(jobId);
   if (!ctx.resume) throw new Error('Master resume not uploaded. Add it in Settings first.');
   const fitResult = ctx.job.analyses?.fit?.result || null;
+  const p = ctx.job.posting || {};
+  const postingText = `${p.title || ''}\n${p.descriptionText || ''}`;
+  // Exact-match terms the posting and master resume share: told to the
+  // model up front, then checked in its output below.
+  const shared = sharedTerms(postingText, ctx.resume);
   const userMessage = buildResumeUserMessage({
-    profile: ctx.profile, masterResume: ctx.resume, fitResult, job: ctx.job,
+    profile: ctx.profile, masterResume: ctx.resume, fitResult, job: ctx.job, shared,
+    mustInclude: Array.isArray(mustInclude) ? mustInclude.filter((t) => typeof t === 'string').slice(0, 40).map((t) => t.slice(0, 80)) : [],
   });
   const r = await routeCall('resume', {
     local: (model) => callOllamaJson({ model, system: RESUME_SYSTEM, userMessage, maxTokens: 6000 }),
@@ -1875,6 +1911,9 @@ async function runResume(jobId) {
     provider: r.provider, fellback: r.fellback,
     generatedAt: new Date().toISOString(),
     promptVersion: RESUME_PROMPT_VERSION,
+    keywordCheck: verifyResume({
+      result: r.result, posting: postingText, masterResume: ctx.resume, profile: ctx.profile, shared,
+    }),
   };
   await setJobAnalysis(jobId, 'resume', record);
   return { ok: true, record };

@@ -4,7 +4,8 @@ import { estimateCostUsd, formatUsd } from '../lib/pricing.js';
 import { normalizeStatus, statusLabel, STATUS_ORDER } from '../lib/statuses.js';
 import { computeStrengthScore, roundFitToTens } from '../lib/strength.js';
 import { trashSvg } from '../lib/icons.js';
-import { $, els, send } from '../lib/pageBoot.js';
+import { $, els, send, fmtDate } from '../lib/pageBoot.js';
+import { postingAgeDays, applicantCount } from '../lib/freshness.js';
 import { h } from '../lib/h.js';
 
 let currentJob = null;
@@ -1221,8 +1222,22 @@ function renderVerdict(job) {
     els.verdictBadges.append(h('span', { class: 'jc-badge' }, fit.levelRead.postedLevel));
   }
 
+  // Freshness — the one signal available before any effort is spent.
+  // ponytail: relative text ("2 days ago") is read as relative to now; fine
+  // for a job open on the page, drifts for one re-opened from the archive.
+  const age = postingAgeDays(p.postedDate);
+  if (age != null) {
+    els.verdictBadges.append(h('span', {
+      class: 'jc-badge',
+      dataset: { tone: age <= 3 ? 'pos' : age <= 14 ? 'caution' : 'neg' },
+      title: 'Rule of thumb, not your data: newer postings tend to get more replies. Green ≤ 3 days, amber ≤ 2 weeks, red older.',
+    }, age === 0 ? 'Posted today' : `Posted ${age}d ago`));
+  }
+  if (p.isReposted) {
+    els.verdictBadges.append(h('span', { class: 'jc-badge', dataset: { tone: 'caution' }, title: 'LinkedIn marks this as reposted — the real age is older than shown.' }, 'Reposted'));
+  }
   if (p.applicantCount) {
-    const count = parseInt(String(p.applicantCount).replace(/[^\d]/g, ''), 10);
+    const count = applicantCount(p.applicantCount);
     const tone = count && count > 100 ? 'neg' : count && count > 50 ? 'caution' : undefined;
     els.verdictBadges.append(h('span', { class: 'jc-badge', dataset: tone ? { tone } : {} }, p.applicantCount));
   }
@@ -1520,7 +1535,7 @@ function renderFitCard(record) {
         h('span', { class: 'jc-notice__title' }, `🔥 Message first: ${o.bestContact}`),
         o.why ? h('div', {}, o.why) : null,
         o.strategy ? h('p', { class: 'jc-prose', style: 'margin-top: 4px' }, o.strategy) : null,
-        ...renderOutreachDraft(),
+        ...renderOutreachDraft(o.bestContact),
       ),
     );
     out.append(box);
@@ -1530,7 +1545,7 @@ function renderFitCard(record) {
 // Ready-to-paste message for the contact Fit recommends. Matt's own
 // wording with the role and company filled in — no model call, and the
 // user pastes it into LinkedIn themselves.
-function renderOutreachDraft() {
+function renderOutreachDraft(contact) {
   const p = currentJob?.posting || {};
   const message = `The ${p.title || 'open'} opening at ${p.company || 'your company'} was brought to my attention and you were the first person I thought of.
 I have applied and I'd love your honest take. What's the team like day to day, and do you know who's hiring for the role?  If you feel it worthwhile I would appreciate anything you know to do to move my application to the top of the list.`;
@@ -1542,9 +1557,27 @@ I have applied and I'd love your honest take. What's the team like day to day, a
       setTimeout(() => { copy.textContent = 'Copy message'; }, 1200);
     },
   }, 'Copy message');
+  // "Sent" is the user's say-so — Jawbs never sends anything. Recorded so
+  // Jawbridge can compare outcomes with and without outreach.
+  const jobId = currentJob?.jobId;
+  let sentAt = null;
+  const paint = () => {
+    sent.textContent = sentAt ? `✓ Sent ${fmtDate(sentAt)}` : 'Mark as sent';
+    sent.title = sentAt ? 'Click to undo' : 'Record that you messaged this person';
+  };
+  const sent = h('button', {
+    class: 'jc-btn', 'data-size': 'sm', type: 'button',
+    onClick: async () => {
+      const r = await send('mark-outreach-sent', { jobId, contact, sent: !sentAt });
+      sentAt = r.data?.sentAt || null;
+      paint();
+    },
+  }, '');
+  paint();
+  send('get-job', { jobId }).then((r) => { sentAt = r.data?.outreach?.sentAt || null; paint(); }).catch(() => {});
   return [
     h('p', { class: 'jc-prose jc-outreach-draft' }, message),
-    h('div', { class: 'jc-btn-row', style: 'margin-top: var(--jc-2)' }, copy),
+    h('div', { class: 'jc-btn-row', style: 'margin-top: var(--jc-2)' }, copy, sent),
   ];
 }
 
@@ -1885,9 +1918,16 @@ function renderResumeCard(record) {
   // v2 schema uses `summary`; v1 used `summaryParagraph`. Support both
   // so already-archived resumes still render in the card.
   const summaryText = r.summary || r.summaryParagraph;
+  out.append(...renderAtsCheck(r, record.keywordCheck));
+  if (r.headline) out.append(h('div', { class: 'jc-resume-role' }, r.headline));
   if (summaryText) {
     out.append(h('span', { class: 'jc-eyebrow' }, 'Summary'));
     out.append(h('p', { class: 'jc-prose' }, summaryText));
+  }
+
+  if (Array.isArray(r.skills) && r.skills.length) {
+    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Skills'));
+    out.append(h('p', { class: 'jc-prose' }, r.skills.join(' | ')));
   }
 
   // v2 shape: experience[] + earlierExperience[] + certifications[] + education[]
@@ -2008,6 +2048,52 @@ function renderResumeCard(record) {
   if (els.resumePdf) els.resumePdf.hidden = true;
 }
 
+// Pre-apply ATS check for a tailored resume. A recruiter finds resumes by
+// searching exact strings (title + a few skills), so these are the things
+// that decide whether this one comes up. Only shown for v3+ resumes —
+// older ones have no headline or skills section to check.
+//
+// `kc` (record.keywordCheck, v4+) is the service worker's string-search
+// of the generated text — lib/keywords.js. When present its counts are
+// used; without it we fall back to what the model said about itself.
+function renderAtsCheck(r, kc) {
+  if (!r.headline && !Array.isArray(r.skills)) return [];
+  const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const title = currentJob?.posting?.title || '';
+  const skills = r.skills?.length || 0;
+  const phrases = kc ? kc.phrasesVerified : (r.vocabularyMirrored?.length || 0);
+  const checks = [
+    [!!title && norm(r.headline) === norm(title), `Headline matches the posting title${title ? ` (“${title}”)` : ''}`],
+    [skills >= 10 && skills <= 30, `${skills} hard skills in the skills section (aim for 10–30)`],
+    [phrases >= 5, `${phrases} phrases ${kc ? 'verified as' : 'reported as'} copied from the posting (aim for 5–15)`],
+    kc && [kc.missed.length === 0, `${kc.covered.length} of ${kc.covered.length + kc.missed.length} terms your master resume shares with the posting made it in`],
+    [true, 'PDF text is selectable (Download produces real text, not an image)'],
+  ].filter(Boolean);
+  const missing = kc ? kc.missing : (r.missingKeywords || []);
+  const regen = kc?.missed.length ? h('button', {
+    class: 'jc-btn', 'data-size': 'sm', type: 'button',
+    title: 'Generate again, telling the model these terms were left out',
+    onClick: () => {
+      regen.disabled = true; regen.textContent = 'Regenerating…';
+      runAnalysis(regen, els.resumeError, 'generate-resume', { jobId: currentJob?.jobId, mustInclude: kc.missed }, () => {})
+        .finally(() => { regen.disabled = false; regen.textContent = 'Regenerate including these'; });
+    },
+  }, 'Regenerate including these') : null;
+  return [
+    h('span', { class: 'jc-eyebrow' }, 'ATS check'),
+    h('ul', { class: 'jc-ats-check' },
+      ...checks.map(([ok, label]) => h('li', { dataset: { ok: String(ok) } }, `${ok ? '✓' : '✗'} ${label}`)),
+    ),
+    kc?.missed.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
+      `On your master resume and in the posting, but left off this draft: ${kc.missed.join(', ')}.`) : null,
+    regen,
+    kc?.unverifiedSkills.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
+      `Skills listed that aren't on your master resume in those exact words — check each is true before sending: ${kc.unverifiedSkills.join(', ')}.`) : null,
+    missing.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
+      `Posting keywords not on your master resume, so left off: ${missing.join(', ')}. If you have any of these, add them to your master resume in Settings and regenerate.`) : null,
+  ].filter(Boolean);
+}
+
 function resumeToPlainText(r) {
   const lines = [];
   // Legacy v1 shape
@@ -2024,7 +2110,9 @@ function resumeToPlainText(r) {
     return lines.join('\n');
   }
   // v2 structured shape
+  if (r.headline) lines.push(r.headline, '');
   if (r.summary) lines.push(r.summary, '');
+  if (Array.isArray(r.skills) && r.skills.length) lines.push('SKILLS', '', r.skills.join(' | '), '');
   if (Array.isArray(r.experience) && r.experience.length) {
     lines.push('EXPERIENCE', '');
     for (const role of r.experience) {

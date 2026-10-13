@@ -42,9 +42,9 @@ function render() {
   const parts = [p.company, p.location, p.workplaceType, p.postedSalaryRange].filter(Boolean);
   els.metaLine.textContent = parts.join(' · ');
 
-  // Toolbar center — title + company mirror the hero so the sticky
-  // header identifies the job as the user scrolls the long Recall
-  // page. Empty strings hide their spans via CSS (`:empty { display:
+  // Toolbar center — title + company mirror the hero so the header
+  // still identifies the job when the rail has scrolled away (it
+  // stacks above the tabs on narrower windows). Empty strings hide their spans via CSS (`:empty { display:
   // none }`), which also collapses the middle separator.
   els.toolbarTitleText.textContent = p.title || '';
   els.toolbarTitleCompany.textContent = p.company || '';
@@ -134,7 +134,94 @@ function render() {
   els.descLen.textContent = desc.length.toLocaleString();
 
   renderRounds();
+
+  renderTabBadges();
+  showTab(activeTab);
 }
+
+// ---------- Section tabs ----------
+//
+// One section on screen at a time. The active tab is module state, so
+// it survives load() → render(); a tab click also writes it to the
+// hash, which is what keeps it across a reload and lets other pages
+// deep-link (recall.html?jobId=…#s=rounds). The "s=" prefix is there
+// because #notes, #timeline and #description are also element ids, and a
+// bare hash makes the browser scroll to that element on load.
+const tabFromHash = () => location.hash.replace(/^#s=/, '');
+let activeTab = tabFromHash();
+
+function showTab(key) {
+  const tabs = [...els.recallTabs.children];
+  // No hash, an unknown one, or Answers on a jawb with none drafted —
+  // land on the working area if there is one, else on the analysis.
+  if (!tabs.some((t) => t.dataset.tab === key && !t.hidden)) {
+    key = job?.interviewRounds?.length ? 'rounds' : 'fit';
+  }
+  activeTab = key;
+  for (const t of tabs) {
+    const active = t.dataset.tab === key;
+    t.dataset.active = active ? 'true' : 'false';
+    t.setAttribute('aria-selected', active ? 'true' : 'false');
+    t.tabIndex = active ? 0 : -1;
+  }
+  for (const p of document.querySelectorAll('.recall-tabpanel')) {
+    p.dataset.active = p.dataset.panel === key ? 'true' : 'false';
+  }
+}
+
+// Badge per tab — a count for lists, n/2 for the paired sections, ✓ for
+// free text — so an empty section reads as empty before the click. The
+// Answers tab disappears with its section when nothing was drafted.
+function renderTabBadges() {
+  const a = job.analyses || {};
+  const outOfTwo = (...xs) => { const n = xs.filter(Boolean).length; return n ? `${n}/2` : ''; };
+  const answers = Array.isArray(job.applicationAnswers) ? job.applicationAnswers.length : 0;
+  const badges = {
+    timeline: (job.timeline || []).length,
+    rounds: (job.interviewRounds || []).length,
+    notes: els.notes.value.trim() ? '✓' : '',
+    fit: outOfTwo(a.fit?.result, a.comp?.result),
+    docs: outOfTwo(a.coverLetter?.result?.letter, a.resume?.result),
+    answers,
+    people: derivePeople(job, { followMap }).length + (job.panel || []).length,
+    description: els.description.textContent ? '✓' : '',
+  };
+  for (const t of els.recallTabs.children) {
+    t.querySelector('.jc-tab__badge').textContent = badges[t.dataset.tab] || '';
+  }
+  $('tab-answers').hidden = !answers;
+}
+
+els.recallTabs.addEventListener('click', (e) => {
+  const tab = e.target.closest('.jc-tab');
+  if (!tab) return;
+  showTab(tab.dataset.tab);
+  history.replaceState(null, '', `#s=${activeTab}`);
+  // If the previous section was scrolled, start the new one at its top
+  // rather than partway down. Left alone when the panel top is already
+  // in view, so a click near the top of the page doesn't jump.
+  const panel = document.querySelector(`.recall-tabpanel[data-panel="${activeTab}"]`);
+  if (panel.getBoundingClientRect().top < els.recallTabs.getBoundingClientRect().bottom) panel.scrollIntoView();
+});
+
+// Arrow keys move between tabs — only the active tab is in the Tab
+// order, so this is the keyboard route to the rest.
+els.recallTabs.addEventListener('keydown', (e) => {
+  const tabs = [...els.recallTabs.children].filter((t) => !t.hidden);
+  const i = tabs.indexOf(document.activeElement);
+  const next = {
+    ArrowRight: tabs[i + 1] || tabs[0],
+    ArrowLeft: tabs[i - 1] || tabs.at(-1),
+    Home: tabs[0],
+    End: tabs.at(-1),
+  }[e.key];
+  if (!next) return;
+  e.preventDefault();
+  next.focus();
+  next.click();
+});
+
+window.addEventListener('hashchange', () => showTab(tabFromHash()));
 
 // ---------- Interview rounds ----------
 

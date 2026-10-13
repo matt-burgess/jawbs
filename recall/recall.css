@@ -64,7 +64,6 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
    show a small gold flag, the current stage a boat/fin marker, future
    stages a dashed circle. Matches mockup 1b's "The hunt" strip. */
 .voyage-log {
-  max-width: 900px; margin: var(--jc-4) auto;
   padding: var(--jc-4) var(--jc-5);
   background: var(--jc-surface-1);
   border: 1px solid var(--jc-border);
@@ -139,11 +138,9 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 .voyage-stage[data-state="next"] .voyage-stage__bar { background: transparent; }
 
 /* Score-dominant hero. Big number on the left, everything else stacks to
-   the right of it. Sticks to the top of the page so the primary actions
-   stay visible as the user scrolls into rounds / notes. */
+   the right of it. Lives in the rail, so the primary actions stay
+   visible while the user works in rounds / notes. */
 .recall-hero--v2 {
-  max-width: 900px; margin: 0 auto;
-  padding: var(--jc-6) var(--jc-5) var(--jc-5);
   display: grid;
   grid-template-columns: 120px 1fr;
   gap: var(--jc-5);
@@ -217,7 +214,6 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 
 /* What's next callout — above-the-fold, tone-colored bar. */
 .whats-next {
-  max-width: 900px; margin: 0 auto var(--jc-4);
   padding: 12px 16px;
   border-radius: var(--jc-radius);
   display: flex; align-items: center; gap: 12px;
@@ -235,10 +231,121 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 }
 .whats-next__msg { flex: 1; color: var(--jc-text); }
 
-.recall-body {
-  max-width: 900px; margin: 0 auto;
-  padding: 0 var(--jc-6) var(--jc-10);
-  display: flex; flex-direction: column; gap: var(--jc-6);
+/* Page shell — the toolbar keeps its height and .recall-layout takes
+   the rest of the viewport and owns the scrolling, so nothing has to
+   know the toolbar's height to stick beneath it. */
+.jc-page { height: 100vh; display: flex; flex-direction: column; }
+.recall-layout { flex: 1; min-height: 0; overflow-y: auto; }
+.recall-rail {
+  box-sizing: border-box;
+  padding: var(--jc-5) var(--jc-6);
+  display: flex; flex-direction: column; gap: var(--jc-4);
+}
+.recall-body { min-width: 0; }
+
+/* Section tabs — the same strip as the side panel's .jc-tabs / .jc-tab
+   (those rules live in sidepanel/panel.css, which this page doesn't
+   load). Differences: tabs size to their label and the strip scrolls
+   sideways instead of squeezing eight labels into equal columns, and
+   the badge sits on a lighter disc so it reads on an inactive tab. */
+.jc-tabs {
+  display: flex; gap: 0;
+  background: var(--jc-surface-3);
+  border-bottom: 1px solid var(--jc-border-strong);
+  position: sticky; top: 0; z-index: 3;
+  overflow-x: auto;
+}
+.jc-tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 13px 14px;
+  border-bottom: 2px solid transparent;
+  flex: 1 0 auto;
+  font: 700 10px/1 var(--jc-font-mono);
+  letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+  color: var(--jc-text-3);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.jc-tab:hover { color: var(--jc-text); background: var(--jc-surface-2); }
+.jc-tab[data-active='true'] {
+  color: var(--jc-text);
+  background: var(--jc-bg);
+  border-bottom-color: var(--jc-accent);
+}
+/* Inset ring — the strip's overflow-x would clip an outset one. */
+.jc-tab:focus-visible { outline: 2px solid var(--jc-accent); outline-offset: -2px; }
+.jc-tab__badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--jc-surface-1);
+  color: var(--jc-text-2);
+  font: 700 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  letter-spacing: 0;
+}
+/* No badge at all is the "nothing in here yet" signal. */
+.jc-tab__badge:empty { display: none; }
+.jc-tab[data-active='true'] .jc-tab__badge {
+  background: var(--jc-accent);
+  color: var(--jc-accent-ink);
+}
+
+/* One section on screen at a time. Screen-only, so printing still gets
+   every section. scroll-margin clears the sticky tab strip when a tab
+   click scrolls its panel back to the top. */
+.recall-tabpanel {
+  box-sizing: border-box;
+  max-width: 1100px;
+  margin: var(--jc-5) var(--jc-6) var(--jc-10);
+  scroll-margin-top: 60px;
+}
+@media screen {
+  .recall-tabpanel:not([data-active='true']) { display: none; }
+}
+.recall-stack { display: flex; flex-direction: column; gap: var(--jc-4); }
+
+/* Wide tab: the rail and the body sit side by side and scroll
+   independently, so the job's identity and status stay put while a
+   long section scrolls. */
+@media (min-width: 1100px) {
+  .recall-layout {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    /* Without an explicit row the auto track grows to the content and
+       the panes never get a height to scroll within. */
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .recall-rail, .recall-body { overflow-y: auto; }
+  .recall-rail { padding: var(--jc-5); border-right: 1px solid var(--jc-border); }
+
+  /* The rail is too narrow for score-beside-title, so the score
+     becomes a one-line strip above it. */
+  .recall-hero--v2 { grid-template-columns: 1fr; gap: var(--jc-3); }
+  .recall-hero__score {
+    flex-direction: row; align-items: baseline; gap: 6px;
+    padding: var(--jc-3) var(--jc-4);
+  }
+  .recall-hero__score-lbl { margin: 0 0 0 auto; }
+
+  /* ...and for five stages abreast, so the voyage log runs top to
+     bottom: mark, label, date on one line per stage. */
+  .voyage-log__stages { flex-direction: column; gap: var(--jc-2); }
+  .voyage-stage { flex-direction: row; align-items: center; }
+  .voyage-stage__row { width: 30px; justify-content: center; }
+  .voyage-stage__bar { display: none; }
+  .voyage-stage__date { margin-left: auto; }
+}
+
+@media print {
+  .jc-page { height: auto; display: block; }
+  .recall-layout, .recall-rail, .recall-body { display: block; overflow: visible; }
+  .jc-toolbar { position: static; }
+  .jc-tabs { display: none; }
+  .recall-rail > *, .recall-tabpanel { margin: 0 0 var(--jc-4); }
+  .doc-body { max-height: none; overflow: visible; }
 }
 /* Two-column layout — fit + comp side-by-side on wider viewports.
    Collapses to stacked below ~680px. */
@@ -395,7 +502,6 @@ details summary {
   font-family: var(--jc-font-mono); font-size: var(--jc-text-2xs);
   color: var(--jc-text-2); line-height: 1.5;
   white-space: pre-wrap; word-break: break-word;
-  max-height: 500px; overflow-y: auto;
 }
 
 .prep-output {
@@ -407,15 +513,15 @@ details summary {
   min-height: 40px;
 }
 
-/* Notes */
-#notes { min-height: 100px; }
+/* Notes — has the tab to itself, so give it room to write in. */
+#notes { min-height: 40vh; }
 
 /* Interview rounds */
 .section-head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--jc-2); }
 .rounds-list { display: flex; flex-direction: column; gap: var(--jc-3); }
 
-/* Job links row — "Open live posting" + "Link to Job on Corp Site"
-   above the Interview rounds section. Explicit row direction because
+/* Job links row — "Open live posting" + "Find on Corp Career Site"
+   at the foot of the rail. Explicit row direction because
    the base `section` rule sets column and would otherwise cause the
    .jc-btn children to stretch full-width. Collapses when empty. */
 .job-links {

@@ -1568,7 +1568,7 @@
   const recentExplicit = new Map(); // `${kind}:${jobId}` → ts
   let lastApplyClick = null;        // { jobId, at } — attributes a later confirmation
 
-  function sendSignal(kind, jobId, { explicit = true, stage, data } = {}) {
+  function sendSignal(kind, jobId, { explicit = true, stage, data, method } = {}) {
     if (!jobId) return;
     const key = `${kind}:${explicit}:${jobId}`;
     if (explicit && kind !== 'apply-confirmed') {
@@ -1580,10 +1580,16 @@
       if (firedThisSession.has(key)) return;
       firedThisSession.add(key);
     }
-    chrome.runtime.sendMessage({ type: 'linkedin-signal', kind, jobId, explicit, stage, data })
+    chrome.runtime.sendMessage({ type: 'linkedin-signal', kind, jobId, explicit, stage, data, method })
       .then((r) => {
         console.info('[Jawbs] signal', kind, jobId, explicit ? '' : '(observed)', stage || '', '→', r);
         if (r?.changed) showToast(`✓ Jawbs: ${r.label}`);
+        // Say why nothing happened, so a silent miss is distinguishable
+        // from the click not being detected at all.
+        else if (explicit && kind === 'tracker') {
+          showToast(r?.skipped === 'not-in-archive' ? "Jawbs: this job isn't in your Jawboard, so there's no status to change"
+            : r?.status ? `Jawbs: already ${r.label}` : `Jawbs: status not changed (${r?.skipped || r?.error || 'no response'})`);
+        }
       })
       .catch((e) => console.warn('[Jawbs] signal send failed:', kind, jobId, e));
   }
@@ -3146,24 +3152,42 @@
   let lastTrackerRow = null; // { jobId, at } — row menus render in a portal, detached from the row
 
   function trackerActionStage(el) {
-    const text = (el.getAttribute('aria-label') || el.innerText || '').trim().replace(/\s+/g, ' ');
-    if (!text || text.length > 60) return null;
-    // Only menu entries or "Move to …"-style wording count — a row's title
-    // link reading "Applied Scientist" is not an action.
+    const clean = (t) => (t || '').trim().replace(/\s+/g, ' ');
+    const text = clean(el.innerText);
+    const aria = clean(el.getAttribute('aria-label'));
+    // Three shapes count as an action. A row's title link reading
+    // "Applied Scientist" matches none of them.
+    //   inMenu  — an entry in a row's dropdown
+    //   phrased — "Move to …" / "Mark … as …" wording, visible or aria
+    //             (aria-labels often carry the job title in the middle)
+    //   exact   — a button whose whole label is a stage name, e.g.
+    //             "Not moving forward". Stage tabs can look like this too,
+    //             so the caller double-checks these (`loose`).
     const inMenu = !!el.closest('[role="menu"], [role="listbox"], [role="menuitem"], [role="option"]');
-    const phrased = /^(move(d)? to|mark(ed)? as|change (status )?to|add to)\b/i.test(text) || /^archive( job)?$/i.test(text);
-    if (!inMenu && !phrased) return null;
-    if (/^(unsave|remove)\b/i.test(text)) return { kind: 'unsave' };
+    const verb = /\b(move(d)?|mark(ed)?|change|set|add)\b.*\b(to|as)\b|^archive\b/i;
+    const phrased = verb.test(text) || verb.test(aria);
+    // ("Save"/"Saved" excluded: that's the bookmark toggle or a dialog's confirm button.)
+    const exact = el.tagName !== 'A' && /^(in progress|applied|interview(ing|s)?|archived?|not moving forward)$/i.test(text);
+    if (!inMenu && !phrased && !exact) return null;
+    const label = text && text.length <= 60 ? text : aria;
+    if (/^(unsave|remove)\b/i.test(label)) return { kind: 'unsave' };
     // Un-archive doesn't say where the job goes; the next tracker sighting will.
-    if (/^(un-?archive|restore|undo)\b/i.test(text)) return {};
-    const hit = ACTION_STAGES.find(([re]) => re.test(text));
-    return hit ? { kind: 'tracker', stage: hit[1] } : null;
+    if (/^(un-?archive|restore|undo)\b/i.test(label)) return {};
+    const hit = ACTION_STAGES.find(([re]) => re.test(text)) || ACTION_STAGES.find(([re]) => re.test(aria));
+    return hit ? { kind: 'tracker', stage: hit[1], loose: !inMenu && !phrased } : null;
   }
 
   document.addEventListener('click', (e) => {
+    const onTracker = isTrackerUrl(location.href);
+    // Remember which tracker row the user is working in, whatever they
+    // clicked — the control that opens a row's menu or status dialog isn't
+    // always a <button>, and the dialog itself renders outside the row.
+    if (onTracker && e.target instanceof Element) {
+      const row = jobForElement(e.target);
+      if (row.card) lastTrackerRow = { jobId: row.jobId, at: Date.now() };
+    }
     const btn = e.target?.closest?.('button, [role="button"], [role="menuitem"], [role="option"], a[href]');
     if (!btn) return;
-    const onTracker = isTrackerUrl(location.href);
 
     // "Did you apply?" / "Did you finish applying?" → Yes. Appears on the
     // job page after an external apply and on In Progress tracker rows.
@@ -3181,6 +3205,34 @@
       }
     }
 
+    // LinkedIn's "update status" dialog: a radio list ("Got an interview" /
+    // "Not moving forward") confirmed with Save. The Save click is the
+    // action; the checked radio says which. Must run before the generic
+    // Save-button branch below, which would read this as a bookmark toggle.
+    if (/^save$/i.test((btn.innerText || '').trim())) {
+      let group = null;
+      for (let n = btn.parentElement, d = 0; n && d < 6 && !group; n = n.parentElement, d++) {
+        group = n.querySelector('[role="radiogroup"]');
+      }
+      if (group) {
+        const picked = group.querySelector('[role="radio"][aria-checked="true"]')
+          || group.querySelector('input[type="radio"]:checked')?.closest('[role="radio"]');
+        const label = (picked?.innerText || '').trim();
+        const stage = /not moving forward/i.test(label) ? 'not-moving-forward'
+          : /interview/i.test(label) ? 'interview' : null;
+        // The dialog isn't inside the row it was opened from, so on the
+        // tracker the job is the row the user last clicked in.
+        let { jobId, card } = jobForElement(btn);
+        if (!card && onTracker) jobId = lastTrackerRow && Date.now() - lastTrackerRow.at < 5 * 60_000 ? lastTrackerRow.jobId : null;
+        if (stage && jobId) sendSignal('tracker', jobId, { stage });
+        else {
+          reportUnmatched(`status dialog Save (picked "${label}", job ${jobId || 'unknown'})`, btn);
+          showToast(jobId ? `Jawbs: didn't recognize "${label}"` : "Jawbs: couldn't tell which job this was — status not changed");
+        }
+        return;
+      }
+    }
+
     if (onTracker) {
       const { jobId, card } = jobForElement(btn);
       // Stage tabs and pagination are navigation, not row actions.
@@ -3188,12 +3240,19 @@
         const action = trackerActionStage(btn);
         if (action) {
           const target = card ? jobId : (lastTrackerRow && Date.now() - lastTrackerRow.at < 60_000 ? lastTrackerRow.jobId : null);
-          if (action.kind && target) sendSignal(action.kind, target, { stage: action.stage });
-          else reportUnmatched(action.kind ? 'tracker action with no row' : 'tracker action not understood', btn);
+          if (!action.kind || !target) {
+            reportUnmatched(action.kind ? 'tracker action with no row' : 'tracker action not understood', btn);
+          } else if (action.loose) {
+            // A bare stage name could be a stage tab. A tab navigates; an
+            // action leaves the URL alone.
+            const href = location.href;
+            setTimeout(() => { if (location.href === href) sendSignal(action.kind, target, { stage: action.stage }); }, 600);
+          } else {
+            sendSignal(action.kind, target, { stage: action.stage });
+          }
           return;
         }
       }
-      if (card) lastTrackerRow = { jobId, at: Date.now() };
     }
 
     if (looksLikeApplyButton(btn)) {
@@ -3203,7 +3262,11 @@
       // LinkedIn files an Apply click under "In Progress"; Applied only
       // comes from a confirmation (see checkObservedState and the Yes
       // prompt above).
-      sendSignal('apply-clicked', jobId, { data: signalData(jobId, card) });
+      // Which door: Easy Apply or the company's own site. Recorded so
+      // Jawbridge can compare reply rates between the two.
+      const label = `${btn.getAttribute('aria-label') || ''} ${btn.innerText || ''}`;
+      const method = /easy\s*apply/i.test(label) ? 'easy-apply' : 'company-site';
+      sendSignal('apply-clicked', jobId, { data: signalData(jobId, card), method });
       return;
     }
 

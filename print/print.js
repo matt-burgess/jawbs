@@ -36,16 +36,25 @@
 
 // Build the resume DOM from the structured JSON the LLM returned +
 // header fields pulled from Settings. Order matches the user's target
-// design: Header -> Summary -> Experience -> Earlier Experience ->
+// design: Header -> Summary -> Skills -> Experience -> Earlier Experience ->
 // Certifications & Awards -> Education.
 function renderResume(root, resume, header) {
   root.innerHTML = '';
-  root.append(buildHeader(header));
+  // The posting's exact title (v3 resumes) replaces the generic Settings
+  // tagline — it's the string a recruiter's title search has to match.
+  root.append(buildHeader({ ...header, tagline: resume.headline || header.tagline }));
   if (resume.summary) {
     root.append(sectionTitle('Summary'));
     const p = document.createElement('p');
     p.className = 'rz-summary';
     p.textContent = resume.summary;
+    root.append(p);
+  }
+  if (Array.isArray(resume.skills) && resume.skills.length) {
+    root.append(sectionTitle('Skills'));
+    const p = document.createElement('p');
+    p.className = 'rz-summary';
+    p.textContent = resume.skills.join(' | ');
     root.append(p);
   }
   if (Array.isArray(resume.experience) && resume.experience.length) {
