@@ -6,7 +6,7 @@
 // 'archive stale jobs' are injected via option callbacks so this
 // module never reaches into a caller's storage or reload logic.
 
-import { normalizeStatus, STATUS_ORDER, statusRank } from '../lib/statuses.js';
+import { normalizeStatus, statusLabel, STATUS_ORDER, statusRank } from '../lib/statuses.js';
 import { escapeHtml } from '../lib/pageBoot.js';
 
 
@@ -14,13 +14,13 @@ import { escapeHtml } from '../lib/pageBoot.js';
 
 export const STATUS_TONE = {
   analyzed:               'var(--jc-text-3)',
-  saved:                  'var(--jc-accent)',
-  inProgressDraft:        'var(--jc-caution)',
-  inProgressClickedApply: 'var(--jc-caution)',
-  applied:                'var(--jc-info)',
-  interviewing:           'var(--jc-pos)',
-  archived:               'var(--jc-text-3)',
-  notMovingForward:       'var(--jc-neg)',
+  saved:                  'var(--jc-st-saved)',
+  inProgressDraft:        'var(--jc-st-progress)',
+  inProgressClickedApply: 'var(--jc-st-progress)',
+  applied:                'var(--jc-st-applied)',
+  interviewing:           'var(--jc-st-interviewing)',
+  archived:               'var(--jc-st-scar)',
+  notMovingForward:       'var(--jc-st-scar)',
 };
 
 // ================================================================
@@ -163,7 +163,7 @@ export function renderStrikeFunnel(container, jobsList, opts = {}) {
       : `▼${Math.abs(delta)}`;
     const deltaTone = delta > 0 ? 'pos' : delta < 0 ? 'neg' : 'neutral';
     // Color by stage: cold blue → warm green as jobs advance.
-    const barColor = ['#6ec6f0', '#f5a54f', '#f4c56f', '#6dd68a'][i];
+    const barColor = ['var(--jc-st-saved)', 'var(--jc-st-applied)', 'var(--jc-st-interviewing)', 'var(--jaw-amber)'][i];
     const canLink = !!opts.links && s.key !== 'offer' && s.count > 0;
     const tag = canLink ? 'a' : 'div';
     const attrs = canLink
@@ -456,21 +456,21 @@ export function renderCalibration(container, jobsList) {
     const bw = colW * 0.35;
     return `
       <rect x="${x.toFixed(1)}" y="${(padT + innerH - iH).toFixed(1)}"
-            width="${bw.toFixed(1)}" height="${iH.toFixed(1)}" fill="#f4c56f" />
+            width="${bw.toFixed(1)}" height="${iH.toFixed(1)}" style="fill:var(--jaw-amber)" />
       <rect x="${(x + bw + 2).toFixed(1)}" y="${(padT + innerH - oH).toFixed(1)}"
-            width="${bw.toFixed(1)}" height="${oH.toFixed(1)}" fill="#6dd68a" />
+            width="${bw.toFixed(1)}" height="${oH.toFixed(1)}" style="fill:var(--jc-pos)" />
       <text x="${(x + bw).toFixed(1)}" y="${(H - padB + 12).toFixed(1)}"
-            text-anchor="middle" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="9">${r.label}</text>
+            text-anchor="middle" style="fill:var(--jc-text-3)" font-family="var(--jc-font-mono)" font-size="9">${r.label}</text>
       <text x="${(x + bw).toFixed(1)}" y="${(H - padB + 22).toFixed(1)}"
-            text-anchor="middle" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="8">n=${r.n}</text>`;
+            text-anchor="middle" style="fill:var(--jc-text-3)" font-family="var(--jc-font-mono)" font-size="8">n=${r.n}</text>`;
   }).join('');
 
   // Axes
   const axis = `
-    <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#4a3b1a" />
-    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H - padB}" stroke="#4a3b1a" />
-    <text x="${padL - 4}" y="${padT + 4}" text-anchor="end" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="9">100%</text>
-    <text x="${padL - 4}" y="${H - padB}" text-anchor="end" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="9">0</text>`;
+    <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" style="stroke:var(--jc-border-strong)" />
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H - padB}" style="stroke:var(--jc-border-strong)" />
+    <text x="${padL - 4}" y="${padT + 4}" text-anchor="end" style="fill:var(--jc-text-3)" font-family="var(--jc-font-mono)" font-size="9">100%</text>
+    <text x="${padL - 4}" y="${H - padB}" text-anchor="end" style="fill:var(--jc-text-3)" font-family="var(--jc-font-mono)" font-size="9">0</text>`;
 
   // Callout: does score predict? Compare top-two vs bottom-two interview%.
   const bottom = rows.slice(0, 2).reduce((a, b) => a + b.n * b.interviewPct, 0) / Math.max(1, rows.slice(0, 2).reduce((a, b) => a + b.n, 0));
@@ -484,8 +484,8 @@ export function renderCalibration(container, jobsList) {
 
   const legend = `
     <div class="two-line-legend">
-      <span><span class="legend-swatch" style="background:#f4c56f"></span>Interview %</span>
-      <span><span class="legend-swatch" style="background:#6dd68a"></span>Offer %</span>
+      <span><span class="legend-swatch" style="background:var(--jaw-amber)"></span>Interview %</span>
+      <span><span class="legend-swatch" style="background:var(--jc-pos)"></span>Offer %</span>
     </div>`;
 
   container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${axis}${bars}</svg>${legend}${callout}`;
@@ -551,9 +551,9 @@ export function renderTrophyBoard(container, jobsList, opts = {}) {
   const barW = Math.max(4, Math.min(24, barSlot * 0.6));
 
   const statusColor = {
-    saved: '#6ec6f0', applied: '#f4c56f', interviewing: '#6dd68a',
-    archived: '#94825a', notMovingForward: '#ff6b6b',
-    analyzed: '#94825a', inProgressDraft: '#f5a54f', inProgressClickedApply: '#f5a54f',
+    saved: 'var(--jc-st-saved)', applied: 'var(--jc-st-applied)', interviewing: 'var(--jc-st-interviewing)',
+    archived: 'var(--jc-st-scar)', notMovingForward: 'var(--jc-st-scar)',
+    analyzed: 'var(--jc-st-analyzed)', inProgressDraft: 'var(--jc-st-progress)', inProgressClickedApply: 'var(--jc-st-progress)',
   };
   const fmtK = (n) => `$${Math.round(n / 1000)}k`;
 
@@ -564,9 +564,9 @@ export function renderTrophyBoard(container, jobsList, opts = {}) {
     const yLo = yFor(s.low);
     const h = Math.max(2, yLo - yHi);
     const yMid = yFor(s.mid);
-    const color = statusColor[s.status] || '#f4c56f';
+    const color = statusColor[s.status] || 'var(--jaw-amber)';
     const title = `${s.title} @ ${s.company} · ${fmtK(s.low)}–${fmtK(s.high)}`;
-    const bar = `<rect x="${x.toFixed(1)}" y="${yHi.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${color}" opacity="0.85" style="cursor:${opts.links ? 'pointer' : 'default'}"><title>${escapeHtml(title)}</title></rect>`;
+    const bar = `<rect x="${x.toFixed(1)}" y="${yHi.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" opacity="0.85" style="fill:${color};cursor:${opts.links ? 'pointer' : 'default'}"><title>${escapeHtml(title)}</title></rect>`;
     const midMark = `<line x1="${(x - 2).toFixed(1)}" y1="${yMid.toFixed(1)}" x2="${(x + barW + 2).toFixed(1)}" y2="${yMid.toFixed(1)}" stroke="var(--jc-text)" stroke-width="1.5" opacity="0.7" />`;
     // Rotated company label along the x-axis
     const label = `<text x="${cx.toFixed(1)}" y="${(H - padB + 10).toFixed(1)}" text-anchor="end" transform="rotate(-40 ${cx.toFixed(1)} ${(H - padB + 10).toFixed(1)})" style="fill:var(--jc-text-3)" font-family="var(--jc-font-mono)" font-size="8">${escapeHtml((s.company || '').slice(0, 14))}</text>`;
@@ -589,8 +589,8 @@ export function renderTrophyBoard(container, jobsList, opts = {}) {
     <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H - padB}" stroke="var(--jc-border-strong)" />`;
 
   // Ask-target reference line, async fetch. Hidden until we get a value.
-  const askLine = `<line id="trophyAsk" stroke="#ff6b6b" stroke-width="1.2" stroke-dasharray="3 3" opacity="0" />
-    <text id="trophyAskLabel" x="${(W - padR - 4).toFixed(1)}" y="0" text-anchor="end" style="fill:#ff6b6b" font-family="var(--jc-font-mono)" font-size="9" opacity="0">ASK</text>`;
+  const askLine = `<line id="trophyAsk" style="stroke:var(--jc-neg)" stroke-width="1.2" stroke-dasharray="3 3" opacity="0" />
+    <text id="trophyAskLabel" x="${(W - padR - 4).toFixed(1)}" y="0" text-anchor="end" style="fill:var(--jc-neg)" font-family="var(--jc-font-mono)" font-size="9" opacity="0">ASK</text>`;
   (async () => {
     try {
       const r = await chrome.storage.local.get('settings.compTargets');
@@ -658,19 +658,19 @@ export function renderFirstBite(container, jobsList) {
     // Highlight the bucket containing the median
     const bucket = buckets[i];
     const holdsMedian = median >= bucket.min && median <= bucket.max;
-    const fill = holdsMedian ? '#f4c56f' : '#6ec6f0';
+    const fill = holdsMedian ? 'var(--jaw-amber)' : 'var(--jc-info)';
     return `
       <rect x="${x.toFixed(1)}" y="${(padT + innerH - h).toFixed(1)}"
-            width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${fill}" />
+            width="${bw.toFixed(1)}" height="${h.toFixed(1)}" style="fill:${fill}" />
       <text x="${(x + bw / 2).toFixed(1)}" y="${(H - padB + 12).toFixed(1)}"
-            text-anchor="middle" style="fill:#94825a" font-family="var(--jc-font-mono)" font-size="9">${bucket.label}</text>
+            text-anchor="middle" style="fill:var(--jc-text-3)" font-family="var(--jc-font-mono)" font-size="9">${bucket.label}</text>
       <text x="${(x + bw / 2).toFixed(1)}" y="${(padT + innerH - h - 3).toFixed(1)}"
-            text-anchor="middle" style="fill:#e8dcb1" font-family="var(--jc-font-mono)" font-size="9">${c || ''}</text>`;
+            text-anchor="middle" style="fill:var(--jc-text)" font-family="var(--jc-font-mono)" font-size="9">${c || ''}</text>`;
   }).join('');
 
   const axis = `
-    <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#4a3b1a" />
-    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H - padB}" stroke="#4a3b1a" />`;
+    <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" style="stroke:var(--jc-border-strong)" />
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H - padB}" style="stroke:var(--jc-border-strong)" />`;
 
   container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${axis}${bars}</svg>
     <div class="chart-caption">Median ${median}d · n=${lags.length} · Amber bar = median bucket</div>`;
@@ -733,10 +733,10 @@ export function renderStatusPie(container, jobsList, opts = {}) {
   const legend = `<ul class="chart-legend">${slices.map((s) => {
     const inner = `
       <span class="legend-dot" style="background:${s.color}"></span>
-      <span class="legend-label">${s.status}</span>
+      <span class="legend-label">${escapeHtml(statusLabel(s.status))}</span>
       <span class="legend-value">${s.count} · ${Math.round(s.count / total * 100)}%</span>`;
     return opts.links
-      ? `<li><a class="legend-link" href="${opts.links.jawboard({ status: s.status })}" title="Filter Jawboard to ${s.status}">${inner}</a></li>`
+      ? `<li><a class="legend-link" href="${opts.links.jawboard({ status: s.status })}" title="Filter Jawboard to ${escapeHtml(statusLabel(s.status))}">${inner}</a></li>`
       : `<li>${inner}</li>`;
   }).join('')}</ul>`;
 
@@ -823,7 +823,7 @@ export function renderCapturedLine(container, jobsList) {
   const interviewPts = seriesPts(interviewCum);
   const legend = `
     <div class="two-line-legend">
-      <span><span class="legend-swatch" style="background:var(--jc-accent)"></span>Jobs · ${captureCum[captureCum.length - 1] || 0}</span>
+      <span><span class="legend-swatch" style="background:var(--jaw-amber)"></span>Jobs · ${captureCum[captureCum.length - 1] || 0}</span>
       <span><span class="legend-swatch" style="background:var(--jc-info)"></span>Applications · ${appliedCum[appliedCum.length - 1] || 0}</span>
       <span><span class="legend-swatch" style="background:var(--jc-pos)"></span>Interviews · ${interviewCum[interviewCum.length - 1] || 0}</span>
     </div>`;
@@ -835,10 +835,10 @@ export function renderCapturedLine(container, jobsList) {
 
   container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
     ${axis}
-    ${polyline(capturePts, 'var(--jc-accent)')}
+    ${polyline(capturePts, 'var(--jaw-amber)')}
     ${polyline(appliedPts, 'var(--jc-info)')}
     ${polyline(interviewPts, 'var(--jc-pos)')}
-    ${dots(capturePts, 'var(--jc-accent)')}
+    ${dots(capturePts, 'var(--jaw-amber)')}
     ${dots(appliedPts, 'var(--jc-info)')}
     ${dots(interviewPts, 'var(--jc-pos)')}
   </svg>

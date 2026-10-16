@@ -220,6 +220,30 @@ const handlers = {
   }),
   'update-job-status': (msg) => updateJobStatus(msg.jobId, msg.status, msg.note),
   'add-timeline': (msg) => addTimelineEntry(msg.jobId, msg.entryType, msg.note),
+  // The Fill button was used on a company's application form. If that
+  // followed an Apply click within the hour, note it on that job and keep
+  // the form's address — the link between a LinkedIn job and where the
+  // application actually lives. Followed from the click, never guessed
+  // from title or company.
+  // "View in Jawbs" link on the on-LinkedIn toast. Opens our own page
+  // only, so it's safe to accept from a content script.
+  'open-job-details': async (msg) => {
+    if (!/^\d+$/.test(String(msg.jobId || ''))) return { ok: false, error: 'bad jobId' };
+    await chrome.tabs.create({ url: `${chrome.runtime.getURL('recall/recall.html')}?jobId=${msg.jobId}` });
+    return { ok: true };
+  },
+  'application-filled': async (msg, sender) => {
+    const c = (await chrome.storage.local.get('ui.applyClick'))['ui.applyClick'];
+    const url = sender?.tab?.url || '';
+    if (!c || Date.now() - c.at > 60 * 60_000 || !/^https:/.test(url)) return { ok: true, skipped: 'no-recent-apply' };
+    const existing = await getJob(c.jobId);
+    if (!existing) return { ok: true, skipped: 'not-in-archive' };
+    const now = new Date().toISOString();
+    await upsertJob(c.jobId,
+      { application: { ...(existing.application || {}), siteUrl: existing.application?.siteUrl || url.slice(0, 500) } },
+      { appendTimeline: [{ at: now, type: 'application', note: `Autofilled ${Number(msg.count) || 0} fields on ${new URL(url).hostname}` }] });
+    return { ok: true };
+  },
   // The user says they messaged the contact Fit recommended (or takes it
   // back). Recorded so outcomes can be compared with and without outreach.
   'mark-outreach-sent': async (msg) => {
@@ -610,11 +634,12 @@ async function handleTrackerList(jobs, stage, url) {
   // Applied, marking Archived) silently didn't reach the extension
   // until the user clicked Thresh.
   try {
-    await passiveBackfill(jobs, stage);
+    // How many jobs this list moved — the page tells the user.
+    return { ok: true, moved: await passiveBackfill(jobs, stage) };
   } catch (e) {
     console.warn('[Jawbs] passive tracker backfill failed:', e);
+    return { ok: true, moved: 0 };
   }
-  return { ok: true };
 }
 
 // Existing-only status sweep. Runs on every SPA nav through LinkedIn's
@@ -624,9 +649,9 @@ async function handleTrackerList(jobs, stage, url) {
 // the two cases where it doesn't). Never creates new archive records —
 // that's what Thresh is for.
 async function passiveBackfill(jobs, stage) {
-  if (!Array.isArray(jobs) || !jobs.length) return;
+  if (!Array.isArray(jobs) || !jobs.length) return 0;
   const target = normalizeTrackerStage(stage);
-  if (!target) return;
+  if (!target) return 0;
   const now = new Date().toISOString();
   const moves = [];
 
@@ -655,6 +680,7 @@ async function passiveBackfill(jobs, stage) {
       note: `stage=${stage} · ${moves.length} of ${records.length} changed · ${moves.slice(0, 8).join(', ')}`,
     });
   }
+  return moves.length;
 }
 
 async function getTrackerState() {
@@ -1423,6 +1449,16 @@ async function handleLinkedInSignal({ jobId, kind, explicit = true, stage, data,
       applicants: prev.applicants ?? applicantCount(posting.applicantCount),
       reposted: prev.reposted ?? (posting.isReposted ?? null),
     };
+  }
+  // Remember which job the user just went to apply for. The company's
+  // form opens in another tab with no job of its own; this is how the
+  // Fill button and the answer drafter know whose application it is.
+  if (explicit && kind === 'apply-clicked') {
+    const posting = data?.posting || existing?.posting || data?.guess || {};
+    await chrome.storage.local.set({
+      'ui.applyClick': { jobId: id, title: posting.title || '', company: posting.company || '', at: Date.now() },
+      'ui.activeApplicationJawbId': id,
+    });
   }
   const record = await upsertJob(id, patch, {
     appendTimeline: [changed

@@ -1375,11 +1375,11 @@
         'display: inline-flex',
         'align-items: center',
         'padding: 5px 10px',
-        'background: #F59320',
-        'color: #FFFFFF',
-        'font: 600 11px/1 system-ui, -apple-system, sans-serif',
-        'border: 1px solid #F59320',
-        'border-radius: 4px',
+        'background: #161E2A',
+        'color: #22CCEE',
+        'font: 600 12px/1 system-ui, -apple-system, sans-serif',
+        'border: 1px solid #3B4B61',
+        'border-radius: 3px',
         'text-decoration: none',
         'cursor: pointer',
         'pointer-events: auto',
@@ -1536,26 +1536,54 @@
       ));
   }
 
-  function showToast(text) {
-    const existing = document.getElementById(TOAST_ID);
-    if (existing) existing.remove();
+  // Confirmation toast, modelled on LinkedIn's own ("Thanks for the update.
+  // Moved to Archived"): plain sentence, the new status as a link to the
+  // job, bottom-left. Sits above where LinkedIn shows its own toast so the
+  // two can appear together. Jawbs colours, not orange.
+  //   showToast('text')                                   plain message
+  //   showToast('Jawbs noted it. Moved to', { jobId, linkText: 'Scar' })
+  function showToast(text, { jobId, linkText } = {}) {
+    document.getElementById(TOAST_ID)?.remove();
     const t = document.createElement('div');
     t.id = TOAST_ID;
-    t.textContent = text;
+    t.setAttribute('role', 'status');
     t.style.cssText = [
-      'position: fixed', 'top: 60px', 'right: 20px', 'z-index: 2147483647',
-      'padding: 10px 16px', 'background: #F59320', 'color: #ffffff',
-      'font: 500 13px/1.4 system-ui, -apple-system, sans-serif',
-      'border-radius: 6px', 'box-shadow: 0 4px 14px rgba(0,0,0,0.25)',
-      'opacity: 0', 'transition: opacity 250ms ease-out',
-      'pointer-events: none',
+      'position: fixed', 'left: 24px', 'bottom: 96px', 'z-index: 2147483647',
+      'display: flex', 'align-items: center', 'gap: 10px', 'max-width: 380px',
+      'padding: 12px 14px', 'background: #161E2A', 'color: #E6EDF5',
+      'border: 1px solid #3B4B61', 'border-left: 4px solid #E8303A', 'border-radius: 6px',
+      'font: 500 14px/1.4 system-ui, -apple-system, sans-serif',
+      'box-shadow: 0 6px 20px rgba(0,0,0,0.25)',
+      'opacity: 0', 'transition: opacity 200ms ease-out',
     ].join(';');
+    const msg = document.createElement('span');
+    msg.textContent = linkText ? `${text} ` : text;
+    if (linkText && jobId) {
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.textContent = linkText;
+      link.title = 'Open this job in Jawbs';
+      link.style.cssText = 'all: unset; cursor: pointer; font-weight: 700; color: #22CCEE; text-decoration: underline';
+      link.addEventListener('click', () => chrome.runtime.sendMessage({ type: 'open-job-details', jobId }).catch(() => {}));
+      msg.append(link);
+    } else if (linkText) {
+      msg.append(linkText);
+    }
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = '×';
+    close.setAttribute('aria-label', 'Dismiss');
+    close.style.cssText = 'all: unset; cursor: pointer; font-size: 18px; line-height: 1; color: #B3C0CF; padding: 0 2px';
+    close.addEventListener('click', () => t.remove());
+    t.append(msg, close);
     document.body.appendChild(t);
     requestAnimationFrame(() => { t.style.opacity = '1'; });
-    setTimeout(() => {
-      t.style.opacity = '0';
-      setTimeout(() => t.remove(), 400);
-    }, 2500);
+    // Stays while the pointer is on it, so the link can be reached.
+    let timer;
+    const arm = () => { timer = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 250); }, 6000); };
+    t.addEventListener('mouseenter', () => clearTimeout(timer));
+    t.addEventListener('mouseleave', arm);
+    arm();
   }
 
   // ---------- Status signals → service worker ----------
@@ -1583,13 +1611,14 @@
     chrome.runtime.sendMessage({ type: 'linkedin-signal', kind, jobId, explicit, stage, data, method })
       .then((r) => {
         console.info('[Jawbs] signal', kind, jobId, explicit ? '' : '(observed)', stage || '', '→', r);
-        if (r?.changed) showToast(`✓ Jawbs: ${r.label}`);
-        // Say why nothing happened, so a silent miss is distinguishable
-        // from the click not being detected at all.
-        else if (explicit && kind === 'tracker') {
-          showToast(r?.skipped === 'not-in-archive' ? "Jawbs: this job isn't in your Jawboard, so there's no status to change"
-            : r?.status ? `Jawbs: already ${r.label}` : `Jawbs: status not changed (${r?.skipped || r?.error || 'no response'})`);
-        }
+        // Confirm everything Jawbs recognised that the user just did, the
+        // way LinkedIn confirms its own updates — including "no change",
+        // so a recognised click is never indistinguishable from a missed one.
+        if (r?.changed) showToast('Jawbs noted it. Moved to', { jobId, linkText: r.label });
+        else if (!explicit) return;
+        else if (r?.skipped === 'not-in-archive') showToast("Jawbs noted it, but this job isn't in your Jawboard, so there's no status to change.");
+        else if (r?.status) showToast('Jawbs noted it. Still', { jobId, linkText: r.label });
+        else showToast(`Jawbs couldn't record that (${r?.skipped || r?.error || 'no response'}).`);
       })
       .catch((e) => console.warn('[Jawbs] signal send failed:', kind, jobId, e));
   }
@@ -1609,10 +1638,14 @@
   function jobIdsIn(el) {
     const ids = new Set();
     const add = (v) => { if (v && /^\d+$/.test(v)) ids.add(v); };
-    const nodes = [el, ...el.querySelectorAll('[data-job-id], [data-occludable-job-id], a[href*="/jobs/view/"], a[href*="currentJobId="]')];
+    // Same conventions scrapeTrackerList reads: job links, data-job-id,
+    // and entity URNs ("urn:li:fsd_jobPosting:123"), which some tracker
+    // rows carry instead of a link.
+    const nodes = [el, ...el.querySelectorAll('[data-job-id], [data-occludable-job-id], a[href*="/jobs/view/"], a[href*="currentJobId="], [data-entity-urn*="jobPosting"], [data-urn*="jobPosting"]')];
     for (const n of nodes) {
       add(n.getAttribute('data-job-id'));
       add(n.getAttribute('data-occludable-job-id'));
+      add((n.getAttribute('data-entity-urn') || n.getAttribute('data-urn') || '').match(/jobPosting[:-](\d+)/i)?.[1]);
       const href = n.getAttribute('href') || '';
       add(href.match(/\/jobs\/view\/(\d+)/)?.[1]);
       add(href.match(/currentJobId=(\d+)/)?.[1]);
@@ -1948,22 +1981,23 @@
   // decorated. Deduped by data-jobid on the badge element so mutation
   // observers don't spam duplicates.
   const STATUS_COLORS = {
-    saved:                  { bg: '#F59320', fg: '#1B0703' },
-    inProgressDraft:        { bg: '#8B6D2F', fg: '#FFFFFF' },
-    inProgressClickedApply: { bg: '#8B6D2F', fg: '#FFFFFF' },
-    applied:                { bg: '#0A66C2', fg: '#FFFFFF' },
-    interviewing:           { bg: '#6D28D9', fg: '#FFFFFF' },
-    archived:               { bg: '#6B7280', fg: '#FFFFFF' },
-    notMovingForward:       { bg: '#7F1D1D', fg: '#FFFFFF' },
-    analyzed:               { bg: '#374151', fg: '#FFFFFF' },
+    // Jawbs status palette on the badge's dark plate: tinted chip, hue text.
+    saved:                  { bg: '#2E2A47', fg: '#B9A4FF' },
+    inProgressDraft:        { bg: '#3A3020', fg: '#FFB547' },
+    inProgressClickedApply: { bg: '#3A3020', fg: '#FFB547' },
+    applied:                { bg: '#1F2E47', fg: '#7FB0FF' },
+    interviewing:           { bg: '#1C3A2D', fg: '#5EDB8A' },
+    archived:               { bg: '#3D2328', fg: '#FF7373' },
+    notMovingForward:       { bg: '#3D2328', fg: '#FF7373' },
+    analyzed:               { bg: '#2A3442', fg: '#B3C0CF' },
   };
   // Weak / fair / strong band palette — same tokens the Jawbar meta
   // strip uses, so the mini gauges in LinkedIn cards read identically
   // to the ones in the sidepanel.
   const BAND_PALETTE = {
-    weak:   { stroke: '#D85A30', track: '#FAECE7', text: '#993C1D' },
-    fair:   { stroke: '#BA7517', track: '#FAEEDA', text: '#854F0B' },
-    strong: { stroke: '#1D9E75', track: '#E1F5EE', text: '#085041' },
+    weak:   { stroke: '#FF7373', track: '#4A2A33', text: '#FF9A9A' },
+    fair:   { stroke: '#FFB547', track: '#4A3A24', text: '#FFC874' },
+    strong: { stroke: '#5EDB8A', track: '#20473A', text: '#8AE8AB' },
   };
   const scoreBand = (score) => {
     const n = Number.isFinite(score) ? score : 0;
@@ -2038,12 +2072,12 @@
       'gap: 5px',
       'align-items: center',
       'padding: 3px 6px',
-      'background: rgba(255,255,255,0.96)',
-      'border: 1px solid rgba(0,0,0,0.15)',
-      'border-radius: 6px',
+      'background: #161E2A',
+      'border: 1px solid #3B4B61',
+      'border-radius: 4px',
       'z-index: 500',
-      'font: 600 10px/1 system-ui, -apple-system, sans-serif',
-      'box-shadow: 0 1px 4px rgba(0,0,0,0.12)',
+      'font: 600 11px/1 system-ui, -apple-system, sans-serif',
+      'box-shadow: 0 1px 4px rgba(0,0,0,0.25)',
       'pointer-events: auto',
     ].join(';');
     // Clicks on the badge itself shouldn't propagate to the card (which
@@ -2073,19 +2107,19 @@
     // when the record has no strength yet, since the number is the
     // whole point.
     const STRENGTH_TIER_FG = {
-      'pygmy':       '#991B1B',
-      'nurse':       '#B45309',
-      'mako':        '#B45309',
-      'bull':        '#166534',
-      'tiger':       '#166534',
-      'great-white': '#065F46',
+      'pygmy':       '#FF7373',
+      'nurse':       '#FFB547',
+      'mako':        '#FFB547',
+      'bull':        '#5EDB8A',
+      'tiger':       '#5EDB8A',
+      'great-white': '#FFB020',
     };
     if (data.strengthScore != null) {
       const strengthNum = document.createElement('span');
       strengthNum.textContent = String(Math.round(data.strengthScore));
       strengthNum.style.cssText = [
         'font: 800 18px/1 system-ui, -apple-system, sans-serif',
-        `color: ${STRENGTH_TIER_FG[data.strengthTier] || '#0F172A'}`,
+        `color: ${STRENGTH_TIER_FG[data.strengthTier] || '#E6EDF5'}`,
         'font-variant-numeric: tabular-nums',
         'padding: 0 2px 0 0',
       ].join(';');
@@ -2340,7 +2374,11 @@
         } else {
           lastTrackerFingerprint = fingerprint;
           lastTrackerSent = { stage, ids: new Set(jobs.map((j) => j.jobId)) };
-          chrome.runtime.sendMessage({ type: 'tracker-list', jobs, url, stage }).catch(() => {});
+          chrome.runtime.sendMessage({ type: 'tracker-list', jobs, url, stage })
+            .then((r) => {
+              if (r?.moved) showToast(`Jawbs updated ${r.moved} job${r.moved === 1 ? '' : 's'} to match this list.`);
+            })
+            .catch(() => {});
         }
       }
       // Sidepanel's "Transition to Applied on LinkedIn" workflow — if
@@ -3179,10 +3217,12 @@
 
   document.addEventListener('click', (e) => {
     const onTracker = isTrackerUrl(location.href);
-    // Remember which tracker row the user is working in, whatever they
+    // Remember which job row the user is working in, whatever they
     // clicked — the control that opens a row's menu or status dialog isn't
     // always a <button>, and the dialog itself renders outside the row.
-    if (onTracker && e.target instanceof Element) {
+    // Any LinkedIn page, not just the tracker: the same "Did you hear
+    // back?" prompt can appear on other job lists.
+    if (e.target instanceof Element) {
       const row = jobForElement(e.target);
       if (row.card) lastTrackerRow = { jobId: row.jobId, at: Date.now() };
     }
@@ -3215,18 +3255,36 @@
         group = n.querySelector('[role="radiogroup"]');
       }
       if (group) {
-        const picked = group.querySelector('[role="radio"][aria-checked="true"]')
-          || group.querySelector('input[type="radio"]:checked')?.closest('[role="radio"]');
-        const label = (picked?.innerText || '').trim();
+        // LinkedIn has shipped two shapes of this dialog: a div[role=radio]
+        // per option carrying aria-checked, and plain <input type=radio>
+        // whose <label> is empty with the option text in a sibling <p>.
+        // For the second, climb from the checked input to the smallest
+        // block that has text and no other option in it.
+        let label = (group.querySelector('[role="radio"][aria-checked="true"]')?.innerText || '').trim();
+        const input = group.querySelector('input[type="radio"]:checked');
+        if (!label && input) {
+          label = (document.querySelector(`label[for="${CSS.escape(input.id || ' ')}"]`)?.innerText || '').trim();
+          for (let n = input.parentElement; !label && n && n !== group; n = n.parentElement) {
+            if (n.querySelectorAll('input[type="radio"]').length > 1) break;
+            label = (n.innerText || '').trim();
+          }
+        }
         const stage = /not moving forward/i.test(label) ? 'not-moving-forward'
           : /interview/i.test(label) ? 'interview' : null;
         // The dialog isn't inside the row it was opened from, so on the
         // tracker the job is the row the user last clicked in.
+        // Inside a job's row → that job. Otherwise the row the user last
+        // clicked in, unless this page is about one job (URL names it).
+        const recentRow = lastTrackerRow && Date.now() - lastTrackerRow.at < 5 * 60_000 ? lastTrackerRow.jobId : null;
         let { jobId, card } = jobForElement(btn);
-        if (!card && onTracker) jobId = lastTrackerRow && Date.now() - lastTrackerRow.at < 5 * 60_000 ? lastTrackerRow.jobId : null;
+        if (!card) jobId = (onTracker ? null : extractJobId(location.href)) || recentRow;
         if (stage && jobId) sendSignal('tracker', jobId, { stage });
         else {
-          reportUnmatched(`status dialog Save (picked "${label}", job ${jobId || 'unknown'})`, btn);
+          // Enough context in the activity log to tell "rows have no job
+          // links we can read" from "the click never happened in a row".
+          const links = document.querySelectorAll('a[href*="/jobs/view/"]').length;
+          const urns = document.querySelectorAll('[data-entity-urn*="jobPosting"], [data-urn*="jobPosting"]').length;
+          reportUnmatched(`status dialog Save (picked "${label}", job ${jobId || 'unknown'}; ${links} job links, ${urns} job URNs on page; last row ${lastTrackerRow ? `${Math.round((Date.now() - lastTrackerRow.at) / 1000)}s ago` : 'never'})`, btn);
           showToast(jobId ? `Jawbs: didn't recognize "${label}"` : "Jawbs: couldn't tell which job this was — status not changed");
         }
         return;

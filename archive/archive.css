@@ -11,9 +11,9 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 .jc-jb-board {
   margin: var(--jc-3) var(--jc-5) var(--jc-5);
   background: var(--jc-surface-1);
-  border: 1px solid var(--jc-border);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px -30px rgba(11, 51, 88, .28), var(--jc-shadow);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius-lg);
+  box-shadow: var(--jc-shadow-lg);
   overflow: hidden;
   /* Own the vertical rhythm of everything nested inside — the child
      panels' bottom-borders and top-borders provide the section
@@ -35,7 +35,7 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
   display: flex; justify-content: space-between; align-items: center;
   gap: var(--jc-3);
   padding: 12px var(--jc-6);
-  background: var(--jc-surface-3);
+  background: var(--jc-surface-sunk);
   font: 400 var(--jc-text-xs)/1 var(--jc-font-mono);
   letter-spacing: .04em;
   color: var(--jc-text-3);
@@ -59,7 +59,8 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 .jc-jb-pipeline {
   display: flex; align-items: flex-end; gap: 8px;
   padding: 16px var(--jc-6) 16px;
-  background: var(--jaw-teal-strip);
+  background: var(--jc-gradient-ocean);
+  border-bottom: 1px solid #24507F;
 }
 /* Each segment stacks: big count, small mono label, proportional bar.
    Width tracks its share of total via inline `flex: N` set in
@@ -78,13 +79,13 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 .jc-jb-pipeline__count {
   font: 700 24px/1 var(--jc-font-mono);
   font-variant-numeric: tabular-nums;
-  color: #fff;
+  color: var(--jc-text);
   letter-spacing: -.02em;
 }
-/* Label sits under the count in the mono eyebrow style. */
+/* Label sits under the count in the condensed label style. */
 .jc-jb-pipeline__label {
-  font: 700 var(--jc-text-3xs)/1.1 var(--jc-font-mono);
-  letter-spacing: .12em; text-transform: uppercase;
+  font: 700 13px/1.1 var(--jc-font-display);
+  letter-spacing: .1em; text-transform: uppercase;
   color: var(--jaw-sand);
   display: block;
   white-space: nowrap;
@@ -98,35 +99,39 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
   transition: transform .18s ease;
 }
 .jc-jb-pipeline__seg:hover .jc-jb-pipeline__bar { transform: scaleY(1.4); }
+@media (prefers-reduced-motion: reduce) {
+  .jc-jb-pipeline__bar { transition: none; }
+  .jc-jb-pipeline__seg:hover .jc-jb-pipeline__bar { transform: none; }
+}
 .jc-jb-pipeline__seg:focus-visible {
-  outline: 2px solid var(--jc-accent-2);
+  outline: 2px solid var(--jc-accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
-/* Segment colors — tied to the status semantics (accent for saved,
-   caution for in-progress, olive for applied, blue for interviewing,
-   muted for archived, red for not-moving-forward). */
-.jc-jb-pipeline__seg[data-stage="saved"]                   { --_bar: #C7DCEF; }
-.jc-jb-pipeline__seg[data-stage="inProgressDraft"]         { --_bar: #F7DD8A; }
-.jc-jb-pipeline__seg[data-stage="inProgressClickedApply"]  { --_bar: #EFB700; }
-.jc-jb-pipeline__seg[data-stage="applied"]                 { --_bar: #C5D093; }
-.jc-jb-pipeline__seg[data-stage="interviewing"]            { --_bar: #7EB4E4; }
-.jc-jb-pipeline__seg[data-stage="archived"]                { --_bar: #7D9490; }
-.jc-jb-pipeline__seg[data-stage="notMovingForward"]        { --_bar: #E9BFB9; }
+/* Segment colors — the shared six-hue status palette. */
+.jc-jb-pipeline__seg[data-stage="saved"]                   { --_bar: var(--jc-st-saved); }
+.jc-jb-pipeline__seg[data-stage="inProgressDraft"]         { --_bar: var(--jc-st-progress); }
+.jc-jb-pipeline__seg[data-stage="inProgressClickedApply"]  { --_bar: var(--jc-st-progress); }
+.jc-jb-pipeline__seg[data-stage="applied"]                 { --_bar: var(--jc-st-applied); }
+.jc-jb-pipeline__seg[data-stage="interviewing"]            { --_bar: var(--jc-st-interviewing); }
+.jc-jb-pipeline__seg[data-stage="archived"]                { --_bar: var(--jc-st-scar); }
+.jc-jb-pipeline__seg[data-stage="notMovingForward"]        { --_bar: var(--jc-st-scar); }
 /* Virtual Scars stage — merges Archived + Not Moving Forward. Uses
    the red-tinted bar to signal "battle-scar" rather than the neutral
    grey previously reserved for LinkedIn's Archived bucket. */
-.jc-jb-pipeline__seg[data-stage="scar"]                    { --_bar: #E9BFB9; }
+.jc-jb-pipeline__seg[data-stage="scar"]                    { --_bar: var(--jc-st-scar); }
 
-/* Compact "JT" button in row actions — LinkedIn icon + "JT" label
-   packed tight so the row action cell stays narrow. */
+/* "Update status" row action — LinkedIn icon + label, packed tight so
+   the row action cell stays narrow. nowrap keeps the label on one line. */
 .jc-jawb-tracker-btn {
   gap: 4px;
   padding: 4px 6px;
-  font: 600 11px/1 var(--jc-font, system-ui, sans-serif);
+  font: 600 13px/1 var(--jc-font-display);
+  text-transform: uppercase;
 }
 .jc-jawb-tracker-btn__label {
-  letter-spacing: .04em;
+  letter-spacing: .02em;
+  white-space: nowrap;
 }
 
 .jc-toolbar {
@@ -154,8 +159,8 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
   align-self: center;
 }
 .toolbar-count {
-  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
-  letter-spacing: .1em;
+  font: 600 15px/1 var(--jc-font-display);
+  letter-spacing: .12em;
   color: var(--jc-text-2);
 }
 .toolbar-count::after { content: ""; }
@@ -188,8 +193,8 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
   min-height: 48px;
   padding-left: 44px;
   font-size: var(--jc-text-sm);
-  border-width: 2px;
-  box-shadow: inset 0 1px 0 rgba(0,0,0,0.02);
+  border-width: 1px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.4);
 }
 .controls__search-input:focus {
   border-color: var(--jc-accent);
@@ -233,11 +238,11 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
   object-fit: contain;
 }
 .strength-cell__score {
-  font: 800 22px/1 var(--jc-font);
+  font: 700 22px/1 var(--jc-font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--jc-text);
 }
-.strength-cell[data-tier="great-white"] .strength-cell__score { color: var(--jc-accent); }
+.strength-cell[data-tier="great-white"] .strength-cell__score { color: var(--jaw-amber); }
 .strength-cell[data-tier="tiger"]       .strength-cell__score { color: var(--jc-pos); }
 .strength-cell[data-tier="bull"]        .strength-cell__score { color: var(--jc-pos); }
 .strength-cell[data-tier="mako"]        .strength-cell__score { color: var(--jc-caution); }
@@ -253,8 +258,8 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 }
 .strength-mini__svg { display: block; }
 .strength-mini__label {
-  font: 700 8px/1 var(--jc-font-mono);
-  letter-spacing: .08em; text-transform: uppercase;
+  font: 600 11px/1 var(--jc-font-display);
+  letter-spacing: .06em; text-transform: uppercase;
   color: var(--jc-text-3);
 }
 
@@ -298,12 +303,12 @@ table {
 }
 thead th {
   padding: 12px var(--jc-4);
-  background: var(--jc-surface-3);
+  background: var(--jc-surface-sunk);
   cursor: pointer;
   user-select: none;
-  font: 700 var(--jc-text-3xs)/1 var(--jc-font-mono);
-  text-transform: uppercase; letter-spacing: .14em;
-  color: var(--jc-text-3);
+  font: 700 14px/1 var(--jc-font-display);
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--jc-text-2);
   border-bottom: 1px solid var(--jc-border);
   text-align: left;
   transition: color var(--jc-dur-fast) var(--jc-ease);
@@ -319,7 +324,7 @@ thead th[aria-sort="descending"] { color: var(--jc-accent); }
 
 tbody td {
   padding: 16px var(--jc-4);
-  border-bottom: 1px solid #ECECEA;
+  border-bottom: 1px solid var(--jc-border);
   font-size: var(--jc-text-sm);
   color: var(--jc-text-2);
   vertical-align: middle;
@@ -331,7 +336,7 @@ tbody tr:last-child td { border-bottom: none; }
    column was retired since this stacked treatment carries the same
    info more efficiently. */
 tbody td.col-title {
-  color: #14293D;
+  color: var(--jc-text);
   font: 600 15px/1.25 var(--jc-font);
   min-width: 0;
 }
@@ -345,7 +350,8 @@ tbody td.col-title .col-title__row {
 /* Only the title text is the openRecall hit-target — the company
    link owns its own click. Underline appears on hover so the
    affordance is discoverable. */
-.col-title__text.clickable { cursor: pointer; color: #14293D; }
+.col-title__text.clickable { cursor: pointer; color: var(--jc-text); }
+.col-title__text.clickable:hover { color: var(--jc-accent); }
 .col-title__text.clickable:hover { text-decoration: underline; }
 /* Company link — mono muted body text with the accent color reserved
    for hover so the row still scans clean at rest. */
@@ -387,9 +393,9 @@ tbody td.col-captured {
   display: inline-flex; align-items: stretch; gap: 2px;
   justify-content: flex-start;
   padding: 2px;
-  background: var(--jc-surface-3);
+  background: var(--jc-surface-input);
   border: 1px solid var(--jc-border);
-  border-radius: 8px;
+  border-radius: var(--jc-radius-sm);
 }
 /* Every child renders as a compact bordered ghost cell so the group
    reads as a segmented control. Overrides the transparent-fill on
@@ -399,13 +405,13 @@ tbody td.col-captured {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 30px; height: 26px;
   padding: 0 8px;
-  background: var(--jc-surface-1);
+  background: var(--jc-surface-2);
   border: 0;
-  border-radius: 6px;
+  border-radius: 2px;
   color: var(--jc-text-2);
   cursor: pointer;
-  font: 600 11px/1 var(--jc-font-mono);
-  letter-spacing: .06em;
+  font: 600 13px/1 var(--jc-font-display);
+  letter-spacing: .05em;
   text-decoration: none;
   transition: background var(--jc-dur-fast) var(--jc-ease),
               color var(--jc-dur-fast) var(--jc-ease);
@@ -439,14 +445,14 @@ tbody tr:hover { background: var(--jc-surface-2); }
 tbody tr > td:first-child {
   box-shadow: inset 5px 0 0 0 var(--_rail);
 }
-/* Tier rail palette — great-white (gold) through pygmy (deep red).
-   Matches the shark halo palette so the tier reads at a glance. */
-tbody tr[data-tier="great-white"] { --_rail: #EFB700; }
-tbody tr[data-tier="tiger"]       { --_rail: #5C7016; }
-tbody tr[data-tier="bull"]        { --_rail: #B4A017; }
-tbody tr[data-tier="mako"]        { --_rail: #B46E12; }
-tbody tr[data-tier="nurse"]       { --_rail: #B4392E; }
-tbody tr[data-tier="pygmy"]       { --_rail: #7A1D18; }
+/* Tier rail palette — great-white (amber, the score-display colour)
+   down through pygmy (deep red). */
+tbody tr[data-tier="great-white"] { --_rail: #FFB020; }
+tbody tr[data-tier="tiger"]       { --_rail: #5EDB8A; }
+tbody tr[data-tier="bull"]        { --_rail: #B5D85A; }
+tbody tr[data-tier="mako"]        { --_rail: #F08A3C; }
+tbody tr[data-tier="nurse"]       { --_rail: #E0474F; }
+tbody tr[data-tier="pygmy"]       { --_rail: #8E2A30; }
 
 tbody td:first-child { color: var(--jc-text); font-weight: 600; }
 
@@ -501,7 +507,7 @@ a.danger { color: var(--jc-neg); }
   font: 500 var(--jc-text-xs)/1 var(--jc-font-mono);
   white-space: nowrap;
 }
-.col-interview--upcoming { color: var(--jc-accent); font-weight: 700; }
+.col-interview--upcoming { color: var(--jaw-amber); font-weight: 700; }
 .col-interview--past     { color: var(--jc-text-3); }
 
 /* Old .strength-cell__subs / .strength-cell__sub rules were retired
@@ -531,8 +537,8 @@ a.danger { color: var(--jc-neg); }
 }
 .saved-searches[open] .saved-searches__chev { transform: rotate(90deg); color: var(--jc-text-2); }
 .saved-searches__title {
-  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
-  letter-spacing: .12em; text-transform: uppercase;
+  font: 700 14px/1 var(--jc-font-display);
+  letter-spacing: .1em; text-transform: uppercase;
   color: var(--jc-text-2);
 }
 .saved-searches__list {
@@ -564,7 +570,7 @@ a.danger { color: var(--jc-neg); }
   display: flex; flex-wrap: wrap; gap: 4px;
 }
 .saved-search__chip {
-  font: 500 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  font: 600 12px/1 var(--jc-font-display);
   letter-spacing: .06em; text-transform: uppercase;
   padding: 2px 6px; border-radius: 3px;
   background: var(--jc-surface-3); color: var(--jc-text-2);
@@ -590,11 +596,9 @@ a.danger { color: var(--jc-neg); }
      the column min-width; charts inside use width: 100% so they scale. */
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: var(--jc-5);
-  padding: var(--jc-5) var(--jc-6);
-  /* Weathered teak deck underneath the instruments */
-  background:
-    repeating-linear-gradient(90deg, #3f2a17 0px, #3f2a17 2px, #422e1a 2px, #422e1a 30px),
-    linear-gradient(180deg, #4a3320 0%, #2c1d0f 100%);
+  padding: var(--jc-6) var(--jc-6) var(--jc-5);
+  /* Instruments sit straight on the cabinet ground (hex mesh). */
+  background: transparent;
 }
 .dash-card {
   padding: var(--jc-5);
@@ -622,8 +626,8 @@ a.danger { color: var(--jc-neg); }
 /* Analytics header — configure + Jawbridge link, tied to the dashboard. */
 .dashboard-header__title {
   flex: 1;
-  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
-  letter-spacing: .12em; text-transform: uppercase;
+  font: 700 15px/1 var(--jc-font-display);
+  letter-spacing: .1em; text-transform: uppercase;
   color: var(--jc-text-2);
 }
 
@@ -791,64 +795,36 @@ a.danger { color: var(--jc-neg); }
   color: var(--jc-caution);
   background: var(--jc-caution-weak);
 }
+/* Instrument panel — a cabinet frame with the chart's name notched
+   into the top border; a dark recessed face with a faint ocean glow.
+   Charts read the shared tokens, so no per-card palette override. */
 .dash-card {
-
-  /* Dark navy instrument face with a soft radial vignette */
+  position: relative;
+  margin-top: 12px;
+  padding-top: 30px;
   background:
-    radial-gradient(ellipse at 50% 30%, #1e2d3c 0%, #0c141c 90%);
-  border-radius: 14px;
-
-  /* Brass bezel ring: layered box-shadows fake concentric rings without SVG */
-  box-shadow:
-    /* Outer brass */
-    0 0 0 3px #c8a04a,
-    /* Darker inner shim */
-    0 0 0 5px #7a5f2a,
-    /* Inner black separator so the face reads as recessed */
-    0 0 0 6px #0c141c,
-    /* Rivets shadow — outer drop for depth on the deck */
-    0 6px 14px rgba(0, 0, 0, 0.55),
-    /* Glass-face highlight along the top edge */
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    /* Inner darkening at the edges for depth */
-    inset 0 0 40px rgba(0, 0, 0, 0.55);
-
-  color: #e8dcb1; /* cream label ink */
-
-  /* Overrides that flow into the chart SVGs and legends */
-  --jc-text:           #e8dcb1;
-  --jc-text-2:         #d4b876;
-  --jc-text-3:         #94825a;
-  --jc-border:         #3a2e18;
-  --jc-border-strong:  #6b5324;
-  --jc-surface-1:      transparent;
-  --jc-surface-2:      #182635;
-  --jc-surface-3:      #24303f;
-  --jc-accent:         #f4c56f;
-  --jc-accent-weak:    #f4c56f22;
-  --jc-accent-line:    #7a5f2a;
-  --jc-pos:            #6dd68a;
-  --jc-pos-weak:       #6dd68a22;
-  --jc-pos-line:       #2f6a3d;
-  --jc-caution:        #f5a54f;
-  --jc-caution-weak:   #f5a54f22;
-  --jc-caution-line:   #7a5228;
-  --jc-neg:            #ff6b6b;
-  --jc-neg-weak:       #ff6b6b22;
-  --jc-neg-line:       #7a2c2c;
-  --jc-info:           #6ec6f0;
-  --jc-info-weak:      #6ec6f022;
-  --jc-info-line:      #2c5a75;
+    radial-gradient(90% 70% at 50% 0%, rgba(21, 101, 192, .14) 0%, rgba(21, 101, 192, 0) 70%),
+    var(--jc-surface-1);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius);
+  box-shadow: var(--jc-shadow-lg);
+  color: var(--jc-text);
 }
-/* Gauge label — engraved-brass eyebrow */
+/* Chart name — label plate notched into the frame's top edge. */
 .dash-card .jc-eyebrow {
-  color: #f4c56f;
-  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
-  letter-spacing: .18em;
+  position: absolute; top: 0; left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 32px);
+  overflow: hidden; text-overflow: ellipsis;
+  padding: 5px 12px 4px;
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius-sm);
+  color: var(--jc-text);
+  font: 700 14px/1 var(--jc-font-display);
+  letter-spacing: .08em;
   text-transform: uppercase;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #6b5324;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
 }
 .chart {
   display: flex; flex-direction: column; align-items: stretch; gap: var(--jc-2);
@@ -860,7 +836,7 @@ a.danger { color: var(--jc-neg); }
    Backdrop is full-screen; modal is centered; user picks exactly 4 boxes. */
 .chart-picker-backdrop {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--jc-scrim);
   display: flex; align-items: center; justify-content: center;
   padding: var(--jc-4);
 }
@@ -869,11 +845,11 @@ a.danger { color: var(--jc-neg); }
   background: var(--jc-surface-1);
   border: 1px solid var(--jc-border-strong);
   border-radius: var(--jc-radius);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--jc-shadow-xl);
   padding: var(--jc-5);
   display: flex; flex-direction: column; gap: var(--jc-3);
 }
-.chart-picker__head h3 { margin: 0 0 6px 0; font: 700 18px/1.2 var(--jc-font); }
+.chart-picker__head h3 { margin: 0 0 6px 0; font: 700 22px/1.1 var(--jc-font-display); letter-spacing: .05em; text-transform: uppercase; }
 .chart-picker__head p { margin: 0; }
 .chart-picker__rows {
   display: flex; flex-direction: column; gap: 4px;
@@ -920,10 +896,10 @@ a.danger { color: var(--jc-neg); }
   border-left: 3px solid;
   color: var(--jc-text);
 }
-.chart-callout[data-tone='pos']     { background: rgba(109, 214, 138, 0.15); border-color: #6dd68a; }
-.chart-callout[data-tone='caution'] { background: rgba(245, 165, 79, 0.15);  border-color: #f5a54f; }
-.chart-callout[data-tone='neg']     { background: rgba(255, 107, 107, 0.15); border-color: #ff6b6b; }
-.chart-callout strong { color: #f4c56f; }
+.chart-callout[data-tone='pos']     { background: rgba(109, 214, 138, 0.15); border-color: var(--jc-pos); }
+.chart-callout[data-tone='caution'] { background: rgba(245, 165, 79, 0.15);  border-color: var(--jc-caution); }
+.chart-callout[data-tone='neg']     { background: rgba(255, 107, 107, 0.15); border-color: var(--jc-neg); }
+.chart-callout strong { color: var(--jaw-amber); }
 
 /* ---- Chart 1 · Strike Rate Funnel ---- */
 .funnel { display: flex; flex-direction: column; gap: var(--jc-3); }
@@ -942,8 +918,8 @@ a.danger { color: var(--jc-neg); }
   margin-left: auto;
   font-size: 10px; letter-spacing: .08em;
 }
-.funnel-row__delta[data-tone='pos']     { color: #6dd68a; }
-.funnel-row__delta[data-tone='neg']     { color: #ff6b6b; }
+.funnel-row__delta[data-tone='pos']     { color: var(--jc-pos); }
+.funnel-row__delta[data-tone='neg']     { color: var(--jc-neg); }
 .funnel-row__delta[data-tone='neutral'] { color: var(--jc-text-3); }
 .funnel-row__bar-wrap {
   height: 22px; border-radius: 3px;
@@ -961,7 +937,7 @@ a.danger { color: var(--jc-neg); }
   letter-spacing: .1em; text-transform: uppercase;
   text-align: right;
 }
-.funnel-row__conv span { color: #f4c56f; font-weight: 700; font-size: 12px; }
+.funnel-row__conv span { color: var(--jaw-amber); font-weight: 700; font-size: 12px; }
 
 /* ---- Chart 4 · Interview Voyage Log ---- */
 .voyage { display: flex; flex-direction: column; gap: 8px; }
@@ -971,7 +947,7 @@ a.danger { color: var(--jc-neg); }
   gap: var(--jc-3);
   align-items: center;
   padding: 6px 0;
-  border-bottom: 1px dashed rgba(148, 130, 90, 0.2);
+  border-bottom: 1px dashed var(--jc-border);
 }
 .voyage-row:last-child { border-bottom: none; }
 .voyage-row__company {
@@ -992,18 +968,18 @@ a.danger { color: var(--jc-neg); }
 .voyage__dot-lbl {
   font-size: 9px; letter-spacing: .08em; text-transform: uppercase; font-weight: 500;
 }
-.voyage__dot[data-tone='pos']     { background: rgba(109,214,138,.12); color:#6dd68a; border-color:#2f6a3d; }
-.voyage__dot[data-tone='neg']     { background: rgba(255,107,107,.12); color:#ff6b6b; border-color:#7a2c2c; }
-.voyage__dot[data-tone='info']    { background: rgba(110,198,240,.12); color:#6ec6f0; border-color:#2c5a75; }
-.voyage__dot[data-tone='neutral'] { background: rgba(244,197,111,.10); color:#f4c56f; border-color:#7a5f2a; }
+.voyage__dot[data-tone='pos']     { background: rgba(109,214,138,.12); color:var(--jc-pos); border-color:var(--jc-pos-line); }
+.voyage__dot[data-tone='neg']     { background: rgba(255,107,107,.12); color:var(--jc-neg); border-color:var(--jc-neg-line); }
+.voyage__dot[data-tone='info']    { background: rgba(110,198,240,.12); color:var(--jc-info); border-color:var(--jc-info-line); }
+.voyage__dot[data-tone='neutral'] { background: rgba(244,197,111,.10); color:var(--jaw-amber); border-color:rgba(255,176,32,.4); }
 .voyage__connector {
   display: inline-block; width: 10px; height: 1px;
-  background: rgba(148, 130, 90, 0.35);
+  background: var(--jc-border-strong);
 }
 .voyage-mortality {
   margin-top: var(--jc-3);
   padding-top: var(--jc-2);
-  border-top: 1px solid rgba(148, 130, 90, 0.3);
+  border-top: 1px solid var(--jc-border);
   display: flex; flex-direction: column; gap: 4px;
 }
 .voyage-mortality__title {
@@ -1020,7 +996,7 @@ a.danger { color: var(--jc-neg); }
 }
 .voyage-mortality__lbl { color: var(--jc-text-2); text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
 .voyage-mortality__bar-wrap { height: 8px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
-.voyage-mortality__bar { height: 100%; background: #ff6b6b; }
+.voyage-mortality__bar { height: 100%; background: var(--jc-neg); }
 .voyage-mortality__count { color: var(--jc-text); font-weight: 700; text-align: right; }
 
 /* ---- Chart 3 · Lines in the Water ---- */
@@ -1049,12 +1025,12 @@ a.danger { color: var(--jc-neg); }
   font-weight: 700; text-align: right; color: var(--jc-text);
   font-variant-numeric: tabular-nums;
 }
-.aging-row[data-tone='pos']     .aging-row__bar { background: #6dd68a; }
-.aging-row[data-tone='caution'] .aging-row__bar { background: #f5a54f; }
-.aging-row[data-tone='neg']     .aging-row__bar { background: #ff6b6b; }
-.aging-row[data-tone='pos']     .aging-row__days { color: #6dd68a; }
-.aging-row[data-tone='caution'] .aging-row__days { color: #f5a54f; }
-.aging-row[data-tone='neg']     .aging-row__days { color: #ff6b6b; }
+.aging-row[data-tone='pos']     .aging-row__bar { background: var(--jc-pos); }
+.aging-row[data-tone='caution'] .aging-row__bar { background: var(--jc-caution); }
+.aging-row[data-tone='neg']     .aging-row__bar { background: var(--jc-neg); }
+.aging-row[data-tone='pos']     .aging-row__days { color: var(--jc-pos); }
+.aging-row[data-tone='caution'] .aging-row__days { color: var(--jc-caution); }
+.aging-row[data-tone='neg']     .aging-row__days { color: var(--jc-neg); }
 
 /* Most-Cast Titles — horizontal bar per role title, count on the right. */
 .titles-chart { display: flex; flex-direction: column; gap: 5px; }
@@ -1073,7 +1049,7 @@ a.danger { color: var(--jc-neg); }
 .titles-row__bar-wrap {
   height: 10px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden;
 }
-.titles-row__bar { height: 100%; background: #f4c56f; border-radius: 2px; }
+.titles-row__bar { height: 100%; background: var(--jaw-amber); border-radius: 2px; }
 .titles-row__count {
   font-family: var(--jc-font-mono); font-weight: 700;
   color: var(--jc-text); text-align: right;
@@ -1094,10 +1070,10 @@ a.danger { color: var(--jc-neg); }
   transform: translateX(2px);
 }
 .voyage-row__company--link {
-  color: var(--jc-accent, #f4c56f);
+  color: var(--jc-accent);
   border-bottom: 1px dotted currentColor;
 }
-.voyage-row__company--link:hover { color: #f4c56f; border-bottom-style: solid; }
+.voyage-row__company--link:hover { color: var(--jc-accent-hover); border-bottom-style: solid; }
 .legend-link { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
 /* SVG trophy dots — cursor already handled inline, no extra style needed. */
 .chart-empty {
@@ -1108,9 +1084,9 @@ a.danger { color: var(--jc-neg); }
   padding: var(--jc-4) 0;
 }
 .chart-caption {
-  font: 400 var(--jc-text-2xs)/1.4 var(--jc-font-mono);
+  font: 600 13px/1.35 var(--jc-font-display);
   color: var(--jc-text-2); text-align: center;
-  letter-spacing: .1em; text-transform: uppercase;
+  letter-spacing: .08em; text-transform: uppercase;
 }
 .chart-legend {
   list-style: none; padding: 0; margin: 0;
@@ -1122,7 +1098,7 @@ a.danger { color: var(--jc-neg); }
 .chart-legend li { display: flex; align-items: center; gap: 8px; }
 .chart-legend .legend-dot {
   width: 10px; height: 10px; border-radius: 50%; flex: none;
-  box-shadow: 0 0 4px currentColor, inset 0 0 1px rgba(0,0,0,0.4);
+  box-shadow: inset 0 0 1px rgba(0,0,0,0.4);
 }
 .chart-legend .legend-label { flex: 1; }
 .chart-legend .legend-value {
@@ -1149,13 +1125,13 @@ a.danger { color: var(--jc-neg); }
 }
 .bulk-bar__actions { display: flex; align-items: center; gap: var(--jc-2); }
 .bulk-bar .jc-btn[data-variant='danger'] {
-  --_bg: var(--jc-accent-ink); --_fg: #FFFFFF; --_bd: var(--jc-accent-ink);
+  --_bg: var(--jaw-red-fill); --_fg: var(--jaw-red-ink); --_bd: var(--jaw-red-fill);
 }
-.bulk-bar .jc-btn[data-variant='danger']:hover { --_bg: #000; }
+.bulk-bar .jc-btn[data-variant='danger']:hover { --_bg: var(--jaw-red-hover); --_bd: var(--jaw-red-hover); --_fg: var(--jaw-red-ink); }
 .bulk-bar .jc-btn[data-variant='ghost'] {
   --_bg: transparent; --_fg: var(--jc-accent-ink); --_bd: var(--jc-accent-ink);
 }
-.bulk-bar .jc-btn[data-variant='ghost']:hover { --_bg: var(--jc-accent-hover); }
+.bulk-bar .jc-btn[data-variant='ghost']:hover { --_bg: var(--jc-accent-hover); --_fg: var(--jc-accent-ink); --_bd: var(--jc-accent-ink); }
 
 .col-select { width: 32px; padding-right: 0 !important; text-align: center; }
 .col-select input[type='checkbox'] {
@@ -1169,22 +1145,30 @@ tbody tr:has(.row-select:checked) { background: var(--jc-accent-weak); }
 /* Status column — plain-text mono uppercase, no pill background. Text
    color still tracks the status semantics so the tone reads at a
    glance without the badge/box treatment. */
+/* A small status-hue dot leads the label so the six states separate by
+   shape-plus-colour, not colour alone. */
 .status-badge {
-  display: inline-block;
+  display: inline-flex; align-items: center; gap: 7px;
   padding: 0;
   background: transparent;
   border: 0;
-  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
-  letter-spacing: .1em; text-transform: uppercase;
-  color: var(--jc-text-2);
+  font: 700 14px/1 var(--jc-font-display);
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--_st, var(--jc-text-2));
 }
-.status-analyzed    { color: var(--jc-text-3); }
-.status-saved       { color: var(--jc-accent); }
-.status-applied     { color: var(--jc-pos); }
-.status-screening   { color: var(--jc-caution); }
-.status-interviewing{ color: var(--jc-accent); font-weight: 800; }
-.status-offer       { color: var(--jc-pos); font-weight: 800; }
-.status-closed      { color: var(--jc-text-3); opacity: 0.8; }
-.status-passed      { color: var(--jc-neg); }
+.status-badge::before {
+  content: ''; flex: none;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor;
+}
+.status-badge[data-status='analyzed']               { --_st: var(--jc-st-analyzed); }
+.status-badge[data-status='analyzed']::before       { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.status-badge[data-status='saved']                  { --_st: var(--jc-st-saved); }
+.status-badge[data-status='inProgressDraft'],
+.status-badge[data-status='inProgressClickedApply'] { --_st: var(--jc-st-progress); }
+.status-badge[data-status='applied']                { --_st: var(--jc-st-applied); }
+.status-badge[data-status='interviewing']           { --_st: var(--jc-st-interviewing); }
+.status-badge[data-status='archived'],
+.status-badge[data-status='notMovingForward']       { --_st: var(--jc-st-scar); }
 
 .jc-empty { max-width: 600px; margin: var(--jc-8) auto; }

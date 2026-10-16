@@ -23,6 +23,7 @@ import {
   setLinkedInProfileUrl,
   getContactEmail,
   setContactEmail,
+  getApplicationProfile, setApplicationProfile,
   getContactPhone,
   setContactPhone,
   getContactLocation,
@@ -608,6 +609,18 @@ async function loadShortcuts() {
   if (els.contactPhone) els.contactPhone.value = phone;
   if (els.contactLocation) els.contactLocation.value = location;
 }
+// Application autofill — every [data-ap] control in the section is one key
+// of the stored profile object, so adding a field is one line of HTML.
+const apFields = () => [...document.querySelectorAll('#applicationProfile [data-ap]')];
+async function loadApplicationProfile() {
+  const p = await getApplicationProfile();
+  for (const el of apFields()) el.value = p[el.dataset.ap] || '';
+}
+els.saveApplicationProfile.addEventListener('click', async () => {
+  await setApplicationProfile(Object.fromEntries(apFields().map((el) => [el.dataset.ap, el.value.trim()])));
+  flash(els.applicationProfileStatus, 'Saved.');
+});
+
 els.saveLinkedIn.addEventListener('click', async () => {
   const url = els.linkedInUrl.value.trim();
   await setLinkedInProfileUrl(url);
@@ -1001,7 +1014,7 @@ function refreshSetupHelper() {
 // ---------- Init ----------
 
 (async () => {
-  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadShortcuts(), loadModels(), loadUsage(), loadActivity()]);
+  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadShortcuts(), loadApplicationProfile(), loadModels(), loadUsage(), loadActivity()]);
   refreshOllamaStatus();
   refreshSetupHelper();
 })();

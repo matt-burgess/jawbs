@@ -4,9 +4,7 @@ html, body {
   /* Cream wash at the top fading into the neutral surface below —
      matches the Jawboard chrome so the welcome page sits inside the
      same visual world as every other extension surface. */
-  background:
-    radial-gradient(ellipse 1200px 800px at 50% -10%, rgba(35, 90, 93, 0.10), transparent 70%),
-    linear-gradient(180deg, var(--jaw-cream) 0%, var(--jc-bg) 100%);
+  background: var(--jc-ground);
   background-attachment: fixed;
 }
 body {
@@ -30,17 +28,12 @@ body {
    ========================================================= */
 .w-hero {
   padding: var(--jc-8) var(--jc-6);
-  border-radius: 20px;
-  /* Same spotlight recipe as the Jawbar's post-analysis job card —
-     deep teal blending into a warmer mid-teal, dropped a shade at the
-     lower-right to feel like "depth." Reads as one visual family with
-     the sidepanel's hero moment. */
-  background:
-    radial-gradient(70% 140% at 10% 10%, rgba(210,240,235,.14) 0%, rgba(210,240,235,0) 60%),
-    radial-gradient(45% 120% at 72% 95%, rgba(0,50,55,.28) 0%, rgba(0,50,55,0) 65%),
-    linear-gradient(100deg, var(--jaw-teal-deep) 0%, var(--jaw-teal-mid) 38%, #1F5154 62%, #2A6669 100%);
-  color: #fff;
-  box-shadow: 0 24px 60px -20px rgba(11, 51, 88, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: var(--jc-radius-lg);
+  /* Same deep-water recipe as the Jawbar's strength spotlight. */
+  background: var(--jc-gradient-ocean);
+  border: 1px solid #24507F;
+  color: var(--jc-text);
+  box-shadow: var(--jc-shadow-xl);
   overflow: hidden;
   position: relative;
 }
@@ -83,11 +76,14 @@ body {
   animation: w-hero-float 4s ease-in-out infinite;
   box-shadow: 0 12px 32px rgba(0,0,0,.28);
 }
+@media (prefers-reduced-motion: reduce) {
+  .w-hero__captain img, [class*="w-hero"] { animation: none !important; }
+}
 .w-hero__tip-cta {
   min-height: 52px;
   padding: 0 18px;
-  font: 700 var(--jc-text-md)/1 var(--jc-font);
-  letter-spacing: .01em;
+  font: 700 17px/1 var(--jc-font-display);
+  letter-spacing: .06em;
   gap: 12px;
   justify-content: center;
 }
@@ -115,11 +111,10 @@ body {
   color: #fff;
 }
 .w-hero__title .jc-brand {
-  /* Override the global .jc-brand color (red on cream chrome) with the
-     gold callout so the Anton wordmark reads on the deep-teal hero.
-     Keeps the shared font-family / scaleX from the base rule. */
+  /* Amber callout so the Anton wordmark reads on the deep-water hero. */
   color: var(--jaw-highlight);
 }
+.w-hero__lede .jc-brand { color: var(--jaw-red-text); }
 .w-hero__lede {
   margin: 0;
   font-size: var(--jc-text-md);
@@ -170,17 +165,9 @@ body {
    ink so the "Start Setup" label reads flatly against the bright
    button. Overrides both the button-native color and the red
    .jc-brand color inside the label span. */
-.w-hero__actions .jc-btn[data-variant="primary"],
+/* Start Setup stays the page's one solid-cyan primary. */
 .w-hero__actions .jc-btn[data-variant="primary"] .jc-brand {
-  color: #000;
-}
-.w-hero__actions .jc-btn[data-variant="primary"] {
-  background: var(--jaw-highlight);
-  box-shadow: 0 8px 20px rgba(239, 183, 0, 0.35);
-  border: none;
-}
-.w-hero__actions .jc-btn[data-variant="primary"]:hover {
-  background: #FFCD1F; filter: none;
+  color: var(--jc-accent-ink);
 }
 /* Enlarged primary CTA — replaces the old row of three buttons with a
    single dominant call to action on the hero card. */
@@ -188,7 +175,7 @@ body {
   min-height: 64px;
   padding: 0 40px;
   font-size: var(--jc-text-xl);
-  border-radius: 12px;
+  border-radius: var(--jc-radius-sm);
 }
 .w-hero__start-cta .jc-brand { font-size: 32px; }
 .w-hero__actions .jc-btn[data-variant="ghost"] {
@@ -225,7 +212,8 @@ body {
 }
 .w-h2 {
   margin: 0;
-  font: 700 22px/1.2 var(--jc-font);
+  font: 700 26px/1.1 var(--jc-font-display);
+  letter-spacing: .05em; text-transform: uppercase;
   color: var(--jc-text);
   display: flex; align-items: center; gap: 12px;
 }
@@ -246,17 +234,15 @@ body {
 }
 .w-card {
   padding: var(--jc-5);
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid var(--jc-border);
-  box-shadow: 0 2px 6px rgba(15, 30, 40, 0.04);
+  background: var(--jc-surface-1);
+  border-radius: var(--jc-radius);
+  border: 1px solid var(--jc-border-strong);
+  box-shadow: var(--jc-shadow-sm);
   display: flex; flex-direction: column; gap: 8px;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 .w-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(41, 134, 204, 0.16);
-  border-color: rgba(41, 134, 204, 0.4);
+  border-color: var(--jc-accent-line);
 }
 .w-card__icon {
   font-size: 28px;
@@ -292,9 +278,10 @@ body {
 }
 .w-term {
   padding: var(--jc-4);
-  background: #fff;
-  border-radius: 10px;
-  border-left: 3px solid var(--jc-accent);
+  background: var(--jc-surface-1);
+  border-radius: var(--jc-radius);
+  border: 1px solid var(--jc-border);
+  border-left: 3px solid var(--jc-border-strong);
   display: flex; gap: var(--jc-3);
   align-items: flex-start;
 }
@@ -356,23 +343,22 @@ body {
   grid-template-columns: 56px 1fr;
   gap: var(--jc-4);
   padding: var(--jc-5);
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid var(--jc-border);
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  background: var(--jc-surface-1);
+  border-radius: var(--jc-radius);
+  border: 1px solid var(--jc-border-strong);
+  transition: border-color 180ms ease;
 }
 .w-step:hover {
-  border-color: rgba(41, 134, 204, 0.4);
-  box-shadow: 0 8px 20px rgba(41, 134, 204, 0.08);
+  border-color: var(--jc-accent-line);
 }
 .w-step__num {
   width: 44px; height: 44px;
   border-radius: 50%;
-  background: var(--jc-gradient-accent);
-  color: #fff;
-  font: 700 20px/44px var(--jc-font);
+  background: var(--jc-gradient-ocean);
+  border: 1px solid #24507F;
+  color: var(--jc-text);
+  font: 700 20px/42px var(--jc-font-mono);
   text-align: center;
-  box-shadow: 0 6px 14px rgba(22, 78, 134, 0.3);
 }
 .w-step__body { display: flex; flex-direction: column; gap: var(--jc-2); min-width: 0; }
 .w-step__title {
@@ -405,10 +391,11 @@ body {
 .w-privacy__pt {
   display: flex; align-items: flex-start; gap: 10px;
   padding: var(--jc-4);
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid var(--jc-border);
+  background: var(--jc-surface-1);
+  border-radius: var(--jc-radius);
+  border: 1px solid var(--jc-border-strong);
 }
+.w-privacy__icon img, .w-card__icon img, .w-term__icon img { filter: brightness(1.9) saturate(1.15); }
 .w-privacy__icon {
   font-size: 22px; line-height: 1.2; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
@@ -436,13 +423,6 @@ body {
   border-top: 1px solid var(--jc-border);
   margin-top: var(--jc-4);
 }
-.w-footer .jc-btn[data-variant="primary"] {
-  background: var(--jc-gradient-accent);
-  color: #fff;
-  box-shadow: 0 8px 20px rgba(22, 78, 134, 0.28);
-  border: none;
-}
-.w-footer .jc-btn[data-variant="primary"]:hover { filter: brightness(1.06); }
 
 /* Support address line under the footer CTAs — muted mono type so
    it reads as metadata, not a headline. */

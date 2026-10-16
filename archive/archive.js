@@ -408,10 +408,10 @@ function miniGaugeSvg(score) {
   const dash = n == null ? 0 : (n / 100) * CIRC;
   const band = n == null ? 'none' : (n >= 70 ? 'strong' : n >= 40 ? 'fair' : 'weak');
   const palette = {
-    weak:   { stroke: '#D85A30', track: '#FAECE7', text: '#993C1D' },
-    fair:   { stroke: '#BA7517', track: '#FAEEDA', text: '#854F0B' },
-    strong: { stroke: '#1D9E75', track: '#E1F5EE', text: '#085041' },
-    none:   { stroke: '#B0B0AF', track: '#EDEDEB', text: '#66696B' },
+    weak:   { stroke: '#FF7373', track: '#4A2A33', text: '#FF9A9A' },
+    fair:   { stroke: '#FFB547', track: '#4A3A24', text: '#FFC874' },
+    strong: { stroke: '#5EDB8A', track: '#20473A', text: '#8AE8AB' },
+    none:   { stroke: '#5A6A80', track: '#2B384A', text: '#8C9AAD' },
   }[band];
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
@@ -600,7 +600,8 @@ function nextOrLatestInterview(job) {
   return { iso: dated[dated.length - 1].slice(0, 10), tense: 'past' };
 }
 
-// "Find on LinkedIn tracker" row action. Opens a LinkedIn tab at the
+// "Update status" row action — named for why people use it: changing
+// the job's status in LinkedIn's Job Tracker. Opens a LinkedIn tab at the
 // right stage URL and walks pages until the job's row is on screen,
 // where it flashes an outline. Disabled for jobs whose status isn't
 // on the tracker at all (analyzed-only records). Source filter: the
@@ -612,10 +613,10 @@ function renderFindOnTrackerBtn(job) {
   const btn = h('button', {
     type: 'button',
     class: 'jc-icon-btn jc-jawb-tracker-btn',
-    'aria-label': 'Find on LinkedIn tracker',
+    'aria-label': "Update this job's status in LinkedIn's Job Tracker",
     title: onTracker
-      ? `Find on LinkedIn tracker (${statusLabel(normalized)})`
-      : 'Not on LinkedIn tracker (analyzed only or Google Jobs capture)',
+      ? `Open this job in LinkedIn's Job Tracker to change its status (now ${statusLabel(normalized)}). Jawbs picks up the change.`
+      : "Not in LinkedIn's Job Tracker (never saved or applied on LinkedIn, or found on Google Jobs)",
     onClick: async (e) => {
       e.preventDefault();
       if (btn.disabled) return;
@@ -645,7 +646,7 @@ function renderFindOnTrackerBtn(job) {
       class: 'jc-li-icon', src: '../assets/linkedin.svg',
       alt: '', 'aria-hidden': 'true', width: '14', height: '14',
     }),
-    h('span', { class: 'jc-jawb-tracker-btn__label' }, 'JT'),
+    h('span', { class: 'jc-jawb-tracker-btn__label' }, 'Update status'),
   );
   if (!onTracker) btn.disabled = true;
   return btn;

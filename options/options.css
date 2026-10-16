@@ -16,7 +16,7 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 }
 .options-header .toolbar-row {
   padding: 12px var(--jc-6);
-  border-bottom: 3px solid var(--jaw-red);
+  border-bottom: 2px solid var(--jaw-red);
   background: var(--jaw-cream);
   color: var(--jc-text);
   display: flex; align-items: center; gap: var(--jc-3);
@@ -240,8 +240,8 @@ body { color: var(--jc-text); font: 400 var(--jc-text-sm)/var(--jc-leading-body)
 .setup-guide__code {
   margin: 8px 0 0;
   padding: 10px 12px;
-  background: #1a1a2e;
-  color: #d4d4e0;
+  background: var(--jc-surface-input);
+  color: var(--jc-text-2);
   border-radius: 4px;
   font: 400 12px/1.5 var(--jc-font-mono);
   white-space: pre;
@@ -450,13 +450,13 @@ label.settings-toggle {
 .setup-helper__title {
   font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
   letter-spacing: .14em; text-transform: uppercase;
-  color: var(--jaw-red);
+  color: var(--jaw-red-text);
 }
 .setup-helper__hint {
   font: 400 var(--jc-text-sm)/1.5 var(--jc-font);
   color: var(--jc-text);
 }
-.setup-helper__hint b { color: var(--jaw-red); }
+.setup-helper__hint b { color: var(--jaw-red-text); }
 .setup-helper__list {
   list-style: none; padding: 0; margin: 0;
   display: flex; flex-direction: column; gap: 6px;
@@ -508,7 +508,7 @@ label.settings-toggle {
 .jc-modal[hidden] { display: none; }
 .jc-modal__scrim {
   position: absolute; inset: 0;
-  background: var(--jc-scrim, rgba(11, 51, 88, .45));
+  background: var(--jc-scrim);
 }
 .jc-modal__panel {
   position: relative;
@@ -525,7 +525,7 @@ label.settings-toggle {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--jc-2);
   padding-bottom: var(--jc-3);
-  border-bottom: 3px solid var(--jaw-red);
+  border-bottom: 2px solid var(--jaw-red);
 }
 .jc-modal__title {
   margin: 0;
@@ -535,7 +535,7 @@ label.settings-toggle {
   line-height: .85;
   text-transform: uppercase;
   letter-spacing: -.005em;
-  color: var(--jaw-red);
+  color: var(--jaw-red-text);
   transform: scaleX(1.05);
   transform-origin: left;
 }
@@ -544,7 +544,7 @@ label.settings-toggle {
   color: var(--jc-text-3);
   width: 30px; height: 30px;
 }
-.jc-modal__close:hover { color: var(--jaw-red); }
+.jc-modal__close:hover { color: var(--jaw-red-text); }
 .jc-modal__intro {
   margin: 0;
   font-size: var(--jc-text-sm);

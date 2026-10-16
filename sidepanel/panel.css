@@ -15,13 +15,11 @@ body { background: var(--jc-bg); }
 .jc__wordmark { min-width: 0; }
 .jc__wordmark .jc-brand { color: var(--jaw-red); }
 
-/* Header buttons on the cream chrome switch to a dark-ink outline so
-   they don't blast the eye like white-on-cream would. */
-.jc__header .jc-btn { color: var(--jc-text); border-color: var(--jaw-cream-line); background: transparent; }
-.jc__header .jc-btn:hover { color: var(--jaw-red); border-color: var(--jaw-red); }
-/* Header pill buttons — Jawboard + Jawbridge in the top bar. Same
-   shape, cream chrome, icon + Anton wordmark, dark-navy ink so the
-   red .jc-brand color doesn't fight the cream header. */
+/* Header buttons on the cabinet chrome — steel outline, cyan on hover. */
+.jc__header .jc-btn { color: var(--jc-text-2); border-color: var(--jc-border-strong); background: transparent; }
+.jc__header .jc-btn:hover { color: var(--jc-accent); border-color: var(--jc-accent-line); }
+/* Header pill buttons — Jawboard + Jawbridge in the top bar. Icon +
+   Anton wordmark in the body ink so the red doesn't fight the rule. */
 .jc__header .jc-header-linkbtn {
   gap: 6px;
   min-height: 28px;
@@ -58,8 +56,9 @@ body { background: var(--jc-bg); }
    long tab panes. */
 .jc-tabs {
   display: flex; gap: 0;
-  background: var(--jc-surface-3);
+  background: var(--jc-surface-sunk);
   border-bottom: 1px solid var(--jc-border-strong);
+  border-radius: 0;
   margin: 0 calc(-1 * var(--jc-4)) var(--jc-3);
   padding: 0;
   /* Negative top cancels .jc__body's top padding so the strip pins flush
@@ -74,16 +73,17 @@ body { background: var(--jc-bg); }
   padding: 13px 8px;
   border-bottom: 2px solid transparent;
   flex: 1; min-width: 0;
-  font: 700 10px/1 var(--jc-font-mono);
-  letter-spacing: .1em; text-transform: uppercase;
+  font: 600 var(--jc-text-label)/1 var(--jc-font-display);
+  letter-spacing: .07em; text-transform: uppercase;
   color: var(--jc-text-3);
+  border-radius: 0;
   cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
-.jc-tab:hover { color: var(--jc-text); background: rgba(255,255,255,.5); }
+.jc-tab:hover { color: var(--jc-text); background: rgba(255,255,255,.03); }
 .jc-tab[data-active='true'] {
   color: var(--jc-text);
-  background: var(--jc-bg);
+  background: var(--jc-surface-1);
   border-bottom-color: var(--jc-accent);
 }
 /* Circle badge on tab labels — count of relevant items (upcoming
@@ -96,10 +96,11 @@ body { background: var(--jc-bg); }
   background: var(--jc-surface-3);
   color: var(--jc-text-2);
   font: 700 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  letter-spacing: 0;
 }
 .jc-tab[data-active='true'] .jc-tab__badge {
   background: var(--jc-accent);
-  color: #fff;
+  color: var(--jc-accent-ink);
 }
 
 /* Tab pane wrappers — hidden until their tab is active. */
@@ -108,9 +109,9 @@ body { background: var(--jc-bg); }
 .jc-tab-pane__group { display: flex; flex-direction: column; gap: var(--jc-2); }
 .jc-tab-pane__h {
   margin: 0;
-  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
-  text-transform: uppercase; letter-spacing: .08em;
-  color: var(--jc-text-3);
+  font: 700 14px/1 var(--jc-font-display);
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--jc-text-2);
 }
 
 /* Interview list — one row per scheduled/recent round. Date on the
@@ -249,7 +250,7 @@ body { background: var(--jc-bg); }
 }
 .jc-stale-row {
   border-color: var(--jc-caution-line) !important;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--jc-surface-1);
 }
 
 /* Inline "Clear" link button used in the Recent (unsaved) group
@@ -272,9 +273,11 @@ body { background: var(--jc-bg); }
    hiding outright. */
 .jc-tip-nudge {
   flex: none;
-  background: linear-gradient(180deg, #FDF6E0 0%, #FBEAB6 100%);
-  border-bottom: 1px solid var(--jc-caution-line);
-  color: #473300;
+  background:
+    radial-gradient(80% 160% at 0% 50%, rgba(255, 176, 32, .12) 0%, rgba(255, 176, 32, 0) 70%),
+    #17150F;
+  border-bottom: 1px solid rgba(255, 176, 32, .3);
+  color: var(--jc-text);
   padding: 10px 12px;
   font: 500 var(--jc-text-xs)/1.4 var(--jc-font);
 }
@@ -293,18 +296,18 @@ body { background: var(--jc-bg); }
 }
 .jc-tip-nudge__title {
   font: 700 var(--jc-text-sm)/1.1 var(--jc-font);
-  color: #473300;
+  color: var(--jc-text);
 }
-.jc-tip-nudge__title .jc-brand { color: var(--jaw-red); font-size: 15px; }
+.jc-tip-nudge__title .jc-brand { color: var(--jaw-red-text); font-size: 15px; }
 .jc-tip-nudge__heart {
-  color: var(--jaw-red);
+  color: var(--jaw-red-text);
   font-style: normal;
   font-size: 14px;
   vertical-align: -1px;
 }
 .jc-tip-nudge__msg {
   font-size: var(--jc-text-xs);
-  color: #5C4300;
+  color: var(--jc-text-2);
 }
 .jc-tip-nudge__actions {
   display: flex; gap: 6px; flex: none;
@@ -313,30 +316,30 @@ body { background: var(--jc-bg); }
 .jc-tip-nudge__cta {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 12px;
-  background: var(--jaw-highlight);
-  color: var(--jaw-navy-footer);
+  background: var(--jaw-amber);
+  color: #1A1200;
   border: 0;
-  border-radius: 6px;
-  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  border-radius: var(--jc-radius-sm);
+  font: 700 var(--jc-text-label)/1 var(--jc-font-display);
   letter-spacing: .08em; text-transform: uppercase;
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
 }
-.jc-tip-nudge__cta:hover { background: #FFCD1F; }
+.jc-tip-nudge__cta:hover { background: var(--jc-accent-2-hover); }
 .jc-tip-nudge__share-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px;
   padding: 0;
-  background: #fff;
-  border: 1px solid var(--jc-caution-line);
-  border-radius: 6px;
+  background: var(--jc-surface-2);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius-sm);
   color: var(--jc-text-2);
   cursor: pointer;
 }
 .jc-tip-nudge__share-btn:hover {
-  border-color: var(--jaw-red);
-  color: var(--jaw-red);
+  border-color: var(--jc-accent-line);
+  color: var(--jc-accent);
 }
 .jc-tip-nudge__share-btn svg { width: 14px; height: 14px; display: block; }
 .jc-tip-nudge__x {
@@ -349,7 +352,7 @@ body { background: var(--jc-bg); }
   cursor: pointer;
   align-self: flex-start;
 }
-.jc-tip-nudge__x:hover { color: var(--jaw-red); }
+.jc-tip-nudge__x:hover { color: var(--jc-text); }
 
 /* Footer pinned to the bottom of the sidebar. `.jc` is a flex column
    (header/body/footer) and `.jc__body` has flex: 1, so this stays put while
@@ -358,7 +361,7 @@ body { background: var(--jc-bg); }
   flex: none;
   padding: 10px var(--jc-4);
   background: var(--jaw-navy-footer);
-  border-top: 0;
+  border-top: 1px solid var(--jc-border);
   display: flex;
   flex-direction: column;
   gap: var(--jc-2);
@@ -399,7 +402,7 @@ body { background: var(--jc-bg); }
 }
 .jc-search-bar__save:hover {
   background: var(--jc-accent);
-  color: #fff;
+  color: var(--jc-accent-ink);
 }
 .jc-search-bar__status {
   flex: none;
@@ -489,17 +492,17 @@ body { background: var(--jc-bg); }
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   min-width: 42px;
 }
-.usage-metric:first-child .usage-metric__val { color: #fff; }
+.usage-metric:first-child .usage-metric__val { color: var(--jaw-amber); }
 .usage-metric__val {
   font: 700 var(--jc-text-sm)/1 var(--jc-font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--jaw-navy-ink);
 }
 .usage-metric__lbl {
-  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
-  color: #8AA5BD;
+  font: 600 12px/1 var(--jc-font-display);
+  color: var(--jc-text-3);
   text-transform: uppercase;
-  letter-spacing: .14em;
+  letter-spacing: .12em;
 }
 .usage-chart {
   flex: 1;
@@ -524,19 +527,16 @@ body { background: var(--jc-bg); }
    .jc-jobcard via data-spotlight="on" (JS toggle) so the same DOM
    supports pre-analysis (white) and post-analysis (teal) states. */
 .jc-jobcard[data-spotlight="on"] {
-  background:
-    radial-gradient(70% 140% at 10% 10%, rgba(210,240,235,.12) 0%, rgba(210,240,235,0) 60%),
-    radial-gradient(45% 120% at 72% 95%, rgba(0,50,55,.28) 0%, rgba(0,50,55,0) 65%),
-    linear-gradient(100deg, var(--jaw-teal-deep) 0%, var(--jaw-teal-mid) 38%, #1F5154 62%, #2A6669 100%);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 24px 60px -30px rgba(11,51,88,.42);
+  background: var(--jc-gradient-ocean);
+  color: var(--jc-text);
+  border-color: #24507F;
+  box-shadow: var(--jc-shadow-lg);
 }
 .jc-jobcard[data-spotlight="on"] .jc-job-title,
-.jc-jobcard[data-spotlight="on"] .jc-jobcard__summary { color: #fff; }
+.jc-jobcard[data-spotlight="on"] .jc-jobcard__summary { color: var(--jc-text); }
 .jc-jobcard[data-spotlight="on"] .jc-job-eyebrow { color: var(--jaw-sand); }
 .jc-jobcard[data-spotlight="on"] .jc-jobcard__summary { border-top-color: rgba(255,255,255,.16); }
-.jc-jobcard[data-spotlight="on"] .jc-meta-strip { background: rgba(255,255,255,.06); }
+.jc-jobcard[data-spotlight="on"] .jc-meta-strip { background: rgba(0,0,0,.25); }
 .jc-jobcard[data-spotlight="on"] .jc-meta-strip__label { color: var(--jaw-sand); }
 .jc__verdict > div:first-child + div { display: flex; flex-direction: column; gap: var(--jc-2); }
 
@@ -564,9 +564,9 @@ body { background: var(--jc-bg); }
 .jc-jobcard {
   padding: var(--jc-4);
   background: var(--jc-surface-1);
-  border: 1px solid var(--jc-border);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px -30px rgba(11, 51, 88, .18), var(--jc-shadow-sm);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius-lg);
+  box-shadow: var(--jc-shadow-lg);
   display: flex; flex-direction: column; gap: var(--jc-2);
   margin-bottom: var(--jc-3);
 }
@@ -659,7 +659,7 @@ body { background: var(--jc-bg); }
   border: 1px solid var(--jc-neg-line, #E9BFAF);
 }
 .mini-hunt__step[data-status]:hover .mini-hunt__label {
-  color: var(--jaw-red);
+  color: var(--jc-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -686,7 +686,7 @@ body { background: var(--jc-bg); }
 }
 .mini-hunt__step:last-child::after { display: none; }
 .mini-hunt__label {
-  font: 700 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  font: 700 var(--jc-text-label)/1 var(--jc-font-display);
   letter-spacing: .1em; text-transform: uppercase;
   color: var(--jc-text-3);
   text-align: center;
@@ -703,13 +703,13 @@ body { background: var(--jc-bg); }
   width: 32px; height: 32px;
   background: url('../assets/shark-fin-red.png') center / 28px 28px no-repeat;
 }
-.mini-hunt__step[data-state="now"] .mini-hunt__label { color: var(--jaw-red); }
+.mini-hunt__step[data-state="now"] .mini-hunt__label { color: var(--jaw-red-text); }
 /* Future stage — dashed circle, open water */
 .mini-hunt__step[data-state="next"] .mini-hunt__mark::before {
   content: "";
   width: 14px; height: 14px;
   border-radius: 50%;
-  border: 2px dashed var(--jc-accent-line);
+  border: 2px dashed var(--jc-text-3);
   box-sizing: border-box;
   display: block;
 }
@@ -736,24 +736,33 @@ body { background: var(--jc-bg); }
 */
 .jc-meta-strip {
   display: flex; align-items: center; gap: var(--jc-3);
-  padding: 12px 10px 10px;
-  background: var(--jc-surface-2, #f5f4f0);
-  border-radius: 8px;
+  padding: 10px;
+  background: var(--jc-surface-2);
+  border: 1px solid var(--jc-border);
+  border-radius: var(--jc-radius);
   margin-top: var(--jc-2);
 }
 /* Big strength score — hero moment on the left of the meta strip.
    Score number reads at a glance; the /100 STRENGTH label sits
    underneath in mono. Band coloring (weak/fair/strong) tints the
    number so tone is legible without a badge. */
+/* Score display plate — the arcade score readout: a dark inset panel
+   with a faint dot-matrix grid behind the band-tinted numeral. */
 .jc-meta-strip__strength {
   display: inline-flex; flex-direction: column;
-  align-items: flex-start; gap: 2px;
+  align-items: center; justify-content: center; gap: 2px;
   flex: none;
-  padding-right: var(--jc-2);
-  border-right: 1px solid var(--jc-border);
+  min-width: 64px;
+  padding: 8px 8px 6px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, .06) 0.7px, transparent 1.1px) 0 0 / 4px 4px,
+    #0A0F16;
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius-sm);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .6);
 }
 .jc-meta-strip__strength-num {
-  font: 700 40px/.85 var(--jc-font-mono);
+  font: 700 36px/.9 var(--jc-font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
   color: var(--jc-text);
@@ -773,34 +782,38 @@ body { background: var(--jc-bg); }
   flex: 1;
 }
 .jc-meta-strip__label {
-  font: 500 var(--jc-text-2xs)/1 var(--jc-font);
-  color: var(--jc-text-3);
+  font: 600 13px/1 var(--jc-font-display);
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--jc-text-2);
   text-align: center;
 }
 /* Shark tier icon — the PNG carries all the tier signal (species,
    silhouette). Rendered without a colored halo so the illustration
    sits directly on the meta strip. */
 .jc-meta-strip__shark-icon {
-  width: 30px; height: 30px;
+  width: 44px; height: 30px;
   background: transparent;
   border-radius: 0;
   display: inline-flex; align-items: center; justify-content: center;
   flex: none;
 }
 .jc-meta-strip__shark-icon img {
-  width: 28px; height: 28px;
+  width: 44px; height: 28px;
   object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6));
 }
 
 .jc-gauge {
   display: block;
 }
 .jc-gauge__text {
-  font: 500 11px/1 var(--jc-font);
+  font: 700 10.5px/1 var(--jc-font-mono);
 }
-.jc-gauge[data-band="weak"]   { --_stroke: #D85A30; --_track: #FAECE7; --_text: #993C1D; }
-.jc-gauge[data-band="fair"]   { --_stroke: #BA7517; --_track: #FAEEDA; --_text: #854F0B; }
-.jc-gauge[data-band="strong"] { --_stroke: #1D9E75; --_track: #E1F5EE; --_text: #085041; }
+/* Gauge bands on the cabinet: lit stroke, dim track of the same hue,
+   light numeral (≥8:1 on the strip). */
+.jc-gauge[data-band="weak"]   { --_stroke: var(--jc-neg);     --_track: rgba(255,115,115,.2); --_text: #FF9A9A; }
+.jc-gauge[data-band="fair"]   { --_stroke: var(--jc-caution); --_track: rgba(255,181,71,.2);  --_text: #FFC874; }
+.jc-gauge[data-band="strong"] { --_stroke: var(--jc-pos);     --_track: rgba(94,219,138,.2);  --_text: #8AE8AB; }
 .jc-gauge__track { stroke: var(--_track); }
 .jc-gauge__fill  {
   stroke: var(--_stroke);
@@ -895,22 +908,20 @@ body { background: var(--jc-bg); }
   flex: none;
   display: inline-flex; align-items: center;
   padding: 3px 8px; border-radius: var(--jc-radius-sm);
-  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  font: 700 13px/1 var(--jc-font-display);
   letter-spacing: .06em; text-transform: uppercase;
   border: 1px solid transparent;
 }
-.status-badge[data-status='analyzed']                 { background: var(--jc-surface-3); color: var(--jc-text-3); border-color: var(--jc-border-strong); }
-.status-badge[data-status='saved']                    { background: var(--jc-accent-weak); color: var(--jc-accent); border-color: var(--jc-accent-line); }
-.status-badge[data-status='inProgressDraft']          { background: var(--jc-caution-weak); color: var(--jc-caution); border-color: var(--jc-caution-line); }
-.status-badge[data-status='inProgressClickedApply']   { background: var(--jc-caution-weak); color: var(--jc-caution); border-color: var(--jc-caution-line); font-weight: 600; }
-/* Applied moves to olive-green (pos) — the mockup treats "you did the
-   work" as a positive completion. Interviewing swaps to the mid-blue
-   accent so it reads distinctly from applied while still feeling
-   affirmative. */
-.status-badge[data-status='applied']                  { background: var(--jc-pos-weak); color: var(--jc-pos); border-color: var(--jc-pos-line); }
-.status-badge[data-status='interviewing']             { background: var(--jc-accent-weak); color: var(--jc-accent); border-color: var(--jc-accent-line); font-weight: 700; }
-.status-badge[data-status='archived']                 { background: var(--jc-surface-3); color: var(--jc-text-3); opacity: 0.8; }
-.status-badge[data-status='notMovingForward']         { background: var(--jc-neg-weak); color: var(--jc-neg); border-color: var(--jc-neg-line); }
+/* Status badges use the six-hue status palette: tinted plate, hue text
+   and a hue edge. None of them are the action cyan. */
+.status-badge[data-status]                            { --_st: var(--jc-st-analyzed); background: color-mix(in srgb, var(--_st) 12%, transparent); color: var(--_st); border-color: color-mix(in srgb, var(--_st) 42%, transparent); }
+.status-badge[data-status='saved']                    { --_st: var(--jc-st-saved); }
+.status-badge[data-status='inProgressDraft'],
+.status-badge[data-status='inProgressClickedApply']   { --_st: var(--jc-st-progress); }
+.status-badge[data-status='applied']                  { --_st: var(--jc-st-applied); }
+.status-badge[data-status='interviewing']             { --_st: var(--jc-st-interviewing); }
+.status-badge[data-status='archived'],
+.status-badge[data-status='notMovingForward']         { --_st: var(--jc-st-scar); }
 
 .jc-job-title { font-size: var(--jc-text-lg); }
 
@@ -930,7 +941,7 @@ body { background: var(--jc-bg); }
   display: inline-flex; align-items: center;
   align-self: flex-start;
   padding: 3px 8px; border-radius: var(--jc-radius-sm);
-  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
+  font: 700 13px/1 var(--jc-font-display);
   letter-spacing: .06em; text-transform: uppercase;
   border: 1px solid transparent;
   width: fit-content;
@@ -981,7 +992,7 @@ body { background: var(--jc-bg); }
   background: currentColor;
   color: transparent;
   position: relative;
-  font: 700 9px/1.2 var(--jc-font-mono);
+  font: 700 11px/1.2 var(--jc-font-mono);
   letter-spacing: .1em;
 }
 .comp-anchor-badge__jd::before {
@@ -1034,22 +1045,30 @@ body { background: var(--jc-bg); }
   flex: none;
 }
 .action-row__title {
-  font: 700 var(--jc-text-xs)/1 var(--jc-font);
-  color: var(--jc-accent);
-  letter-spacing: .02em;
+  font: 700 17px/1 var(--jc-font-display);
+  color: var(--jc-text);
+  letter-spacing: .08em; text-transform: uppercase;
 }
 .action-row__sub {
-  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  font: 600 11px/1 var(--jc-font-display);
   color: var(--jc-text-3);
   text-transform: uppercase;
-  letter-spacing: .05em;
+  letter-spacing: .1em;
 }
 .jc-action-bar .jc-btn {
   min-height: 30px;
-  padding: 0 12px;
-  font-size: var(--jc-text-2xs);
+  padding: 0 10px;
+  font-size: 13px;
   flex: 1 1 auto;
   min-width: 0;
+}
+/* Cast / Bait buttons are the panel's real actions — cyan outline
+   until they've run, then they settle to a green "caught" state. */
+.jc-action-bar .jc-btn[data-action] {
+  --_bg: transparent; --_fg: var(--jc-accent); --_bd: var(--jc-accent-line);
+}
+.jc-action-bar .jc-btn[data-action]:hover {
+  --_bg: var(--jc-accent-weak); --_fg: var(--jc-accent-hover); --_bd: var(--jc-accent);
 }
 .jc-action-bar .jc-btn[data-cached='true'] {
   border-color: var(--jc-pos-line);
@@ -1145,10 +1164,10 @@ body { background: var(--jc-bg); }
   display: flex; gap: 0;
   position: sticky; top: calc(var(--jc-tabs-h, 47px) - var(--jc-4)); z-index: 2;
   margin: 0 calc(-1 * var(--jc-4)) var(--jc-1);
-  background: var(--jc-surface-3);
+  background: var(--jc-surface-sunk);
   border-block: 1px solid var(--jc-border);
 }
-.jc-subtabs .jc-tab { padding: 10px 4px; letter-spacing: .06em; border-radius: 0; }
+.jc-subtabs .jc-tab { padding: 10px 4px; font-size: 13px; letter-spacing: .06em; border-radius: 0; }
 .jc-subtabs .jc-tab[data-status='done']::before {
   content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--jc-pos);
 }
@@ -1199,8 +1218,8 @@ body { background: var(--jc-bg); }
   gap: var(--jc-2);
   padding: 5px 12px;
   border-radius: var(--jc-radius-sm);
-  font: 600 var(--jc-text-2xs)/1 var(--jc-font-mono);
-  letter-spacing: .1em; text-transform: uppercase;
+  font: 700 var(--jc-text-label)/1 var(--jc-font-display);
+  letter-spacing: .08em; text-transform: uppercase;
   border: 1px solid;
 }
 .jc-verdict-inline[data-tone='pos']     { color: var(--jc-pos);     background: var(--jc-pos-weak);     border-color: var(--jc-pos-line); }
@@ -1224,7 +1243,7 @@ body { background: var(--jc-bg); }
   align-items: baseline;
   gap: 5px;
   flex-wrap: wrap;
-  font: 500 var(--jc-text-2xs)/1.4 var(--jc-font);
+  font: 500 var(--jc-text-xs)/1.4 var(--jc-font);
   color: var(--jc-text-2);
   flex: 1 1 auto;
   min-width: 0;
@@ -1242,7 +1261,7 @@ body { background: var(--jc-bg); }
   padding: var(--jc-4);
   background: var(--jc-surface-1);
   border: 1px solid var(--jc-border);
-  border-left: 3px solid var(--jc-accent);
+  border-left: 3px solid var(--jc-border-strong);
   border-radius: var(--jc-radius);
 }
 .jc-artifact__actions { flex-wrap: wrap; }
@@ -1254,7 +1273,7 @@ body { background: var(--jc-bg); }
   padding: var(--jc-4);
   background: var(--jc-surface-1);
   border: 1px solid var(--jc-border);
-  border-left: 3px solid var(--jc-accent);
+  border-left: 3px solid var(--jc-border-strong);
   border-radius: var(--jc-radius);
   display: flex;
   flex-direction: column;
@@ -1302,13 +1321,13 @@ body { background: var(--jc-bg); }
   transition: background var(--jc-dur-fast) var(--jc-ease), color var(--jc-dur-fast) var(--jc-ease);
   align-self: flex-start;
 }
-.jc-copy-link:hover { background: var(--jc-accent); color: var(--jc-on-accent, #fff); }
+.jc-copy-link:hover { background: var(--jc-accent); color: var(--jc-on-accent); }
 
 .jc-resume-role { font-weight: 600; margin-top: var(--jc-2); font-size: var(--jc-text-sm); color: var(--jc-text); }
 .jc-resume-role + ul { padding-left: var(--jc-4); margin: 6px 0 0; }
 .jc-resume-role + ul li { color: var(--jc-text-2); margin-bottom: 4px; font-size: var(--jc-text-sm); }
 .jc-bullet-tag {
-  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
+  font: 600 12px/1 var(--jc-font-display);
   padding: 2px 6px; margin-left: 6px; border-radius: 3px;
   background: var(--jc-surface-3); color: var(--jc-text-3);
   vertical-align: middle; text-transform: uppercase; letter-spacing: .06em;
@@ -1335,8 +1354,8 @@ body { background: var(--jc-bg); }
 .offer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--jc-2); }
 .offer-fields label { display: flex; flex-direction: column; gap: 4px; }
 .offer-fields label span {
-  font: 500 var(--jc-text-3xs)/1 var(--jc-font-mono);
-  text-transform: uppercase; letter-spacing: .06em;
+  font: 600 12px/1 var(--jc-font-display);
+  text-transform: uppercase; letter-spacing: .08em;
   color: var(--jc-text-3);
 }
 .offer-fields .jc-input, .offer-fields .jc-textarea {
@@ -1391,4 +1410,39 @@ body { background: var(--jc-bg); }
 @keyframes jc-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .jc-btn[data-running='true']::after { animation: none; }
+}
+
+/* Empty-state overview — framed panel with today's capture count
+   notched into the top border as its label plate. */
+#noJob { position: relative; margin-top: 18px; padding-top: var(--jc-8); }
+#noJob > .jc-today-count--headline {
+  position: absolute; top: 0; left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 6px 14px 5px;
+  background: var(--jc-surface-1);
+  border: 1px solid var(--jc-border-strong);
+  border-radius: var(--jc-radius-sm);
+  white-space: nowrap;
+}
+
+/* Narrow Jawbar (≤ 400px) — condensed caps run wider than the old
+   mixed-case labels, so tighten tracking and padding so every control
+   row still fits on one line at the 320–360px side-panel widths. */
+@media (max-width: 400px) {
+  .jc__verdict { padding-inline: 0; }
+  .jc-jobcard { padding: var(--jc-3); }
+  .jc-jobcard__actions .jc-btn { padding: 0 6px; letter-spacing: .02em; font-size: 12.5px; }
+  .jc-action-bar .jc-btn { padding: 0 4px; letter-spacing: .01em; font-size: 12.5px; }
+  .action-row__label { min-width: 60px; }
+  .action-row__title { font-size: 15px; }
+  .jc-meta-strip { gap: 6px; padding: 8px; }
+  .jc-meta-strip__strength { min-width: 52px; padding: 6px 6px 4px; }
+  .jc-meta-strip__strength-num { font-size: 30px; }
+  .jc-meta-strip__label { font-size: 11.5px; letter-spacing: .01em; }
+  .jc-meta-strip__shark-icon, .jc-meta-strip__shark-icon img { width: 36px; }
+}
+@media (max-width: 340px) {
+  .jc-tab { padding-inline: 4px; font-size: 13px; letter-spacing: .02em; }
+  .jc-jobcard__actions .jc-btn { padding: 0 4px; }
 }

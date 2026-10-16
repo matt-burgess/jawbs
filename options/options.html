@@ -1,11 +1,11 @@
 <!doctype html>
-<html data-theme="light">
+<html data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <title>Jawbs · Settings</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" />
     <link rel="stylesheet" href="../styles/job-copilot.css" />
     <link rel="stylesheet" href="options.css" />
   </head>
@@ -322,6 +322,33 @@
               <div class="jc-btn-row">
                 <button id="saveContactLocation" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
                 <span id="contactLocationStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section" id="applicationProfile">
+              <div class="section-head">
+                <h2>Application autofill</h2>
+                <p class="jc-footnote">On company application forms (Greenhouse, Lever, Ashby, Workday and similar) a
+                  <strong>Fill application</strong> button fills the fields it recognises: your name (from You → About),
+                  the four contact values above, and whatever you save here. It only fills empty fields, outlines what
+                  it filled, and never submits. Leave anything blank to have Jawbs skip that question.</p>
+              </div>
+              <label><span>Street address</span><input type="text" class="jc-input" data-ap="street" data-fill="none" /></label>
+              <label><span>ZIP / postal code</span><input type="text" class="jc-input" data-ap="postalCode" data-fill="none" /></label>
+              <label><span>Country</span><input type="text" class="jc-input" data-ap="country" placeholder="United States" data-fill="none" /></label>
+              <label><span>Website or portfolio</span><input type="url" class="jc-input" data-ap="website" data-fill="none" /></label>
+              <label><span>GitHub URL</span><input type="url" class="jc-input" data-ap="github" data-fill="none" /></label>
+              <label><span>Current company</span><input type="text" class="jc-input" data-ap="currentCompany" data-fill="none" /></label>
+              <label><span>Current title</span><input type="text" class="jc-input" data-ap="currentTitle" data-fill="none" /></label>
+              <label><span>Salary expectation (as you'd type it)</span><input type="text" class="jc-input" data-ap="salaryExpectation" placeholder="$250,000 base" data-fill="none" /></label>
+              <label><span>Notice period / start date</span><input type="text" class="jc-input" data-ap="noticePeriod" placeholder="2 weeks" data-fill="none" /></label>
+              <label><span>Legally authorized to work where you're applying?</span>
+                <select class="jc-select" data-ap="workAuthorized"><option value="">Don't answer for me</option><option>Yes</option><option>No</option></select></label>
+              <label><span>Need visa sponsorship, now or later?</span>
+                <select class="jc-select" data-ap="needsSponsorship"><option value="">Don't answer for me</option><option>Yes</option><option>No</option></select></label>
+              <div class="jc-btn-row">
+                <button id="saveApplicationProfile" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="applicationProfileStatus" class="jc-footnote"></span>
               </div>
             </section>
           </div>
