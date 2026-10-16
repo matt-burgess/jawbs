@@ -1,4 +1,4 @@
-import { getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getContactEmail, getContactPhone, getContactLocation, getCompTargets, getCandidateName, getCandidateTagline, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
+import { getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getContactEmail, getContactPhone, getContactLocation, getCompTargets, getApplicationProfile, getCandidateName, getCandidateTagline, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
 import { initQuickFill } from '../lib/contactFill.js';
 import { estimateCostUsd, formatUsd } from '../lib/pricing.js';
 import { normalizeStatus, statusLabel, STATUS_ORDER } from '../lib/statuses.js';
@@ -7,6 +7,8 @@ import { trashSvg } from '../lib/icons.js';
 import { $, els, send, fmtDate } from '../lib/pageBoot.js';
 import { postingAgeDays, applicantCount } from '../lib/freshness.js';
 import { h } from '../lib/h.js';
+import { compVerdict, rangeBar } from '../lib/compVerdict.js';
+import { trackRecordLine } from '../lib/calibration.js';
 
 let currentJob = null;
 let letterTone = 'warm';
@@ -20,6 +22,7 @@ let followMap = {};
 // on any settings change. Nullable until first load; the strength
 // scorer handles a null targets object.
 let compTargets = null;
+let applicationProfile = {}; // Settings → Application autofill; Fit reads work authorization from it
 
 // ---------- Helpers ----------
 
@@ -1415,21 +1418,60 @@ function renderAskCard(chats) {
   }
 }
 
+// ---------- Analysis card footers ----------
+
+// A label set while the button is in its working state ("Casting…")
+// must replace the label that state restores afterwards — otherwise the
+// button snaps back to "Analyze" next to a finished result.
+function setActionLabel(btn, text, variant) {
+  if (!btn) return;
+  if (btn.dataset.running) btn.dataset.origLabel = text; else btn.textContent = text;
+  if (variant !== undefined) btn.dataset.variant = variant;
+}
+
+// "Analyzed 5:34 PM" for people; model, tokens and cost in the tooltip.
+// Local-model and fell-back-to-cloud stay visible: they change how much
+// to trust the result.
+function setAnalyzedMeta(el, record) {
+  if (!record) { el.textContent = ''; el.title = ''; return; }
+  const d = new Date(record.generatedAt);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  const when = sameDay
+    ? d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : fmtWhen(record.generatedAt);
+  el.textContent = `${record.provider === 'local' ? 'Local model · ' : ''}Analyzed ${when}${record.fellback ? ' · fell back to cloud' : ''}`;
+  const cost = estimateCostUsd(record.model, record.usage);
+  el.title = [
+    record.model,
+    record.usage ? `${record.usage.input_tokens ?? '?'} in / ${record.usage.output_tokens ?? '?'} out` : null,
+    cost != null ? `≈ ${formatUsd(cost)}` : null,
+  ].filter(Boolean).join(' · ');
+}
+
+// Opens Settings at a section — e.g. to fill in work authorization or
+// comp targets that a card needs.
+function settingsLink(text, anchor) {
+  return h('a', {
+    href: chrome.runtime.getURL(`options/options.html?tab=you#${anchor}`),
+    target: '_blank', rel: 'noopener',
+  }, text);
+}
+
 // ---------- Fit ----------
 
 function renderFitCard(record) {
   const out = els.fitOutput;
   out.innerHTML = '';
   if (!record) {
-    els.fitMeta.textContent = '';
-    els.analyzeFit.textContent = 'Analyze';
+    setAnalyzedMeta(els.fitMeta, null);
+    setActionLabel(els.analyzeFit, 'Analyze fit', 'primary');
     replaceGlance(els.fitGlance, h('span', { class: 'jc-footnote' }, 'Not analyzed'));
     return;
   }
 
   const r = record.result || {};
-  els.fitMeta.textContent = `${fmtWhen(record.generatedAt)} · ${record.model}${record.usage ? ` · in ${record.usage.input_tokens} · out ${record.usage.output_tokens}` : ''}`;
-  els.analyzeFit.textContent = 'Regenerate';
+  setAnalyzedMeta(els.fitMeta, record);
+  setActionLabel(els.analyzeFit, 'Re-run fit', 'outline');
 
   // Recovery-skeleton detection — the fit prompt (v8+) returns
   // fitScore=0 plus a gap starting with "No job description was
@@ -1455,7 +1497,7 @@ function renderFitCard(record) {
         h('span', { class: 'jc-notice__title' }, '⚠ Fit couldn\'t run — description wasn\'t captured cleanly'),
         h('p', { class: 'jc-prose', style: 'margin-top: 4px' },
           'This jawb was likely analyzed from LinkedIn\'s search-results view, which mixes multiple postings into one blob. Open the jawb in a single-job view (linkedin.com/jobs/view/...) and click ',
-          h('strong', {}, 'Regenerate'),
+          h('strong', {}, 'Re-run fit'),
           ' to get a real analysis.',
         ),
         singleJobUrl ? h('div', { style: 'margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap' },
@@ -1473,53 +1515,35 @@ function renderFitCard(record) {
   const tier = scoreTier(r.fitScore);
   replaceGlance(els.fitGlance, h('span', { style: `color:var(--jc-${tier})` }, `${r.fitScore ?? '—'}/100`));
 
-  // Top row — verdict pill + remote/location summary side-by-side. Both
-  // are optional. Alignments were dropped from this card per user
-  // feedback (only gaps carry actionable signal), so verdict + remote
-  // now lead the section as the at-a-glance takeaway; gaps follow.
-  const ra = r.remoteAuthenticity;
-  const hasRemote = ra && (ra.postedAs || ra.actualExpectation || ra.flag);
-  const hasVerdict = !!r.verdict;
-  if (hasVerdict || hasRemote) {
-    const topRow = h('div', { class: 'jc-fit-summary' });
-    if (hasVerdict) {
-      const rec = r.verdict.recommendation || '';
-      const recTone = rec === 'apply-now' ? 'pos' : rec === 'skip' ? 'neg' : 'caution';
-      const pillText = rec === 'apply-now' ? 'Apply' : rec === 'skip' ? 'Skip' : 'Apply if nothing better';
-      topRow.append(h('span', { class: 'jc-verdict-inline', dataset: { tone: recTone } }, pillText));
-    }
-    if (hasRemote) {
-      const tone = ra.flag ? 'neg' : (ra.matchesUserLocations === false ? 'caution' : 'pos');
-      const remoteSpan = h('span', { class: 'jc-fit-summary__remote', dataset: { tone } });
-      const parts = [];
-      if (ra.postedAs && ra.actualExpectation) {
-        parts.push(h('span', {}, h('strong', {}, 'Posted: '), ra.postedAs));
-        parts.push(h('span', {}, h('strong', {}, 'Actual: '), ra.actualExpectation));
-      } else if (ra.actualExpectation) {
-        parts.push(h('span', {}, h('strong', {}, 'Actual: '), ra.actualExpectation));
-      } else if (ra.postedAs) {
-        parts.push(h('span', {}, h('strong', {}, 'Posted: '), ra.postedAs));
-      }
-      if (ra.requiresLocation) parts.push(h('span', {}, `Constraint: ${ra.requiresLocation}`));
-      if (ra.flag) parts.push(h('strong', {}, ra.flag));
-      parts.forEach((p, i) => {
-        if (i > 0) remoteSpan.append(h('span', { class: 'jc-fit-summary__sep' }, '·'));
-        remoteSpan.append(p);
-      });
-      topRow.append(remoteSpan);
-    }
-    out.append(topRow);
+  // 1. The answer: score and verdict on one line.
+  const rec = r.verdict?.recommendation || '';
+  out.append(h('div', { class: 'jc-fit-head' },
+    h('span', { class: `jc-score jc-score--${tier}` },
+      h('span', { class: 'jc-score__num' }, String(r.fitScore ?? '—')),
+      h('span', { class: 'jc-score__den' }, '/100')),
+    rec ? h('span', { class: 'jc-verdict-inline', dataset: { tone: rec === 'apply-now' ? 'pos' : rec === 'skip' ? 'neg' : 'caution' } },
+      rec === 'apply-now' ? 'Apply' : rec === 'skip' ? 'Skip' : 'Apply if nothing better') : null,
+  ));
+
+  // 2. Anything that stops you, or needs checking first.
+  out.append(...renderFitGates(r));
+
+  // 3. Gaps — bullet list only (alignments were dropped from this card by
+  // request: scanners want what to address, not what's already strong).
+  if (r.gaps?.length) {
+    out.append(h('div', {},
+      h('span', { class: 'jc-eyebrow' }, 'Gaps'),
+      h('ul', { class: 'jc-list' }, ...r.gaps.map((g) => h('li', {}, g)))));
   }
 
-  // Gaps — bullet list only. Alignments dropped per user request:
-  // scanners want the "what to address" list, not the "what's already
-  // strong" list.
-  if (r.gaps?.length) {
-    out.append(h('span', { class: 'jc-eyebrow' }, 'Gaps'));
-    out.append(h('ul', { class: 'jc-list' },
-      ...r.gaps.map((g) => h('li', {}, g)),
-    ));
-  }
+  // 4. Your own track record for this score band — exact counts from the
+  // archive, filled in once the list loads.
+  const track = h('p', { class: 'jc-prose jc-track', hidden: true });
+  out.append(track);
+  send('list-jobs').then((res) => {
+    const line = trackRecordLine(res?.data || [], r.fitScore);
+    if (line) { track.textContent = line; track.hidden = false; }
+  }).catch(() => {});
 
   // Outreach — LLM's recommended first-contact and messaging strategy.
   // Only rendered when the model actually found network leverage; skipped
@@ -1540,6 +1564,51 @@ function renderFitCard(record) {
     );
     out.append(box);
   }
+}
+
+// What stops you, or needs checking, before applying — one box. Red only
+// for a real deal-breaker (a gate FAIL, or a location you can't work
+// from); everything else is amber. The posting's own words are quoted so
+// the user judges rather than trusts the model. An eligibility CHECK
+// caused by a blank Settings answer is a missing setting, not a risk in
+// this posting, so it becomes a quiet prompt to fill it in.
+function renderFitGates(r) {
+  const items = []; // [tone, label, text]
+  const quote = (g) => (g?.quote ? `“${g.quote}”` : '');
+  const elig = r.gates?.eligibility;
+  let settingPrompt = null;
+  if (elig?.verdict === 'FAIL') items.push(['neg', 'Not eligible', quote(elig)]);
+  else if (elig?.verdict === 'CHECK') {
+    if (!applicationProfile?.workAuthorized) {
+      settingPrompt = h('p', { class: 'jc-prose jc-fit-setting' },
+        `Work authorization not set, so Jawbs can't check ${quote(elig) || 'this posting\'s eligibility line'}. `,
+        settingsLink('Set it in Settings', 'applicationProfile'),
+        ' (it also lets autofill answer this question).');
+    } else items.push(['caution', 'Check eligibility', quote(elig)]);
+  }
+  const lang = r.gates?.language;
+  if (lang?.verdict === 'FAIL') items.push(['neg', 'Language rules you out', quote(lang)]);
+  else if (lang?.verdict === 'FLAG') items.push(['caution', 'Check language level', quote(lang)]);
+
+  const ra = r.remoteAuthenticity;
+  if (ra?.flag) {
+    const mismatch = ra.matchesUserLocations === false;
+    items.push([mismatch ? 'neg' : 'caution', mismatch ? 'Not remote for you' : 'Location',
+      `${!mismatch && ra.postedAs === 'Unknown' ? 'LinkedIn label not captured. ' : ''}${ra.flag}`]);
+  }
+
+  const out = [];
+  if (items.length) {
+    const neg = items.some(([t]) => t === 'neg');
+    out.push(h('div', { class: 'jc-notice', dataset: { tone: neg ? 'neg' : 'caution' } },
+      h('div', { class: 'jc-notice__body' },
+        h('span', { class: 'jc-notice__title' }, neg ? 'Rules you out' : 'Check before applying'),
+        h('dl', { class: 'jc-kv' }, ...items.flatMap(([, label, text]) => [h('dt', {}, label), h('dd', {}, text)])))));
+  } else if (ra?.actualExpectation && ra.actualExpectation !== 'Unclear') {
+    out.push(h('dl', { class: 'jc-kv' }, h('dt', {}, 'Workplace'), h('dd', {}, ra.actualExpectation)));
+  }
+  if (settingPrompt) out.push(settingPrompt);
+  return out;
 }
 
 // Ready-to-paste message for the contact Fit recommends. Matt's own
@@ -1633,103 +1702,88 @@ function renderCompCard(record) {
   const out = els.compOutput;
   out.innerHTML = '';
   if (!record) {
-    els.compMeta.textContent = '';
-    els.analyzeComp.textContent = 'Analyze';
+    setAnalyzedMeta(els.compMeta, null);
+    setActionLabel(els.analyzeComp, 'Analyze comp', 'primary');
     replaceGlance(els.compGlance, h('span', { class: 'jc-footnote' }, 'Not analyzed'));
     return;
   }
   const r = record.result || {};
-  els.compMeta.textContent = `${fmtWhen(record.generatedAt)} · ${record.model}`;
-  els.analyzeComp.textContent = 'Regenerate';
+  setAnalyzedMeta(els.compMeta, record);
+  setActionLabel(els.analyzeComp, 'Re-run comp', 'outline');
 
   const s = r.salary || {};
   const base = s.base || {};
+  const estimate = s.source !== 'posting';
   const rangeText = (base.low != null && base.high != null)
-    ? `$${Math.round(base.low / 1000)}K – $${Math.round(base.high / 1000)}K`
-    : (base.low != null ? `$${Math.round(base.low / 1000)}K+` : (base.high != null ? `up to $${Math.round(base.high / 1000)}K` : '—'));
-  replaceGlance(els.compGlance, h('span', {}, rangeText));
+    ? `${fmtMoneyK(base.low)} – ${fmtMoneyK(base.high)}`
+    : (base.low != null ? `${fmtMoneyK(base.low)}+` : (base.high != null ? `up to ${fmtMoneyK(base.high)}` : '—'));
+  replaceGlance(els.compGlance, h('span', {}, `${estimate && rangeText !== '—' ? '~' : ''}${rangeText}`));
 
-  // Big number: base range
-  out.append(h('div', { class: 'jc-metric jc-metric--hero' },
-    h('span', { class: 'jc-metric__label' }, 'Base salary'),
-    h('span', { class: 'jc-metric__value' },
-      base.low != null && base.high != null
-        ? `$${base.low.toLocaleString()} – $${base.high.toLocaleString()}`
-        : (base.raw || rangeText)),
-  ));
-
-  // Source label — always shown, prominent. Confidence pill on the right.
-  const srcTone = s.source === 'posting' ? 'pos'
-                 : s.source === 'company-research' ? 'info'
-                 : s.source === 'title-benchmark' ? 'caution'
-                 : 'neg';
-  const confLabel = s.confidence === 'high' ? 'high confidence'
-                   : s.confidence === 'medium' ? 'medium confidence'
-                   : s.confidence === 'low' ? 'low confidence'
-                   : 'unknown';
-  out.append(h('div', { class: 'jc-notice', dataset: { tone: srcTone }, style: 'margin-top:var(--jc-2)' },
-    h('div', { class: 'jc-notice__body' },
-      h('span', { class: 'jc-notice__title' }, 'Source'),
-      h('span', {}, s.sourceLabel || '(not provided)'),
-      h('span', { class: 'jc-footnote', style: 'margin-top:2px' }, `${sourceHuman(s.source)} · ${confLabel}`),
-    ),
-  ));
-
-  // If posted band verbatim exists, show it distinctly.
-  if (base.raw && s.source === 'posting') {
-    out.append(h('div', { class: 'jc-metric', style: 'margin-top:var(--jc-2)' },
-      h('span', { class: 'jc-metric__label' }, 'As posted'),
-      h('span', { class: 'jc-metric__value', style: 'font-family:var(--jc-font-mono)' }, base.raw),
-    ));
+  // 1. The answer: does it clear YOUR floor and target? Computed from
+  // Settings, not by the model, so it matches the numbers on screen.
+  const offer = currentJob?.offerDetails;
+  if (offer?.base) {
+    const ov = compVerdict({ low: offer.base, high: offer.base }, compTargets || {});
+    out.append(h('div', { class: 'jc-comp-answer', dataset: { tone: ov?.tone || 'info' } },
+      h('strong', {}, `Offer: ${fmtMoneyK(offer.base)} base`), ov ? h('span', {}, ov.label) : null));
+  }
+  const verdict = compVerdict(base, compTargets || {});
+  if (verdict) {
+    out.append(h('div', { class: 'jc-comp-answer', dataset: { tone: verdict.tone } },
+      h('strong', {}, verdict.label), h('span', {}, verdict.detail)));
+  } else if (!compTargets?.floor && !compTargets?.target) {
+    out.append(h('p', { class: 'jc-prose jc-fit-setting' },
+      settingsLink('Set your floor and target', 'compTargets'), ' to see whether this clears them.'));
   }
 
-  // Bonus (only when source explicitly provided).
+  // 2. The range, once. An estimate is marked "~" and amber so it never
+  // passes for a posted number.
+  const confShort = { high: 'High', medium: 'Med', low: 'Low' }[s.confidence] || '';
+  const badge = s.source === 'posting' ? ['pos', `Posted${confShort ? ` · ${confShort}` : ''}`]
+    : s.source === 'unknown' || rangeText === '—' ? ['neg', 'Unknown']
+    : ['caution', `Estimate${confShort ? ` · ${confShort}` : ''}`];
+  out.append(h('div', { class: 'jc-comp-hero', dataset: { estimate: String(estimate) } },
+    h('div', { class: 'jc-comp-hero__top' },
+      h('span', { class: 'jc-eyebrow' }, 'Base'),
+      h('span', { class: 'jc-badge', dataset: { tone: badge[0] } }, badge[1])),
+    h('span', {
+      class: 'jc-comp-hero__num',
+      title: base.low != null && base.high != null ? `$${base.low.toLocaleString()} – $${base.high.toLocaleString()}` : '',
+    }, `${estimate && rangeText !== '—' ? '~' : ''}${rangeText}`)));
+
+  // 3. Where it sits against your floor and target.
+  const bar = rangeBar(base, compTargets || {});
+  if (bar) {
+    out.append(h('div', { class: 'jc-range', dataset: { tone: verdict?.tone || 'pos' } },
+      h('div', { class: 'jc-range__track' },
+        h('span', { class: 'jc-range__band', style: `left:${bar.band.left}%;width:${bar.band.width}%` }),
+        bar.floor != null ? h('span', { class: 'jc-range__tick', dataset: { kind: 'floor' }, style: `left:${bar.floor}%` }) : null,
+        bar.target != null ? h('span', { class: 'jc-range__tick', dataset: { kind: 'target' }, style: `left:${bar.target}%` }) : null),
+      h('div', { class: 'jc-range__legend' },
+        compTargets?.floor ? h('span', {}, h('i', { 'data-kind': 'floor' }), `Floor ${fmtMoneyK(Number(compTargets.floor))}`) : null,
+        compTargets?.target ? h('span', {}, h('i', { 'data-kind': 'target' }), `Target ${fmtMoneyK(Number(compTargets.target))}`) : null)));
+  }
+
+  // 4. The detail, as short rows.
+  const rows = [['Source', sourceHuman(s.source, currentJob?.posting?.company)]];
+  const posted = String(base.raw || '').replace(/[\s,]/g, '').replace(/[–—]/g, '-');
+  if (s.source === 'posting' && base.raw && !(base.low != null && posted === `$${base.low}-$${base.high}`)) rows.push(['Posted as', base.raw]);
+  if (estimate && s.sourceLabel) rows.push(['Basis', s.sourceLabel]);
+  const tc = s.totalCash || {};
+  if (tc.low != null || tc.high != null) rows.push(['Total cash', `${tc.low != null ? fmtMoneyK(tc.low) : '?'} – ${tc.high != null ? fmtMoneyK(tc.high) : '?'} (base + bonus)`]);
   const bonus = s.bonus || {};
-  if (bonus.percent != null || bonus.note) {
-    out.append(h('div', { class: 'jc-metric', style: 'margin-top:var(--jc-2)' },
-      h('span', { class: 'jc-metric__label' }, 'Bonus'),
-      h('span', { class: 'jc-metric__value' },
-        bonus.percent != null ? `${bonus.percent}% target` : '',
-        bonus.note ? h('div', { class: 'jc-footnote' }, bonus.note) : null,
-      ),
-    ));
-  }
-
-  // Equity (only when source explicitly provided).
-  const equity = s.equity || {};
-  if (equity.note) {
-    out.append(h('div', { class: 'jc-metric', style: 'margin-top:var(--jc-2)' },
-      h('span', { class: 'jc-metric__label' }, 'Equity'),
-      h('span', { class: 'jc-metric__value jc-footnote' }, equity.note),
-    ));
-  }
-
-  // Floor/target comparison flag — the only "warning" we surface.
-  const vt = r.vsTargets || {};
-  if (vt.flag) {
-    out.append(h('div', { class: 'jc-notice', dataset: { tone: 'neg' }, style: 'margin-top:var(--jc-2)' },
-      h('div', { class: 'jc-notice__body' },
-        h('span', { class: 'jc-notice__title' }, 'Below your floor'),
-        h('span', {}, vt.flag),
-      ),
-    ));
-  } else if (vt.vsFloor || vt.vsTarget) {
-    // Show relative-to-targets summary when set.
-    const parts = [];
-    if (vt.vsFloor && vt.vsFloor !== 'unknown') parts.push(`vs floor: ${vt.vsFloor}`);
-    if (vt.vsTarget && vt.vsTarget !== 'unknown') parts.push(`vs target: ${vt.vsTarget}`);
-    if (parts.length) {
-      out.append(h('div', { class: 'jc-footnote', style: 'margin-top:var(--jc-2)' }, parts.join(' · ')));
-    }
-  }
+  if (bonus.percent != null || bonus.note) rows.push(['Bonus', [bonus.percent != null ? `${bonus.percent}% target` : '', bonus.note || ''].filter(Boolean).join(' · ')]);
+  if (s.equity?.note) rows.push(['Equity', s.equity.note]);
+  out.append(h('dl', { class: 'jc-kv' }, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, v)])));
 }
 
-// Map internal source code → human phrase.
-function sourceHuman(src) {
-  if (src === 'posting') return 'From the job posting';
-  if (src === 'company-research') return 'Company research (comparable to Glassdoor)';
-  if (src === 'title-benchmark') return 'General title benchmark';
-  return 'Source unknown';
+// Where a pay number came from, in words that don't overstate it. Anything
+// not quoted from the posting is the model's own estimate.
+function sourceHuman(src, company) {
+  if (src === 'posting') return 'Quoted from the posting';
+  if (src === 'company-research') return `Model estimate from what it knows about ${company || 'this company'}, not from the posting or any pay database`;
+  if (src === 'title-benchmark') return 'Model estimate for this title, not from any data source';
+  return 'No pay information found';
 }
 
 function hydrateOfferForm(offer) {
@@ -1774,10 +1828,11 @@ els.saveOffer?.addEventListener('click', async () => {
     // Persist offerDetails
     await send('save-to-archive', { data: { jobId: currentJob.jobId, offerDetails: details } });
     currentJob = { ...currentJob, offerDetails: details };
-    els.offerStatus.textContent = 'Saved. Re-analyzing…';
-    // Trigger comp re-analysis so counter-offer output appears
-    els.analyzeComp.click();
-    setTimeout(() => { els.offerStatus.textContent = ''; }, 4000);
+    // No AI re-run: the comp analysis doesn't read the offer. The card
+    // compares the offer with your floor and target directly.
+    els.offerStatus.textContent = 'Saved.';
+    renderCompCard(currentJob.analyses?.comp);
+    setTimeout(() => { els.offerStatus.textContent = ''; }, 2000);
   } catch (e) {
     els.offerStatus.textContent = `Failed: ${e.message}`;
   }
@@ -1789,6 +1844,7 @@ els.clearOffer?.addEventListener('click', async () => {
   hydrateOfferForm(null);
   await send('save-to-archive', { data: { jobId: currentJob.jobId, offerDetails: null } });
   currentJob = { ...currentJob, offerDetails: null };
+  renderCompCard(currentJob.analyses?.comp);
   els.offerStatus.textContent = 'Cleared.';
   setTimeout(() => { els.offerStatus.textContent = ''; }, 2000);
 });
@@ -1801,7 +1857,7 @@ function renderPrepCard(analyses) {
   out.innerHTML = '';
 
   if (brief) {
-    els.buildBrief.textContent = 'Rebait';
+    setActionLabel(els.buildBrief, 'Rebait');
     els.questionMeta.textContent = `${fmtWhen(brief.generatedAt)} · ${brief.model}`;
     replaceGlance(els.prepGlance, h('span', {}, 'Prep ready'));
     out.append(h('div', { class: 'jc-doc-body' }, brief.brief || ''));
@@ -1815,7 +1871,7 @@ function renderPrepCard(analyses) {
       },
     }, 'Copy prep'));
   } else {
-    els.buildBrief.textContent = 'Bait';
+    setActionLabel(els.buildBrief, 'Bait');
     els.questionMeta.textContent = '';
     replaceGlance(els.prepGlance, h('span', { class: 'jc-footnote' }, 'Not baited'));
   }
@@ -1828,7 +1884,7 @@ function renderLetterCard(record) {
   if (!record) {
     els.letterMeta.innerHTML = '';
     els.letterMeta.append(h('span', { class: 'jc-footnote' }, 'Not generated'));
-    els.generateLetter.textContent = 'Generate';
+    setActionLabel(els.generateLetter, 'Generate');
     els.letterCopy.hidden = true;
     els.letterPdf.hidden = true;
     if (els.letterCopyTop) els.letterCopyTop.hidden = true;
@@ -1838,12 +1894,20 @@ function renderLetterCard(record) {
   const tone = record.tone || 'warm';
   els.letterMeta.innerHTML = '';
   els.letterMeta.append(h('span', { class: 'jc-footnote' }, `Generated ${fmtWhen(record.generatedAt)} · ${tone}`));
-  els.generateLetter.textContent = 'Regenerate';
+  setActionLabel(els.generateLetter, 'Regenerate');
   els.letterCopy.hidden = false;
   els.letterPdf.hidden = false;
   if (els.letterCopyTop) els.letterCopyTop.hidden = false;
 
   const letterEl = h('div', { class: 'jc-doc-body', contenteditable: 'true' }, r.letter || '');
+  // Inline edits used to vanish on the next render. Save them when the
+  // user leaves the letter, so Copy, PDF and the review all see them.
+  letterEl.addEventListener('blur', async () => {
+    const text = letterEl.innerText.trim();
+    if (!currentJob?.jobId || text === (r.letter || '').trim()) return;
+    const res = await send('update-letter', { jobId: currentJob.jobId, letter: text }).catch(() => null);
+    if (res?.record) { currentJob.analyses = { ...currentJob.analyses, coverLetter: res.record }; renderLetterCard(res.record); }
+  });
   els.letterOutput.append(letterEl);
 
   // Inline copy link — sits at the bottom of the letter body so it's obvious
@@ -1864,6 +1928,8 @@ function renderLetterCard(record) {
 
   if (r.wordCount) els.letterOutput.append(h('span', { class: 'jc-footnote' }, `Word count: ${r.wordCount}`));
   if (r.flags?.length) els.letterOutput.append(h('span', { class: 'jc-footnote', style: 'color:var(--jc-caution)' }, `Flags: ${r.flags.join('; ')}`));
+  els.letterOutput.append(...renderHonestyChecks(record.factCheck?.unsupportedFacts, r.stretches));
+  els.letterOutput.append(...renderLetterReview(record));
 
   els.letterCopy.onclick = async () => {
     await copyText();
@@ -1897,7 +1963,7 @@ function renderResumeCard(record) {
   if (!record) {
     els.resumeMeta.innerHTML = '';
     els.resumeMeta.append(h('span', { class: 'jc-footnote' }, 'Not generated'));
-    els.generateResume.textContent = 'Generate';
+    setActionLabel(els.generateResume, 'Generate');
     els.resumeCopy.hidden = true;
     els.resumeDownload.hidden = true;
     els.resumePdf.hidden = true;
@@ -1907,7 +1973,7 @@ function renderResumeCard(record) {
   const r = record.result || {};
   els.resumeMeta.innerHTML = '';
   els.resumeMeta.append(h('span', { class: 'jc-footnote' }, `Generated ${fmtWhen(record.generatedAt)}`));
-  els.generateResume.textContent = 'Regenerate';
+  setActionLabel(els.generateResume, 'Regenerate');
   els.resumeCopy.hidden = false;
   els.resumeDownload.hidden = false;
   els.resumePdf.hidden = false;
@@ -2087,11 +2153,85 @@ function renderAtsCheck(r, kc) {
     kc?.missed.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
       `On your master resume and in the posting, but left off this draft: ${kc.missed.join(', ')}.`) : null,
     regen,
+    ...renderHonestyChecks(kc?.unsupportedFacts, r.stretches, kc?.unknownRoles),
     kc?.unverifiedSkills.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
       `Skills listed that aren't on your master resume in those exact words — check each is true before sending: ${kc.unverifiedSkills.join(', ')}.`) : null,
     missing.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
       `Posting keywords not on your master resume, so left off: ${missing.join(', ')}. If you have any of these, add them to your master resume in Settings and regenerate.`) : null,
   ].filter(Boolean);
+}
+
+// Optional hiring-manager review of the letter: a button (one more AI
+// call), then the review's edits — each applied with one click — and its
+// notes. A review of an older version of the letter is labelled as such.
+function renderLetterReview(letterRecord) {
+  const review = currentJob?.analyses?.letterReview;
+  const letter = letterRecord.result?.letter || '';
+  const btn = h('button', {
+    class: 'jc-btn', 'data-size': 'sm', type: 'button',
+    title: 'A second AI pass reads the letter as the hiring manager would and suggests edits. One more AI call.',
+    onClick: () => {
+      btn.disabled = true; btn.textContent = 'Reviewing…';
+      runAnalysis(btn, els.letterError, 'review-letter', { jobId: currentJob?.jobId }, () => {})
+        .finally(() => { btn.disabled = false; btn.textContent = review ? 'Review again' : 'Review as hiring manager'; });
+    },
+  }, review ? 'Review again' : 'Review as hiring manager');
+  const out = [h('div', { class: 'jc-btn-row', style: 'margin-top: var(--jc-2)' }, btn)];
+  if (!review?.result) return out;
+  if (review.reviewedLetter !== letter) {
+    out.push(h('p', { class: 'jc-footnote' }, 'The letter changed after this review; some edits may no longer apply.'));
+  }
+  const edits = (review.result.edits || []).filter((e) => letter.includes(e.old));
+  if (edits.length) {
+    out.push(h('span', { class: 'jc-eyebrow' }, `Suggested edits (${edits.length})`));
+    for (const e of edits) {
+      const apply = h('button', {
+        class: 'jc-btn', 'data-size': 'sm', type: 'button',
+        onClick: async () => {
+          apply.disabled = true;
+          const res = await send('update-letter', { jobId: currentJob.jobId, letter: letter.replace(e.old, e.new) }).catch(() => null);
+          if (res?.record) { currentJob.analyses = { ...currentJob.analyses, coverLetter: res.record }; renderLetterCard(res.record); }
+        },
+      }, 'Apply');
+      out.push(h('div', { class: 'jc-review-edit' },
+        h('p', { class: 'jc-footnote' }, e.reason || ''),
+        h('p', { class: 'jc-prose' }, h('del', {}, e.old)),
+        h('p', { class: 'jc-prose' }, h('ins', {}, e.new)),
+        apply));
+    }
+  }
+  const NOTE_LABELS = { grounding: 'Facts', missedRequirements: 'Missed requirements', companyAngle: 'Company angle', reframing: 'Reframing', tone: 'Tone' };
+  const notes = Object.entries(NOTE_LABELS).filter(([k]) => review.result.notes?.[k]);
+  if (notes.length) {
+    out.push(h('span', { class: 'jc-eyebrow' }, 'Reviewer notes'));
+    out.push(h('ul', { class: 'jc-list' }, ...notes.map(([k, label]) => h('li', {}, `${label}: ${review.result.notes[k]}`))));
+  }
+  return out;
+}
+
+// The checks that stand between a generated document and an employer:
+// numbers and roles the source never states (found by text search, so
+// certain), and stretches the model itself flagged (a judgement — the
+// user decides keep, soften or drop). Shown as notices, not footnotes:
+// these are the ones that cost credibility in an interview.
+function renderHonestyChecks(facts = [], stretches = [], roles = []) {
+  const out = [];
+  if (facts?.length || roles?.length) {
+    out.push(h('div', { class: 'jc-notice', dataset: { tone: 'neg' } },
+      h('div', { class: 'jc-notice__body' },
+        h('span', { class: 'jc-notice__title' }, 'Not in your master resume — check before sending'),
+        facts?.length ? h('span', {}, `Numbers or dates: ${facts.join(', ')}`) : null,
+        roles?.length ? h('span', {}, `Titles or employers: ${roles.join(', ')}`) : null,
+      )));
+  }
+  if (stretches?.length) {
+    out.push(h('div', { class: 'jc-notice', dataset: { tone: 'caution' } },
+      h('div', { class: 'jc-notice__body' },
+        h('span', { class: 'jc-notice__title' }, 'Stretches — keep, soften or drop?'),
+        h('ul', { class: 'jc-list' }, ...stretches.map((x) => h('li', {}, `“${x.text}” — ${x.why}`))),
+      )));
+  }
+  return out;
 }
 
 function resumeToPlainText(r) {
@@ -2160,6 +2300,7 @@ const PROGRESS_MESSAGE = {
   'generate-letter':  'Drafting cover letter…',
   'generate-resume':  'Tailoring your resume…',
   'ask-llm':          'Asking the model…',
+  'review-letter':    'Reviewing your cover letter as the hiring manager…',
 };
 
 // In-flight analysis state, keyed by jobId. Value is an ordered array of
@@ -2298,6 +2439,7 @@ const PROCESSING_CARDS = {
   'generate-letter': ['letterCard'],
   'generate-resume': ['resumeCard'],
   'ask-llm':         ['askCard'],
+  'review-letter':   ['letterCard'],
 };
 // Map card-button IDs to action-bar action names so we can mirror state.
 const ACTION_MIRROR = {
@@ -2487,7 +2629,11 @@ chrome.storage.onChanged.addListener((changes) => {
   // the verdict block so the strength badge reflects the new targets.
   if (changes['settings.compTargets']) {
     compTargets = changes['settings.compTargets'].newValue || null;
-    if (currentJob) renderVerdict(currentJob);
+    if (currentJob) { renderVerdict(currentJob); renderCompCard(currentJob.analyses?.comp); }
+  }
+  if (changes['settings.applicationProfile']) {
+    applicationProfile = changes['settings.applicationProfile'].newValue || {};
+    if (currentJob) renderFitCard(currentJob.analyses?.fit);
   }
 });
 
@@ -2625,6 +2771,7 @@ async function init() {
   // Read once at boot; the settings-change listener below refreshes them
   // whenever the user edits comp floor/target/walk-away.
   try { compTargets = await getCompTargets(); } catch { compTargets = null; }
+  try { applicationProfile = await getApplicationProfile(); } catch { applicationProfile = {}; }
 
   // Check whichever provider is currently active. Nothing leaves the
   // browser until the user provides a key for their chosen cloud AI.

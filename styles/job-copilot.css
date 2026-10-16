@@ -221,8 +221,11 @@ html { background: var(--jc-bg); }
   text-wrap: pretty;
 }
 .jc *, .jc *::before, .jc *::after { box-sizing: border-box; }
-.jc a { color: var(--jc-accent); text-decoration: none; }
-.jc a:hover { color: var(--jc-accent-hover); text-decoration: underline; }
+/* :where() keeps this at single-class weight, so a component's own colour
+   (a link styled as a button — e.g. black ink on the amber CTAs) wins. As
+   `.jc a` it out-ranked them and painted cyan text onto amber buttons. */
+.jc :where(a) { color: var(--jc-accent); text-decoration: none; }
+.jc :where(a):hover { color: var(--jc-accent-hover); text-decoration: underline; }
 .jc :focus-visible,
 .jc-page :focus-visible {
   outline: 2px solid var(--jc-accent);
@@ -590,13 +593,13 @@ html { background: var(--jc-bg); }
 
 /* Amber highlight CTA — "Sync with LinkedIn". Dark ink on amber. */
 .jc-btn[data-variant="highlight"] {
-  --_bg: var(--jaw-amber); --_fg: #1A1200; --_bd: var(--jaw-amber);
+  --_bg: var(--jaw-amber); --_fg: #000; --_bd: var(--jaw-amber);
   font-weight: 700;
   letter-spacing: .08em;
   padding: 0 14px;
   min-height: 34px;
 }
-.jc-btn[data-variant="highlight"]:hover { --_bg: var(--jc-accent-2-hover); --_bd: var(--jc-accent-2-hover); --_fg: #1A1200; }
+.jc-btn[data-variant="highlight"]:hover { --_bg: var(--jc-accent-2-hover); --_bd: var(--jc-accent-2-hover); --_fg: #000; }
 /* LinkedIn glyph on the amber CTA — corporate blue reads fine on amber. */
 .jc-btn[data-variant="highlight"] .jc-li-icon { filter: none; }
 .jc-btn[data-variant="ghost"] { --_bg: transparent; --_bd: transparent; --_fg: var(--jc-text-2); }

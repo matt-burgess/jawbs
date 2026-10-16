@@ -5,6 +5,7 @@ import { derivePeople, relationshipTags, relationshipTone } from '../lib/people.
 import { roundFitToTens } from '../lib/strength.js';
 import { $, els, send, escapeHtml, fmtDate } from '../lib/pageBoot.js';
 import { h } from '../lib/h.js';
+import { quietness, followUpDue, isStale, FOLLOW_UP_AFTER_DAYS, MAX_FOLLOW_UPS } from '../lib/followups.js';
 
 const params = new URLSearchParams(location.search);
 const jobId = params.get('jobId');
@@ -68,6 +69,7 @@ function render() {
 
   renderHero();
   renderWhatsNext();
+  renderFollowUpBox();
   renderVoyageLog();
 
   // Static summary — first ~400 chars of the description. No API call.
@@ -893,6 +895,16 @@ function renderFitReadout() {
     return;
   }
 
+  // Eligibility / language gates from Fit (v9+), with the posting's words.
+  for (const [gate, label] of [['eligibility', 'Eligibility'], ['language', 'Language']]) {
+    const g = fit.gates?.[gate];
+    if (!g?.verdict || g.verdict === 'PASS') continue;
+    els.fitReadout.append(h('div', { class: 'jc-notice', dataset: { tone: g.verdict === 'FAIL' ? 'neg' : 'caution' } },
+      h('div', { class: 'jc-notice__body' },
+        h('span', { class: 'jc-notice__title' }, g.verdict === 'FAIL' ? `${label}: rules you out` : `${label}: check before applying`),
+        g.quote ? h('span', {}, `“${g.quote}”`) : null)));
+  }
+
   // Alignments — v6 outputs plain string bullets
   if (fit.alignments?.length) {
     els.fitReadout.append(h('div', { class: 'label' }, 'Alignments'));
@@ -1159,6 +1171,55 @@ function renderPersonRow(person, opts = {}) {
 //
 // Per-round AI prep is handled inside the round card. Top-level "Prep me
 // for this call" was removed; each interview lives as a round.
+
+// ---------- Follow-up on a quiet application ----------
+//
+// Shown while the job is Applied and waiting to hear back. Drafting is
+// one AI call, on click; "Mark sent" logs it so the quiet clock and the
+// two-follow-up limit stay right. Jawbs never sends anything.
+function renderFollowUpBox() {
+  const box = els.followUpBox;
+  box.innerHTML = '';
+  const q = quietness(job);
+  box.hidden = !q;
+  if (!q) return;
+  const due = followUpDue(q);
+  const head = q.followUps >= MAX_FOLLOW_UPS
+    ? `Quiet for ${q.daysQuiet} days after ${q.followUps} follow-ups. Standard practice is to stop chasing here.`
+    : `Quiet for ${q.daysQuiet} day${q.daysQuiet === 1 ? '' : 's'} · ${q.followUps} of ${MAX_FOLLOW_UPS} follow-ups sent.${due ? ' A short follow-up is reasonable now.' : ` Standard practice is to wait about ${FOLLOW_UP_AFTER_DAYS} days.`}`;
+  box.append(h('p', { class: 'jc-prose' }, head));
+  if (isStale(q)) {
+    box.append(h('p', { class: 'jc-footnote' }, 'Two months without a reply usually means no. You can close it from the status buttons, or from the Jawboard for several at once.'));
+  }
+  const draft = job.analyses?.applicationFollowUp?.result;
+  const row = h('div', { class: 'jc-btn-row' });
+  if (q.followUps < MAX_FOLLOW_UPS) {
+    const btn = h('button', {
+      class: 'jc-btn', 'data-variant': due ? 'primary' : undefined, 'data-size': 'sm', type: 'button',
+      title: 'Drafts a short note using only what you submitted. One AI call.',
+      onClick: async () => {
+        btn.disabled = true; btn.textContent = 'Drafting…';
+        try { await send('draft-application-followup', { jobId }); await load(); }
+        catch (e) { btn.disabled = false; btn.textContent = 'Draft follow-up'; alert(`Failed: ${e.message}`); }
+      },
+    }, draft ? 'Redraft follow-up' : 'Draft follow-up');
+    row.append(btn);
+  }
+  row.append(h('button', {
+    class: 'jc-btn', 'data-size': 'sm', type: 'button',
+    title: 'Record that you sent a follow-up today',
+    onClick: async () => { await send('add-timeline', { jobId, entryType: 'followup', note: 'Follow-up sent' }); await load(); },
+  }, 'Mark follow-up sent'));
+  box.append(row);
+  if (draft?.body) {
+    const text = `${draft.subject ? `Subject: ${draft.subject}\n\n` : ''}${draft.body}`;
+    const copy = h('button', {
+      class: 'jc-btn', 'data-size': 'sm', type: 'button',
+      onClick: async () => { await navigator.clipboard.writeText(text); copy.textContent = 'Copied'; setTimeout(() => { copy.textContent = 'Copy'; }, 1200); },
+    }, 'Copy');
+    box.append(h('pre', { class: 'followup-box__draft' }, text), copy);
+  }
+}
 
 els.logContact.addEventListener('click', async () => {
   const note = els.contactNote.value.trim();

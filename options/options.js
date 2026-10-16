@@ -156,7 +156,10 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
 });
 
 // Restore last-viewed tab on load — URL ?tab=X overrides so sidebar
-// quick-launch cards can jump straight to a specific tab.
+// quick-launch cards can jump straight to a specific tab. A #section in
+// the link (the side panel's "Set it in Settings") is scrolled to after
+// the tab switch, which would otherwise clear it.
+const initialSection = location.hash;
 try {
   const requested = new URLSearchParams(location.search).get('tab');
   const saved = localStorage.getItem(TAB_STORAGE_KEY);
@@ -164,6 +167,7 @@ try {
   if (target && document.querySelector(`.tab-btn[data-tab="${target}"]`)) {
     activateTab(target);
   }
+  if (initialSection) document.querySelector(initialSection)?.scrollIntoView({ block: 'start' });
 } catch {}
 
 // ---------- Sub-nav active-state ----------

@@ -317,7 +317,7 @@ body { background: var(--jc-bg); }
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 12px;
   background: var(--jaw-amber);
-  color: #1A1200;
+  color: #000;
   border: 0;
   border-radius: var(--jc-radius-sm);
   font: 700 var(--jc-text-label)/1 var(--jc-font-display);
@@ -1174,6 +1174,70 @@ body { background: var(--jc-bg); }
 #analysisSection .jc-card[data-open='false'] { display: none; }
 #analysisSection .jc-card__head { cursor: default; }
 #analysisSection .jc-card__chev { display: none; }
+
+/* ---------- Fit & Comp cards: answer first, one rhythm ----------
+   Body content stacks with one gap instead of per-element margins. */
+.jc-card__out { display: flex; flex-direction: column; gap: var(--jc-3); }
+.jc-card__out:empty { display: none; }
+.jc-card__foot {
+  display: flex; align-items: center; gap: var(--jc-2);
+  margin-top: var(--jc-3); padding-top: var(--jc-3);
+  border-top: 1px solid var(--jc-border);
+}
+.jc-card__foot .jc-footnote { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jc-card__foot .jc-btn { flex: none; }
+
+/* Fit: score + verdict on one line. */
+.jc-fit-head { display: flex; align-items: center; gap: var(--jc-3); flex-wrap: wrap; }
+.jc-fit-head .jc-score { align-items: baseline; gap: 4px; }
+.jc-fit-head .jc-score__num { font-size: 32px; line-height: 1; }
+.jc-fit-head .jc-score__den { padding-bottom: 0; }
+.jc-fit-head .jc-verdict-inline { margin-left: auto; }
+.jc-track { color: var(--jc-text-3); font-size: var(--jc-text-sm); }
+.jc-fit-setting { color: var(--jc-text-2); font-size: var(--jc-text-sm); }
+
+/* Label/value rows — shared by both cards and by notice items. */
+.jc-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--jc-2) var(--jc-3); margin: 0; }
+.jc-kv > dt { font: 600 var(--jc-text-2xs)/20px var(--jc-font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--jc-text-3); }
+.jc-kv > dd { margin: 0; padding-top: 1px; font: 400 var(--jc-text-sm)/var(--jc-leading-snug) var(--jc-font); color: var(--jc-text-2); }
+.jc-notice .jc-kv { margin-top: 2px; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.jc-notice .jc-kv > dd + dt { margin-top: var(--jc-2); }
+
+/* Comp: the answer, then the range once, then the bar. */
+.jc-comp-answer {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--jc-2) var(--jc-3);
+  border-left: 3px solid var(--_tone, var(--jc-info)); border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-2);
+  font: 400 var(--jc-text-sm)/1.4 var(--jc-font); color: var(--jc-text-2);
+}
+.jc-comp-answer strong { font: 700 var(--jc-text-md)/1.2 var(--jc-font-display); letter-spacing: .04em; text-transform: uppercase; color: var(--_tone, var(--jc-text)); }
+.jc-comp-answer[data-tone='pos'] { --_tone: var(--jc-pos); }
+.jc-comp-answer[data-tone='caution'] { --_tone: var(--jc-caution); }
+.jc-comp-answer[data-tone='neg'] { --_tone: var(--jc-neg); }
+.jc-comp-hero { display: flex; flex-direction: column; gap: 4px; }
+.jc-comp-hero__top { display: flex; align-items: center; justify-content: space-between; gap: var(--jc-2); }
+.jc-comp-hero .jc-badge { white-space: nowrap; }
+.jc-comp-hero__num { font: 500 28px/1 var(--jc-font-mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--jc-text); white-space: nowrap; }
+.jc-comp-hero[data-estimate='true'] .jc-comp-hero__num { color: var(--jc-caution); }
+.jc-range { display: flex; flex-direction: column; gap: 6px; }
+.jc-range__track { position: relative; height: 8px; border-radius: 2px; background: var(--jc-surface-3); margin-top: 4px; }
+.jc-range__band { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: var(--jc-pos); opacity: .85; }
+.jc-range[data-tone='caution'] .jc-range__band { background: var(--jc-caution); }
+.jc-range[data-tone='neg'] .jc-range__band { background: var(--jc-neg); }
+.jc-range__tick { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--jc-text-3); }
+.jc-range__tick[data-kind='target'] { background: var(--jc-text); }
+.jc-range__legend { display: flex; align-items: center; gap: var(--jc-3); flex-wrap: wrap; font: 400 var(--jc-text-3xs)/1.4 var(--jc-font-mono); color: var(--jc-text-3); }
+.jc-range__legend i { display: inline-block; width: 2px; height: 10px; margin-right: 5px; vertical-align: -1px; background: var(--jc-text-3); }
+.jc-range__legend i[data-kind='target'] { background: var(--jc-text); }
+
+/* Cover-letter review edits — before (struck) and after, with Apply. */
+.jc-review-edit {
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+  padding: var(--jc-2) 0; border-top: 1px solid var(--jc-border);
+}
+.jc-review-edit del { color: var(--jc-text-3); }
+.jc-review-edit ins { text-decoration: none; color: var(--jc-text); }
 
 /* Resume ATS check — pass/fail rows above the tailored resume. */
 .jc-ats-check { list-style: none; margin: 0; padding: 0; font-size: var(--jc-text-sm); line-height: 1.6; }

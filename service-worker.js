@@ -18,6 +18,7 @@ import {
   upsertJob,
   getJob,
   listJobs,
+  getApplicationProfile,
   bulkGetJobsByIds,
   deleteJob,
   countJobs,
@@ -60,6 +61,10 @@ import { upgradeStatus, resolveTransition, stageOf, normalizeTrackerStage, statu
 import { computeStrengthScore, computeCompGaugeScore, roundFitToTens } from './lib/strength.js';
 import { ROUND_SYSTEM, ROUND_PROMPT_VERSION, buildRoundUserMessage } from './lib/prompts/interviewRound.js';
 import { FOLLOWUP_SYSTEM, FOLLOWUP_PROMPT_VERSION, buildFollowUpUserMessage } from './lib/prompts/followUpEmail.js';
+import { HUMAN_STYLE } from './lib/prompts/humanStyle.js';
+import { APPLICATION_FOLLOWUP_SYSTEM, APPLICATION_FOLLOWUP_PROMPT_VERSION, buildApplicationFollowUpUserMessage } from './lib/prompts/applicationFollowUp.js';
+import { quietness } from './lib/followups.js';
+import { LETTER_REVIEW_SYSTEM, LETTER_REVIEW_PROMPT_VERSION, buildLetterReviewUserMessage } from './lib/prompts/letterReview.js';
 import { fetchJobDetail } from './lib/enrich.js';
 import {
   isReachable as ollamaReachable,
@@ -70,7 +75,7 @@ import {
 
 import { matchInbound } from './lib/search.js';
 import { postingAgeDays, applicantCount } from './lib/freshness.js';
-import { sharedTerms, verifyResume } from './lib/keywords.js';
+import { sharedTerms, verifyResume, unsupportedFacts } from './lib/keywords.js';
 
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
@@ -257,6 +262,9 @@ const handlers = {
   'analyze-comp': (msg) => instrumentAnalysis('analyze-comp', msg.jobId, () => runComp(msg.jobId)),
   'build-brief': (msg) => instrumentAnalysis('build-brief', msg.jobId, () => runBrief(msg.jobId)),
   'generate-letter': (msg) => instrumentAnalysis('generate-letter', msg.jobId, () => runLetter(msg.jobId, msg.tone)),
+  'draft-application-followup': (msg) => instrumentAnalysis('draft-application-followup', msg.jobId, () => runApplicationFollowUp(msg.jobId)),
+  'review-letter': (msg) => instrumentAnalysis('review-letter', msg.jobId, () => runLetterReview(msg.jobId)),
+  'update-letter': (msg) => updateLetterText(msg.jobId, msg.letter),
   'generate-resume': (msg) => instrumentAnalysis('generate-resume', msg.jobId, () => runResume(msg.jobId, msg.mustInclude)),
   'ask-llm': (msg) => instrumentAnalysis('ask-llm', msg.jobId, () => runAsk(msg.jobId, msg.prompt, msg.provider)),
   'get-chats': (msg) => getChats(msg.jobId),
@@ -1706,9 +1714,11 @@ async function runFit(jobId) {
   // isn't open or modal extraction fails, fit still runs with preview data.
   await enrichWarmthOnDemand(jobId);
   const ctx = await loadContext(jobId);
+  const authorization = await getApplicationProfile();
   const userMessage = buildFitUserMessage({
     profile: ctx.profile, masterResume: ctx.resume, job: ctx.job,
     workLocations: ctx.workLocations, workPreferences: ctx.workPreferences,
+    authorization,
   });
   const r = await routeCall('fit', {
     local: (model) => callOllamaJson({ model, system: FIT_SYSTEM, userMessage, maxTokens: 1200 }),
@@ -1913,6 +1923,13 @@ async function runLetter(jobId, tone = 'warm') {
     provider: r.provider, fellback: r.fellback,
     generatedAt: new Date().toISOString(),
     promptVersion: LETTER_PROMPT_VERSION,
+    // Numbers the letter states that the resume, profile and posting never
+    // do. The posting counts here — a letter may quote the company's own
+    // figures — unlike the resume check, where only his record does.
+    factCheck: {
+      unsupportedFacts: unsupportedFacts(r.result?.letter || '',
+        `${ctx.resume || ''}\n${ctx.profile || ''}\n${ctx.job.posting?.title || ''}\n${ctx.job.posting?.descriptionText || ''}`),
+    },
   };
   await setJobAnalysis(jobId, 'coverLetter', record);
   return { ok: true, record };
@@ -1920,6 +1937,88 @@ async function runLetter(jobId, tone = 'warm') {
 
 // mustInclude — terms the last draft's keyword check found missing; the
 // "Regenerate including these" button passes them back.
+// Follow-up on an application that has gone quiet. The model sees only
+// what was actually sent (tailored resume and cover letter, or the master
+// resume if none was tailored) so the note can't introduce new claims.
+async function runApplicationFollowUp(jobId) {
+  const ctx = await loadContext(jobId);
+  const a = ctx.job.analyses || {};
+  const resumeText = a.resume?.result ? JSON.stringify(a.resume.result) : '';
+  const submitted = [a.coverLetter?.result?.letter, resumeText].filter(Boolean).join('\n\n') || ctx.resume;
+  const q = quietness(ctx.job);
+  const appliedAt = ctx.job.application?.appliedAt || ctx.job.statusUpdatedAt;
+  const userMessage = buildApplicationFollowUpUserMessage({
+    job: ctx.job, submitted, profile: ctx.profile,
+    appliedOn: appliedAt ? new Date(appliedAt).toDateString() : null,
+    followUpNumber: Math.min((q?.followUps || 0) + 1, 2),
+  });
+  const r = await routeCall('coverLetter', {
+    local: (model) => callOllamaJson({ model, system: APPLICATION_FOLLOWUP_SYSTEM, userMessage, maxTokens: 700 }),
+    cloud: () => callJsonAnthropic({
+      apiKey: ctx.apiKey, model: ctx.models.coverLetter,
+      system: APPLICATION_FOLLOWUP_SYSTEM, userMessage, maxTokens: 700,
+    }),
+  });
+  const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
+  await addUsage({ model: modelLabel, usage: r.usage });
+  const record = {
+    result: r.result, model: modelLabel, usage: r.usage,
+    generatedAt: new Date().toISOString(), promptVersion: APPLICATION_FOLLOWUP_PROMPT_VERSION,
+  };
+  await setJobAnalysis(jobId, 'applicationFollowUp', record);
+  return { ok: true, record };
+}
+
+// Hiring-manager review of the current cover letter. Edits whose "old"
+// text isn't in the letter verbatim are dropped — they could not be
+// applied, and showing them would invite the user to hunt for text that
+// isn't there.
+async function runLetterReview(jobId) {
+  const ctx = await loadContext(jobId);
+  const letter = ctx.job.analyses?.coverLetter?.result?.letter;
+  if (!letter) throw new Error('Generate a cover letter first.');
+  const userMessage = buildLetterReviewUserMessage({
+    letter, profile: ctx.profile, masterResume: ctx.resume, writingSamples: ctx.samples, job: ctx.job,
+  });
+  const r = await routeCall('coverLetter', {
+    local: (model) => callOllamaJson({ model, system: LETTER_REVIEW_SYSTEM, userMessage, maxTokens: 2000 }),
+    cloud: () => callJsonAnthropic({
+      apiKey: ctx.apiKey, model: ctx.models.coverLetter,
+      system: LETTER_REVIEW_SYSTEM, userMessage, maxTokens: 2000,
+    }),
+  });
+  const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
+  await addUsage({ model: modelLabel, usage: r.usage });
+  const edits = (r.result?.edits || []).filter((e) => e?.old && typeof e.new === 'string' && letter.split(e.old).length === 2);
+  const record = {
+    result: { edits, notes: r.result?.notes || {} },
+    reviewedLetter: letter, model: modelLabel, usage: r.usage,
+    generatedAt: new Date().toISOString(), promptVersion: LETTER_REVIEW_PROMPT_VERSION,
+  };
+  await setJobAnalysis(jobId, 'letterReview', record);
+  return { ok: true, record };
+}
+
+// The user edited the letter (inline, or by applying a review edit). Keep
+// it, and re-run the free number check against the new text.
+async function updateLetterText(jobId, letter) {
+  const job = await getJob(jobId);
+  const rec = job?.analyses?.coverLetter;
+  if (!rec || typeof letter !== 'string') return { ok: false, error: 'No cover letter to update' };
+  const ctx = await loadContext(jobId);
+  const updated = {
+    ...rec,
+    result: { ...rec.result, letter: letter.slice(0, 20000) },
+    editedAt: new Date().toISOString(),
+    factCheck: {
+      unsupportedFacts: unsupportedFacts(letter,
+        `${ctx.resume || ''}\n${ctx.profile || ''}\n${job.posting?.title || ''}\n${job.posting?.descriptionText || ''}`),
+    },
+  };
+  await setJobAnalysis(jobId, 'coverLetter', updated);
+  return { ok: true, record: updated };
+}
+
 async function runResume(jobId, mustInclude) {
   const ctx = await loadContext(jobId);
   if (!ctx.resume) throw new Error('Master resume not uploaded. Add it in Settings first.');
@@ -2034,11 +2133,16 @@ async function handleDeleteRound(jobId, roundId) {
 // user's resume + profile + (if a jawb is active) the JD, and logs
 // the Q&A to job.applicationAnswers so it can be recalled later when
 // the recruiter phones.
-async function handleDraftApplicationAnswer({ question, url, jobId }) {
+async function handleDraftApplicationAnswer({ question, url, jobId, maxChars }) {
   if (typeof question !== 'string' || !question.trim()) {
     return { ok: false, error: 'Question text required' };
   }
   const trimmedQuestion = question.trim().slice(0, 1000);
+  // A stated limit, from the field itself or the question's wording
+  // ("max 200 words", "up to 500 characters").
+  const words = trimmedQuestion.match(/(\d{2,4})\s*words?\b/i)?.[1];
+  const chars = Number(maxChars) > 0 ? Number(maxChars) : Number(trimmedQuestion.match(/(\d{2,5})\s*char/i)?.[1]) || null;
+  const limit = [words && `${words} words`, chars && `${chars} characters`].filter(Boolean).join(' and ');
   // Resolve which jawb this application belongs to. Explicit arg wins,
   // then the sidepanel's active-jawb hint written on renderJob, else null.
   let effectiveJobId = jobId;
@@ -2062,15 +2166,20 @@ async function handleDraftApplicationAnswer({ question, url, jobId }) {
     '- If the question requires a specific fact you cannot ground in the resume, leave a "[TODO: <what is missing>]" placeholder in your answer instead of making one up.',
     '- Return ONLY the answer text. No preamble ("Here is my answer:"), no meta-commentary, no bullet-point outline unless the question explicitly asks for one.',
     '',
-    'STYLE BANS (these read as machine-written and undercut authenticity):',
-    '- NO em-dashes. Use a comma, semicolon, parentheses, or split into two sentences instead. Compound-word hyphens (e.g. "hands-on") are fine.',
-    '- NO en-dashes for the same reason.',
-    '- Do NOT use the word "intersection" (as in "at the intersection of X and Y") anywhere in the answer.',
-    '- If you reach for either of the above, rewrite the sentence.',
+    // Field-type guidance adapted from MadsLorentzen/ai-job-search (MIT).
+    'BY QUESTION TYPE:',
+    '- Self-introduction / "tell us about yourself": current situation, then the single strongest piece of evidence with its number and scale, then where he wants to go next tied to THIS employer. Lead with the strongest evidence, not chronology.',
+    '- Project or experience entries: his role ON THAT PROJECT, which may be narrower than his job title; never upgrade it. Where he contributed rather than owned, say so. Use project dates, not employment dates.',
+    '- Short pitches and tight limits: one concrete situation beats adjectives ("passionate", "fast learner", "team player").',
+    '- Motivation ("why us"): use only what the job context says about the company; never supply company facts from memory.',
+    '',
+    HUMAN_STYLE,
     '',
     'VOICE: match the writing samples below if present. Otherwise write first-person, professional-but-warm.',
     '',
-    'LENGTH: default to 150-250 words. Match the implied scope of the question. Short-answer prompts get a couple of sentences; essay-style prompts get 200-300 words.',
+    limit
+      ? `LENGTH — HARD LIMIT: ${limit}. Count before answering; portals cut longer answers off silently. Aim for about 90% of the limit.`
+      : 'LENGTH: default to 150-250 words. Match the implied scope of the question. Short-answer prompts get a couple of sentences; essay-style prompts get 200-300 words.',
     '',
   ];
   if (profile) systemLines.push('=== USER PROFILE ===', profile, '');
@@ -2097,8 +2206,15 @@ async function handleDraftApplicationAnswer({ question, url, jobId }) {
     maxTokens: 1500,
   });
   const durationMs = Math.round(performance.now() - started);
-  const answer = (r.text || '').trim();
+  let answer = (r.text || '').trim();
   if (!answer) return { ok: false, error: 'LLM returned an empty draft' };
+  // Over a hard character limit anyway: cut back to the last whole
+  // sentence that fits, rather than let the portal chop mid-word.
+  if (chars && answer.length > chars) {
+    const cut = answer.slice(0, chars);
+    const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+    answer = (end > chars * 0.5 ? cut.slice(0, end + 1) : cut).trim();
+  }
 
   // Persist the Q&A on the jawb record if we have one. Cap the array so
   // a runaway loop can't balloon storage. Timeline gets a short note so

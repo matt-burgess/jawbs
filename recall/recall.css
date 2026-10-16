@@ -845,3 +845,16 @@ details summary {
   white-space: nowrap;
 }
 .recall-panel.recall-tabpanel { margin-top: 24px; }
+
+/* Follow-up box — top of the Timeline tab while an application waits to hear back. */
+.followup-box {
+  display: flex; flex-direction: column; gap: var(--jc-2);
+  margin: var(--jc-2) 0 var(--jc-3); padding: var(--jc-3);
+  border: 1px solid var(--jc-border); border-radius: var(--jc-radius);
+  background: var(--jc-surface-1);
+}
+.followup-box__draft {
+  margin: 0; white-space: pre-wrap;
+  font: 400 var(--jc-text-sm)/1.5 var(--jc-font);
+  color: var(--jc-text);
+}

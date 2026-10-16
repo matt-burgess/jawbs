@@ -81,6 +81,9 @@
       const r = await chrome.runtime.sendMessage({
         type: 'draft-application-answer',
         question,
+        // The field's own hard limit, if it has one. Portals often cut
+        // longer answers off silently.
+        maxChars: target.maxLength > 0 ? target.maxLength : null,
         url: location.href,
       });
       if (!r?.ok) throw new Error(r?.error || 'Draft failed');

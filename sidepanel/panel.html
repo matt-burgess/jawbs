@@ -391,10 +391,10 @@
               <span class="jc-card__chev">▸</span>
             </button>
             <div class="jc-card__body">
-              <div id="fitOutput"></div>
-              <div class="jc-btn-row">
-                <button id="analyzeFit" class="jc-btn" data-variant="primary" data-size="sm" type="button">Analyze</button>
+              <div id="fitOutput" class="jc-card__out"></div>
+              <div class="jc-card__foot">
                 <span id="fitMeta" class="jc-footnote"></span>
+                <button id="analyzeFit" class="jc-btn" data-variant="primary" data-size="sm" type="button">Analyze fit</button>
               </div>
               <div id="fitError" class="jc-notice" data-tone="neg" hidden></div>
             </div>
@@ -431,14 +431,14 @@
               <span class="jc-card__chev">▸</span>
             </button>
             <div class="jc-card__body">
-              <div id="compOutput"></div>
-              <div class="jc-btn-row">
-                <button id="analyzeComp" class="jc-btn" data-size="sm" type="button">Analyze</button>
+              <div id="compOutput" class="jc-card__out"></div>
+              <div class="jc-card__foot">
                 <span id="compMeta" class="jc-footnote"></span>
+                <button id="analyzeComp" class="jc-btn" data-variant="primary" data-size="sm" type="button">Analyze comp</button>
               </div>
 
               <details class="offer-form" id="offerForm">
-                <summary><span class="jc-eyebrow">Offer details (from interview / recruiter)</span></summary>
+                <summary><span class="jc-eyebrow">Got an offer? Record it</span></summary>
                 <div class="offer-fields">
                   <div class="offer-grid">
                     <label><span>Base salary (USD)</span><input id="offerBase" class="jc-input" type="number" min="0" step="1000" /></label>
@@ -451,7 +451,7 @@
                   </div>
                   <label><span>Other notes</span><textarea id="offerNotes" class="jc-textarea" placeholder="Benefits, PTO, remote-work clause, offer expiration, etc."></textarea></label>
                   <div class="jc-btn-row">
-                    <button id="saveOffer" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save &amp; re-analyze</button>
+                    <button id="saveOffer" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save offer</button>
                     <button id="clearOffer" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Clear</button>
                     <span id="offerStatus" class="jc-footnote"></span>
                   </div>

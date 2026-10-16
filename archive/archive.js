@@ -7,6 +7,7 @@ import { trashSvg } from '../lib/icons.js';
 import { computeStrengthScore, computeCompGaugeScore, roundFitToTens } from '../lib/strength.js';
 import { $, els, send, fmtDate } from '../lib/pageBoot.js';
 import { h } from '../lib/h.js';
+import { quietness, followUpDue, isStale } from '../lib/followups.js';
 
 initQuickFill();
 
@@ -216,20 +217,38 @@ function renderBoardFoot(rows) {
   foot.hidden = false;
   const sortLabel = SORT_LABELS[sortKey] || sortKey;
   summary.textContent = `Showing ${rows.length} of ${jobs.length} · sorted by ${sortLabel} ${sortDir === 'asc' ? '↑' : '↓'}`;
-  if (stale) {
-    const staleCutoff = Date.now() - 21 * 86400_000;
-    const staleCount = rows.filter((j) => {
-      const status = normalizeStatus(j.status);
-      if (status !== 'applied' && status !== 'interviewing') return false;
-      const t = Date.parse(j.statusUpdatedAt || j.updatedAt || j.capturedAt || '');
-      return t && t < staleCutoff;
-    }).length;
-    if (staleCount) {
-      stale.hidden = false;
-      stale.textContent = `⚠ ${staleCount} jawb${staleCount === 1 ? '' : 's'} going stale — no move in 21+ days`;
-    } else {
-      stale.hidden = true;
-    }
+  if (stale) renderQuietApplications(stale);
+}
+
+// Applications waiting to hear back: ones due a follow-up (10+ days quiet,
+// fewer than two sent) link to their Timeline tab, where the follow-up is
+// drafted; ones quiet 60+ days can be closed together. Whole archive, not
+// just the filtered rows — a filter shouldn't hide that something is due.
+function renderQuietApplications(el) {
+  el.innerHTML = '';
+  const quiet = jobs.map((j) => ({ j, q: quietness(j) })).filter((x) => x.q);
+  const due = quiet.filter((x) => followUpDue(x.q) && !isStale(x.q));
+  const stale = quiet.filter((x) => isStale(x.q));
+  el.hidden = !due.length && !stale.length;
+  const link = ({ j, q }) => h('a', { href: `../recall/recall.html?jobId=${encodeURIComponent(j.jobId)}#s=timeline`, title: `${q.daysQuiet} days quiet` },
+    j.posting?.company || j.posting?.title || j.jobId);
+  if (due.length) {
+    el.append(h('span', {}, `Follow-up due (${due.length}): `), ...due.flatMap((x, i) => (i ? [', ', link(x)] : [link(x)])));
+  }
+  if (stale.length) {
+    const btn = h('button', {
+      class: 'jc-btn', 'data-size': 'sm', type: 'button',
+      onClick: async () => {
+        const names = stale.map(({ j, q }) => `• ${j.posting?.title || j.jobId} at ${j.posting?.company || '?'} (${q.daysQuiet} days)`).join('\n');
+        if (!confirm(`Close these as no response? They'll move to Scar; you can change any of them later.\n\n${names}`)) return;
+        btn.disabled = true;
+        for (const { j, q } of stale) {
+          await send('update-job-status', { jobId: j.jobId, status: 'notMovingForward', note: `No response after ${q.daysQuiet} days — closed from the Jawboard` });
+        }
+        await load();
+      },
+    }, `Close ${stale.length} quiet 60+ days…`);
+    el.append(due.length ? ' · ' : '', btn);
   }
 }
 const SORT_LABELS = {
