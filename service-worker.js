@@ -58,11 +58,12 @@ import {
   PROFILE_SYSTEM, buildProfileUserMessage,
   KB_SYSTEM, buildKbUserMessage,
 } from './lib/prompts/bootstrap.js';
-import { upgradeStatus, resolveTransition, stageOf, normalizeTrackerStage, statusLabel, normalizeStatus, STATUS_ORDER } from './lib/statuses.js';
+import { upgradeStatus, resolveTransition, stageOf, undoTarget, normalizeTrackerStage, statusLabel, normalizeStatus, STATUS_ORDER } from './lib/statuses.js';
 import { computeStrengthScore, computeCompGaugeScore, roundFitToTens } from './lib/strength.js';
 import { ROUND_SYSTEM, ROUND_PROMPT_VERSION, buildRoundUserMessage } from './lib/prompts/interviewRound.js';
 import { FOLLOWUP_SYSTEM, FOLLOWUP_PROMPT_VERSION, buildFollowUpUserMessage } from './lib/prompts/followUpEmail.js';
 import { HUMAN_STYLE } from './lib/prompts/humanStyle.js';
+import { UNTRUSTED_POSTING } from './lib/prompts/parts.js';
 import { APPLICATION_FOLLOWUP_SYSTEM, APPLICATION_FOLLOWUP_PROMPT_VERSION, buildApplicationFollowUpUserMessage } from './lib/prompts/applicationFollowUp.js';
 import { quietness } from './lib/followups.js';
 import { companiesUrl, jobsUrl, jobUrl, pickCompany, pickMatch, summarize, usableSalary } from './lib/freehire.js';
@@ -265,6 +266,7 @@ const handlers = {
   'build-brief': (msg) => instrumentAnalysis('build-brief', msg.jobId, () => runBrief(msg.jobId)),
   'generate-letter': (msg) => instrumentAnalysis('generate-letter', msg.jobId, () => runLetter(msg.jobId, msg.tone)),
   'draft-application-followup': (msg) => instrumentAnalysis('draft-application-followup', msg.jobId, () => runApplicationFollowUp(msg.jobId)),
+  'undo-status': (msg) => undoStatus(msg.jobId),
   'company-site-lookup': (msg) => lookupCompanySite(msg),
   'company-site-choose': (msg) => chooseCompanySite(msg.jobId, msg.slug),
   'refresh-company-sites': () => refreshCompanySites(),
@@ -1283,6 +1285,7 @@ async function applyReconciliation(resolutions) {
   const mismatchById = new Map((diff.statusMismatches || []).map((m) => [String(m.jobId), m]));
   const now = new Date().toISOString();
   let applied = 0, deleted = 0, skipped = 0;
+  const changedIds = []; // for the Jawboard's Undo
 
   for (const { jobId, resolution } of resolutions) {
     const id = String(jobId);
@@ -1300,6 +1303,7 @@ async function applyReconciliation(resolutions) {
     }
 
     let patch;
+    let append = [];
     if (resolution === 'accept-linkedin') {
       if (mismatch) {
         // Direct status write — user intent overrides upgrade-only.
@@ -1308,22 +1312,15 @@ async function applyReconciliation(resolutions) {
           statusUpdatedAt: now,
           linkedInStage: stageOf(mismatch.linkedInStatus),
           manualLock: false,
-          timeline: [
-            ...(existing.timeline || []),
-            { at: now, type: 'reconcile', note: `Accepted LinkedIn: ${existing.status || 'analyzed'} → ${mismatch.linkedInStatus}` },
-          ],
         };
+        append = [{ at: now, type: 'status-change', from: existing.status || 'analyzed', to: mismatch.linkedInStatus, source: 'reconcile',
+          note: `Accepted LinkedIn: ${existing.status || 'analyzed'} → ${mismatch.linkedInStatus}` }];
       } else if (missing) {
         // "Accept" for a missing record = "LinkedIn no longer tracks
         // this" → set to notMovingForward (soft-archive).
-        patch = {
-          status: 'notMovingForward',
-          statusUpdatedAt: now,
-          timeline: [
-            ...(existing.timeline || []),
-            { at: now, type: 'reconcile', note: 'Accepted LinkedIn: no longer on any list → notMovingForward' },
-          ],
-        };
+        patch = { status: 'notMovingForward', statusUpdatedAt: now };
+        append = [{ at: now, type: 'status-change', from: existing.status || 'analyzed', to: 'notMovingForward', source: 'reconcile',
+          note: 'Accepted LinkedIn: no longer on any list → notMovingForward' }];
       }
     } else if (resolution === 'keep-local') {
       // No status change — audit trail only.
@@ -1334,7 +1331,8 @@ async function applyReconciliation(resolutions) {
     }
 
     if (patch) {
-      await upsertJob(id, patch);
+      await upsertJob(id, patch, { appendTimeline: append });
+      if (patch.status) changedIds.push(id);
       applied++;
     } else {
       skipped++;
@@ -1345,7 +1343,7 @@ async function applyReconciliation(resolutions) {
     type: 'reconcile-apply', ok: true,
     note: `applied ${applied} · deleted ${deleted} · skipped ${skipped}`,
   });
-  return { ok: true, applied, deleted, skipped };
+  return { ok: true, applied, deleted, skipped, changedIds };
 }
 
 async function getReconciliationDiff() {
@@ -1989,6 +1987,28 @@ async function runApplicationFollowUp(jobId) {
   return { ok: true, record };
 }
 
+// ---------- Undo the last status change ----------
+//
+// Restores what the newest status entry recorded it replaced (status,
+// LinkedIn stage, manual lock) and logs the undo. One step only.
+async function undoStatus(jobId) {
+  const id = String(jobId || '');
+  const job = await getJob(id);
+  const t = undoTarget(job?.timeline);
+  if (!t) return { ok: false, error: 'Nothing to undo' };
+  const now = new Date().toISOString();
+  const status = normalizeStatus(t.previousStatus);
+  await upsertJob(id, {
+    status, statusUpdatedAt: now,
+    linkedInStage: t.previousLinkedInStage ?? undefined, manualLock: !!t.previousManualLock,
+  }, {
+    appendTimeline: [{ at: now, type: 'status-undone', from: job.status, to: status, undoes: t.at,
+      note: `Undid ${statusLabel(job.status)}, back to ${statusLabel(status)}` }],
+  });
+  chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
+  return { ok: true, status, label: statusLabel(status) };
+}
+
 // ---------- Company-site lookup (freehire.me) ----------
 //
 // Is this LinkedIn job also on the employer's own careers site? Two
@@ -2296,7 +2316,7 @@ async function handleDraftApplicationAnswer({ question, url, jobId, maxChars }) 
     if (job.posting.company) systemLines.push(`Company: ${job.posting.company}`);
     if (job.posting.descriptionText) {
       systemLines.push('Description:');
-      systemLines.push(String(job.posting.descriptionText).slice(0, 8000));
+      systemLines.push(UNTRUSTED_POSTING(String(job.posting.descriptionText).slice(0, 8000)));
     }
     systemLines.push('');
   }

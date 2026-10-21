@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <em>Chromium extension · Manifest V3 · Anthropic Claude (with optional local Ollama routing)</em>
+  <em>Chromium extension · Manifest V3 · Anthropic Claude, OpenAI or Google Gemini (with optional local Ollama routing)</em>
 </p>
 
 <p align="center">
@@ -157,14 +157,15 @@ Then load the `jawbs` folder as an unpacked extension using **Step 3** above. Se
 | **Saved LinkedIn Searches** | Save any `/jobs/search/*` URL. Suggestion pill nudges you toward high-signal filters (past 24h, in-network) most searches leave off. |
 | **Auto-capture on LinkedIn Save/Apply** | Clicking LinkedIn's own Save or Apply button archives the job — no separate "Save to Job Thresher" click. |
 | **Recall** | Full-page per-job view for interview rounds, timeline, comp offer form — the stuff that doesn't fit in the Jawbar. |
-| **Local vs Cloud routing** | Anthropic Claude by default. Optional Ollama routing per-feature (Fit, Comp, Prep, Letter, Resume) — keeps routine work off your API bill. |
+| **AI providers** | Anthropic Claude, OpenAI or Google Gemini (your own key). Optional local Ollama routing per feature (Fit, Comp, Prep, Letter, Resume) keeps routine work off your API bill. |
 | **Personal-Tool disclaimer** | The API key sits in `chrome.storage.local` in plaintext. Appropriate for your own machine. Not appropriate for shared devices or org rollouts. |
 
 ## Privacy & data
 
 - **All data is local.** `chrome.storage.local` on your machine.
 - **API key is plaintext**, per Chrome extension convention. Not for shared devices.
-- **No telemetry.** Nothing is logged, phoned home, or sent to any server other than the AI provider (`api.anthropic.com` or your local Ollama at `localhost:11434`).
+- **No telemetry.** Nothing is logged or phoned home. Network calls go only to: the AI provider you chose (`api.anthropic.com`, `api.openai.com` or `generativelanguage.googleapis.com`) or your local Ollama at `localhost:11434`, when you click; LinkedIn and Google pages you are already on; and `freehire.me`, which receives a job's title and company (nothing about you) to find the same job on the employer's own careers site. That lookup is on by default and can be switched off in Settings.
+- **Untrusted text stays data.** Job postings and pasted emails are fenced in prompts as material to read, never instructions (`lib/prompts/parts.js`).
 - **Manual export/import**. `Jawboard → Export JSON` gives you a portable dump minus the API key. Import restores it.
 - **Cost tracking is local** — token counts and cost estimates live in the Jawbar footer. Numbers are approximate; verify against your Anthropic console for billing.
 
@@ -186,7 +187,10 @@ content/               LinkedIn scraper + ATS form-fill helpers
   externalFill.js      Fill helpers for common ATS sites
   selectors.js         Selector maps used by scrape.js
 lib/
+  aiRouter.js          Provider switch: Anthropic, OpenAI or Gemini
   anthropic.js         Anthropic API client (browser-direct with dangerous header)
+  openaiClient.js      OpenAI client
+  geminiClient.js      Google Gemini client
   json.js              JSON-response helper with retry
   ollamaClient.js      Local model client (Ollama)
   store.js             chrome.storage.local wrapper — settings + Jawboard + usage
@@ -197,7 +201,16 @@ lib/
   search.js            Fuzzy search across the Jawboard
   linkedInFill.js      Shared LinkedIn URL fill helper
   enrich.js            Fetch full posting via JSON-LD when scrape falls back
+  keywords.js          ATS keyword matching + fact check on generated documents (pure)
+  freshness.js         Posting age and applicant counts (pure)
+  followups.js         Quiet-application rules (pure)
+  calibration.js       Fit track record from your own outcomes (pure)
+  compVerdict.js       Pay vs your floor and target (pure)
+  applicationFill.js   ATS form field recognition for autofill (pure)
+  freehire.js          Company-site lookup matching (freehire.me)
   prompts/             System prompts + user-message builders
+    parts.js           Shared parts: untrusted-text fences, no-dash rule
+    humanStyle.js      Writing rules for anything sent to a person
     fit.js
     comp.js
     questionPrep.js
@@ -205,6 +218,8 @@ lib/
     resume.js
     ask.js
     interviewRound.js
+    followUpEmail.js, applicationFollowUp.js, letterReview.js, bootstrap.js
+tests/                 node:test files for every pure lib/ module
 assets/                Icons, PNGs
 styles/
   job-copilot.css      Shared design tokens + component styles
@@ -222,7 +237,6 @@ docs/                  Architecture notes
 
 ### Not in the box
 
-- No test suite. This is a personal tool that ships to production every reload.
 - No i18n. English only. LinkedIn URL matching assumes `www.linkedin.com/*`.
 - No cross-device sync. Deliberate — the API key is one of the reasons.
 
@@ -240,6 +254,12 @@ Debug consoles:
 - **Jawbar / options / Jawboard**: right-click the page → Inspect
 - **Service worker**: `chrome://extensions` → Jawbs → *Inspect views: service worker*
 - **Content script**: DevTools on any linkedin.com tab → Console; filter for `[Jawbs]`
+
+Tests: every pure module under `lib/` has a `node:test` file in `tests/`. No dependencies to install.
+
+```bash
+node --test tests/
+```
 
 Syntax check before reload (all files are Node-parseable ES modules):
 
@@ -263,9 +283,9 @@ Cloud remains the fallback on any local failure. Cover Letter and Tailored Resum
 This started as, and remains, a personal-use tool. PRs welcome but expect an opinionated maintainer. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the small print. In short:
 
 - Keep to the "no build step" constraint
-- No test suite → no need to add one; use `node --check` for syntax
+- Logic that doesn't need a model goes in a pure `lib/` module with a `node:test` file in `tests/`; run `node --test tests/`
 - Match the existing code style (native ES modules, no bundler, no framework)
-- Don't add telemetry, remote logging, or any auto-network-call outside the explicit AI provider path
+- Don't add telemetry, remote logging, or any automatic network call beyond the AI provider path and the documented company-site lookup
 
 ## Tip your captain
 

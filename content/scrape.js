@@ -1542,7 +1542,8 @@
   // two can appear together. Jawbs colours, not orange.
   //   showToast('text')                                   plain message
   //   showToast('Jawbs noted it. Moved to', { jobId, linkText: 'Scar' })
-  function showToast(text, { jobId, linkText } = {}) {
+  //   showToast('…', { jobId, linkText, undo: true })     + an Undo button
+  function showToast(text, { jobId, linkText, undo } = {}) {
     document.getElementById(TOAST_ID)?.remove();
     const t = document.createElement('div');
     t.id = TOAST_ID;
@@ -1569,13 +1570,27 @@
     } else if (linkText) {
       msg.append(linkText);
     }
+    // Undo the status change this toast reports. Offered for the toast's
+    // life (about six seconds), then gone.
+    let undoBtn = null;
+    if (undo && jobId) {
+      undoBtn = document.createElement('button');
+      undoBtn.type = 'button';
+      undoBtn.textContent = 'Undo';
+      undoBtn.style.cssText = 'all: unset; cursor: pointer; font-weight: 700; color: #22CCEE; padding: 0 4px';
+      undoBtn.addEventListener('click', async () => {
+        undoBtn.remove();
+        const r = await chrome.runtime.sendMessage({ type: 'undo-status', jobId }).catch(() => null);
+        showToast(r?.ok ? `Undone. Back to ${r.label}.` : "Jawbs couldn't undo that.");
+      });
+    }
     const close = document.createElement('button');
     close.type = 'button';
     close.textContent = '×';
     close.setAttribute('aria-label', 'Dismiss');
     close.style.cssText = 'all: unset; cursor: pointer; font-size: 18px; line-height: 1; color: #B3C0CF; padding: 0 2px';
     close.addEventListener('click', () => t.remove());
-    t.append(msg, close);
+    t.append(...[msg, undoBtn, close].filter(Boolean));
     document.body.appendChild(t);
     requestAnimationFrame(() => { t.style.opacity = '1'; });
     // Stays while the pointer is on it, so the link can be reached.
@@ -1614,7 +1629,7 @@
         // Confirm everything Jawbs recognised that the user just did, the
         // way LinkedIn confirms its own updates — including "no change",
         // so a recognised click is never indistinguishable from a missed one.
-        if (r?.changed) showToast('Jawbs noted it. Moved to', { jobId, linkText: r.label });
+        if (r?.changed) showToast('Jawbs noted it. Moved to', { jobId, linkText: r.label, undo: true });
         else if (!explicit) return;
         else if (r?.skipped === 'not-in-archive') showToast("Jawbs noted it, but this job isn't in your Jawboard, so there's no status to change.");
         else if (r?.status) showToast('Jawbs noted it. Still', { jobId, linkText: r.label });

@@ -1117,8 +1117,23 @@ els.reconcileApply?.addEventListener('click', async () => {
     const r = await send('apply-reconciliation', { resolutions });
     els.reconcileApplyStatus.textContent = `Applied ${r.applied ?? 0} · deleted ${r.deleted ?? 0} · skipped ${r.skipped ?? 0}`;
     await load();
-    // Auto-close after 2s so the user sees the confirmation.
-    setTimeout(() => { els.reconcilePanel.hidden = true; }, 2500);
+    // Status changes can be undone for five seconds; deletions can't.
+    const ids = r.changedIds || [];
+    if (ids.length) {
+      const undo = h('button', {
+        class: 'jc-btn', 'data-size': 'sm', type: 'button',
+        onClick: async () => {
+          undo.disabled = true;
+          for (const jobId of ids) await send('undo-status', { jobId }).catch(() => {});
+          els.reconcileApplyStatus.textContent = `Undid ${ids.length} status change${ids.length === 1 ? '' : 's'}.`;
+          await load();
+        },
+      }, `Undo ${ids.length} status change${ids.length === 1 ? '' : 's'}`);
+      els.reconcileApplyStatus.append(' ', undo);
+      setTimeout(() => undo.remove(), 5000);
+    }
+    // Auto-close after the undo window so the user sees the confirmation.
+    setTimeout(() => { els.reconcilePanel.hidden = true; }, ids.length ? 6000 : 2500);
   } catch (e) {
     els.reconcileApplyStatus.textContent = `Failed: ${e.message}`;
   } finally {

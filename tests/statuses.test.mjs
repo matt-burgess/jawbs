@@ -76,3 +76,22 @@ test('normalizeTrackerStage', () => {
   assert.equal(normalizeTrackerStage('unknown'), null);
   assert.equal(normalizeTrackerStage(''), null);
 });
+
+import { furthestStageAfter, undoTarget } from '../lib/statuses.js';
+
+test('furthestStageAfter only ever moves forward through the pipeline', () => {
+  assert.equal(furthestStageAfter(null, 'saved'), 'saved');
+  assert.equal(furthestStageAfter('saved', 'applied'), 'applied');
+  assert.equal(furthestStageAfter('applied', 'saved'), 'applied');             // bounced back: still reached applied
+  assert.equal(furthestStageAfter('interviewing', 'notMovingForward'), 'interviewing'); // closing is not progress
+  assert.equal(furthestStageAfter(null, 'analyzed'), null);
+  assert.equal(furthestStageAfter('inProgressDraft', 'inProgressClickedApply'), 'inProgressClickedApply');
+});
+
+test('undoTarget finds the latest reversible status change, one step only', () => {
+  const change = (to, prev) => ({ type: 'status-change', to, previousStatus: prev, at: to });
+  assert.equal(undoTarget([change('saved', 'analyzed'), { type: 'note' }, change('applied', 'saved')]).to, 'applied');
+  assert.equal(undoTarget([change('applied', 'saved'), { type: 'status-undone', to: 'saved' }]), null);  // no redo
+  assert.equal(undoTarget([{ type: 'status-change', to: 'applied' }]), null);                            // older entry, no "before"
+  assert.equal(undoTarget([]), null);
+});

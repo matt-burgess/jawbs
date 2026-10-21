@@ -42,6 +42,9 @@ export function furthestStage(job) {
   const rounds = job.interviewRounds || [];
   const hasOffer = rounds.some((r) => /offer/i.test(r.outcome || ''));
   if (hasOffer) return 100;
+  // Recorded on every status move since v0.11 (lib/store.js): the highest
+  // stage reached, so a job that bounced back still counts where it got.
+  const recorded = job.furthestStage ? statusRank(job.furthestStage) : 0;
   // If a job is currently in a terminal state, use the highest positive
   // stage it must have passed through — reconstruct from timeline.
   const norm = normalizeStatus(job.status);
@@ -58,9 +61,9 @@ export function furthestStage(job) {
     }
     // If the job has any interview rounds, treat as at least reached interviewing.
     if (rounds.length) best = Math.max(best, statusRank('interviewing'));
-    return best;
+    return Math.max(best, recorded);
   }
-  return statusRank(norm);
+  return Math.max(statusRank(norm), recorded);
 }
 
 // Round-type classifier — returns the user's free-text `round.type` as

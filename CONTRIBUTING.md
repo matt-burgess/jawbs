@@ -17,7 +17,7 @@ Thanks for taking a look. Jawbs is a personal-scale extension built to make my o
 - **Keep PRs focused.** Bug fix and refactor should be separate PRs.
 - **No new dependencies without discussion.** The project has zero runtime dependencies and no build step — I'd like to keep it that way.
 - **Touched the UI?** Include a before/after screenshot in the PR description.
-- **Verify by hand.** No test suite. Load the unpacked extension in Chrome, exercise both a LinkedIn job page and the standalone Jawboard.
+- **Test what you can, then verify by hand.** Pure logic under `lib/` has `node:test` files in `tests/`; run `node --test tests/` (no install). Then load the unpacked extension in Chrome and exercise both a LinkedIn job page and the standalone Jawboard.
 - **Syntax check** any changed JS files with `node --check <file>` before pushing — the extension has no bundler to catch parse errors for you.
 
 ## Local dev
