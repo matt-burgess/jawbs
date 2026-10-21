@@ -24,6 +24,7 @@ import {
   getContactEmail,
   setContactEmail,
   getApplicationProfile, setApplicationProfile,
+  getCompanySiteLookupEnabled, setCompanySiteLookupEnabled,
   getContactPhone,
   setContactPhone,
   getContactLocation,
@@ -718,6 +719,14 @@ els.savePreferences.addEventListener('click', async () => {
 
 // ---------- Auto-analyze toggle ----------
 
+async function loadCompanySiteLookup() {
+  els.companySiteLookup.checked = await getCompanySiteLookupEnabled();
+}
+els.saveCompanySiteLookup.addEventListener('click', async () => {
+  await setCompanySiteLookupEnabled(els.companySiteLookup.checked);
+  flash(els.companySiteLookupStatus, 'Saved.');
+});
+
 async function loadAutoAnalyze() {
   els.autoAnalyzeHighMatch.checked = await getAutoAnalyzeEnabled();
 }
@@ -1018,7 +1027,7 @@ function refreshSetupHelper() {
 // ---------- Init ----------
 
 (async () => {
-  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadShortcuts(), loadApplicationProfile(), loadModels(), loadUsage(), loadActivity()]);
+  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadCompanySiteLookup(), loadShortcuts(), loadApplicationProfile(), loadModels(), loadUsage(), loadActivity()]);
   refreshOllamaStatus();
   refreshSetupHelper();
 })();

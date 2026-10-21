@@ -227,13 +227,20 @@ function renderBoardFoot(rows) {
 function renderQuietApplications(el) {
   el.innerHTML = '';
   const quiet = jobs.map((j) => ({ j, q: quietness(j) })).filter((x) => x.q);
-  const due = quiet.filter((x) => followUpDue(x.q) && !isStale(x.q));
-  const stale = quiet.filter((x) => isStale(x.q));
-  el.hidden = !due.length && !stale.length;
+  const isClosed = (j) => !!j.companySite?.match?.closedAt;
+  const closed = quiet.filter((x) => isClosed(x.j));
+  const due = quiet.filter((x) => followUpDue(x.q) && !isStale(x.q) && !isClosed(x.j));
+  const stale = quiet.filter((x) => isStale(x.q) && !isClosed(x.j));
+  el.hidden = !due.length && !stale.length && !closed.length;
   const link = ({ j, q }) => h('a', { href: `../recall/recall.html?jobId=${encodeURIComponent(j.jobId)}#s=timeline`, title: `${q.daysQuiet} days quiet` },
     j.posting?.company || j.posting?.title || j.jobId);
+  // The employer closed the posting on its own site — a clearer answer
+  // than silence. Seen via the freehire.me company-site lookup.
+  if (closed.length) {
+    el.append(h('span', {}, `Closed on company site (${closed.length}): `), ...closed.flatMap((x, i) => (i ? [', ', link(x)] : [link(x)])));
+  }
   if (due.length) {
-    el.append(h('span', {}, `Follow-up due (${due.length}): `), ...due.flatMap((x, i) => (i ? [', ', link(x)] : [link(x)])));
+    el.append(closed.length ? ' · ' : '', h('span', {}, `Follow-up due (${due.length}): `), ...due.flatMap((x, i) => (i ? [', ', link(x)] : [link(x)])));
   }
   if (stale.length) {
     const btn = h('button', {
@@ -1329,3 +1336,7 @@ async function checkExportReminder() {
 }
 
 load();
+// Once per visit: check whether employers have closed the postings you're
+// waiting on (company-site lookup; skips anything checked today). Reload
+// only if something changed.
+send('refresh-company-sites').then((r) => { if (r?.closed) load(); }).catch(() => {});

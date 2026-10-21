@@ -1175,6 +1175,20 @@ body { background: var(--jc-bg); }
 #analysisSection .jc-card__head { cursor: default; }
 #analysisSection .jc-card__chev { display: none; }
 
+/* On the company site — same job on the employer's own careers page. */
+.jc-company-site {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: var(--jc-2) var(--jc-3);
+  border: 1px solid var(--jc-border); border-radius: var(--jc-radius-sm);
+  background: var(--jc-surface-2);
+}
+.jc-company-site[hidden] { display: none; }
+.jc-company-site__head { display: flex; align-items: center; justify-content: space-between; gap: var(--jc-2); }
+.jc-company-site__facts { margin: 0; font: 400 var(--jc-text-sm)/1.4 var(--jc-font); color: var(--jc-text); }
+.jc-company-site__note { margin: 0; font: 400 var(--jc-text-sm)/1.4 var(--jc-font); color: var(--jc-text-2); }
+.jc-company-site__row { display: flex; align-items: center; justify-content: space-between; gap: var(--jc-2); font: 400 var(--jc-text-sm)/1.4 var(--jc-font); color: var(--jc-text); }
+.jc-company-site .jc-linkbtn { align-self: flex-start; background: none; border: 0; padding: 0; color: var(--jc-text-3); font: 400 var(--jc-text-2xs)/1.4 var(--jc-font); cursor: pointer; text-decoration: underline; }
+
 /* ---------- Fit & Comp cards: answer first, one rhythm ----------
    Body content stacks with one gap instead of per-element margins. */
 .jc-card__out { display: flex; flex-direction: column; gap: var(--jc-3); }

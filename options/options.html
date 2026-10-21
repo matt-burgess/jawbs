@@ -588,6 +588,24 @@ sudo systemctl restart ollama
 
             <section class="options-section">
               <div class="section-head">
+                <h2>Company-site lookup</h2>
+                <p class="jc-footnote">When you open a job, Jawbs checks freehire.me, a free public catalogue of
+                  company career sites, for the same job on the employer's own site: a direct link, its real age and
+                  repost history, and pay when the posting states it. Only the job's title and company are sent;
+                  nothing about you. It also checks whether employers have closed postings you're waiting on.</p>
+              </div>
+              <label class="toggle-row">
+                <input id="companySiteLookup" type="checkbox" />
+                <span>Look up jobs on company career sites</span>
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveCompanySiteLookup" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="companySiteLookupStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
                 <h2>Auto-analyze on LinkedIn "high match"</h2>
                 <p class="jc-footnote">When LinkedIn Premium marks a posting as a "high match", Jawbs
                   can run fit analysis automatically. Fires once per jawb per session.</p>

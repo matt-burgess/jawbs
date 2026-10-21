@@ -19,6 +19,7 @@ import {
   getJob,
   listJobs,
   getApplicationProfile,
+  getCompanySiteLookupEnabled,
   bulkGetJobsByIds,
   deleteJob,
   countJobs,
@@ -64,6 +65,7 @@ import { FOLLOWUP_SYSTEM, FOLLOWUP_PROMPT_VERSION, buildFollowUpUserMessage } fr
 import { HUMAN_STYLE } from './lib/prompts/humanStyle.js';
 import { APPLICATION_FOLLOWUP_SYSTEM, APPLICATION_FOLLOWUP_PROMPT_VERSION, buildApplicationFollowUpUserMessage } from './lib/prompts/applicationFollowUp.js';
 import { quietness } from './lib/followups.js';
+import { companiesUrl, jobsUrl, jobUrl, pickCompany, pickMatch, summarize, usableSalary } from './lib/freehire.js';
 import { LETTER_REVIEW_SYSTEM, LETTER_REVIEW_PROMPT_VERSION, buildLetterReviewUserMessage } from './lib/prompts/letterReview.js';
 import { fetchJobDetail } from './lib/enrich.js';
 import {
@@ -263,6 +265,21 @@ const handlers = {
   'build-brief': (msg) => instrumentAnalysis('build-brief', msg.jobId, () => runBrief(msg.jobId)),
   'generate-letter': (msg) => instrumentAnalysis('generate-letter', msg.jobId, () => runLetter(msg.jobId, msg.tone)),
   'draft-application-followup': (msg) => instrumentAnalysis('draft-application-followup', msg.jobId, () => runApplicationFollowUp(msg.jobId)),
+  'company-site-lookup': (msg) => lookupCompanySite(msg),
+  'company-site-choose': (msg) => chooseCompanySite(msg.jobId, msg.slug),
+  'refresh-company-sites': () => refreshCompanySites(),
+  // The user opened this job's company-site posting from the side panel:
+  // remember it the same way an Apply click does, for the Fill button and
+  // the answer drafter on that page. No status change.
+  'company-site-opened': async (msg) => {
+    const job = await getJob(String(msg.jobId || ''));
+    const posting = job?.posting || {};
+    await chrome.storage.local.set({
+      'ui.applyClick': { jobId: String(msg.jobId), title: posting.title || '', company: posting.company || '', at: Date.now() },
+      'ui.activeApplicationJawbId': String(msg.jobId),
+    });
+    return { ok: true };
+  },
   'review-letter': (msg) => instrumentAnalysis('review-letter', msg.jobId, () => runLetterReview(msg.jobId)),
   'update-letter': (msg) => updateLetterText(msg.jobId, msg.letter),
   'generate-resume': (msg) => instrumentAnalysis('generate-resume', msg.jobId, () => runResume(msg.jobId, msg.mustInclude)),
@@ -1741,7 +1758,10 @@ async function runFit(jobId) {
 
 async function runComp(jobId) {
   const ctx = await loadContext(jobId);
-  const userMessage = buildCompUserMessage({ compTargets: ctx.comp, job: ctx.job });
+  const userMessage = buildCompUserMessage({
+    compTargets: ctx.comp, job: ctx.job,
+    companySiteSalary: usableSalary(ctx.job.companySite?.match),
+  });
   const r = await routeCall('comp', {
     local: (model) => callOllamaJson({ model, system: COMP_SYSTEM, userMessage, maxTokens: 2000 }),
     cloud: () => callJsonAnthropic({
@@ -1967,6 +1987,91 @@ async function runApplicationFollowUp(jobId) {
   };
   await setJobAnalysis(jobId, 'applicationFollowUp', record);
   return { ok: true, record };
+}
+
+// ---------- Company-site lookup (freehire.me) ----------
+//
+// Is this LinkedIn job also on the employer's own careers site? Two
+// keyless calls — the company by exact name, then its jobs by title — and
+// a conservative match (lib/freehire.js). Cached on the job for a day;
+// a match the user picked is refreshed by its id, never re-searched.
+const SITE_TTL_MS = 24 * 60 * 60_000;
+const siteKey = (id) => `companySite.${id}`;
+
+async function freehireGet(url) {
+  const r = await fetch(url, { headers: { accept: 'application/json' } });
+  if (!r.ok) throw new Error(`freehire.me answered ${r.status}`);
+  return (await r.json()).data;
+}
+
+async function saveSite(id, existing, site) {
+  await chrome.storage.session.set({ [siteKey(id)]: site });
+  if (existing) await upsertJob(id, { companySite: site });
+  return site;
+}
+
+async function lookupCompanySite({ jobId, title, company, location, force }) {
+  if (!(await getCompanySiteLookupEnabled())) return { ok: true, disabled: true };
+  const id = String(jobId || '');
+  if (!/^\d+$/.test(id) || !title || !company) return { ok: true, data: null };
+  const existing = await getJob(id);
+  const cached = existing?.companySite || (await chrome.storage.session.get(siteKey(id)))[siteKey(id)];
+  if (cached && !force && Date.now() - Date.parse(cached.checkedAt) < SITE_TTL_MS) {
+    // Looked up before the job was saved: keep it with the job now.
+    if (existing && !existing.companySite) await upsertJob(id, { companySite: cached });
+    return { ok: true, data: cached };
+  }
+  try {
+    if (cached?.chosen) return { ok: true, data: await saveSite(id, existing, await refreshSite(cached)) };
+    const c = pickCompany(await freehireGet(companiesUrl(company)), company);
+    let site = { status: 'none' };
+    if (c) {
+      const { match, possible } = pickMatch(await freehireGet(jobsUrl(title, c.slug)), { title, company, location });
+      site = match ? { status: 'match', match: summarize(match) }
+        : possible.length ? { status: 'possible', possible: possible.map(summarize) } : { status: 'none' };
+      site.companySlug = c.slug;
+    }
+    site.checkedAt = new Date().toISOString();
+    return { ok: true, data: await saveSite(id, existing, site) };
+  } catch (e) {
+    // Service down or rate-limited: show what we had, cache nothing.
+    return { ok: true, data: cached || null, error: e.message };
+  }
+}
+
+// Re-read a matched posting by its id — picks up a close or a repost.
+async function refreshSite(site) {
+  const j = await freehireGet(jobUrl(site.match.slug));
+  return { ...site, match: summarize(j), checkedAt: new Date().toISOString() };
+}
+
+// The user picked one of the "possible" postings, or said none of them.
+async function chooseCompanySite(jobId, slug) {
+  const id = String(jobId || '');
+  const existing = await getJob(id);
+  const site = slug
+    ? { status: 'match', chosen: true, match: summarize(await freehireGet(jobUrl(slug))), checkedAt: new Date().toISOString() }
+    : { status: 'none', chosen: true, checkedAt: new Date().toISOString() };
+  return { ok: true, data: await saveSite(id, existing, site) };
+}
+
+// For applications waiting to hear back: has the employer closed the
+// posting on its own site? Run when the Jawboard opens; at most 25 per
+// run, each at most once a day.
+async function refreshCompanySites() {
+  if (!(await getCompanySiteLookupEnabled())) return { ok: true, refreshed: 0 };
+  const due = (await listJobs()).filter((j) => (j.status === 'applied' || j.status === 'inProgressClickedApply')
+    && j.companySite?.match?.slug && !j.companySite.match.closedAt
+    && Date.now() - Date.parse(j.companySite.checkedAt || 0) > SITE_TTL_MS).slice(0, 25);
+  let closed = 0;
+  for (const j of due) {
+    try {
+      const site = await refreshSite(j.companySite);
+      if (site.match.closedAt) closed++;
+      await upsertJob(j.jobId, { companySite: site });
+    } catch { break; } // service unavailable — try again next time
+  }
+  return { ok: true, refreshed: due.length, closed };
 }
 
 // Hiring-manager review of the current cover letter. Edits whose "old"

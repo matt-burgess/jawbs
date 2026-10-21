@@ -57,7 +57,13 @@ function render() {
   // the same role on the company's own careers page. Falls back on
   // just the company when the title is missing; hidden with no company
   // to search against.
-  if (p.company) {
+  const site = job.companySite?.status === 'match' ? job.companySite.match : null;
+  if (site?.url && !site.closedAt) {
+    // Found on the employer's own careers site (freehire.me lookup).
+    els.corpSiteSearch.href = site.url;
+    els.corpSiteSearch.firstChild.textContent = 'Open on company site';
+    els.corpSiteSearch.hidden = false;
+  } else if (p.company) {
     const q = `${p.company} Careers${p.title ? ' - ' + p.title : ''}`;
     els.corpSiteSearch.href = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
     els.corpSiteSearch.hidden = false;

@@ -23,7 +23,8 @@
     "https://www.linkedin.com/*",
     "https://www.google.com/search*",
     "https://google.com/search*",
-    "http://localhost:11434/*"
+    "http://localhost:11434/*",
+    "https://freehire.me/*"
   ],
   "background": {
     "service_worker": "service-worker.js",
