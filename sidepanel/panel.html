@@ -562,6 +562,11 @@
                 <div id="askChips" class="jc-chips" hidden></div>
                 <textarea id="askInput" class="jc-textarea" rows="3" placeholder="e.g. What negotiation angles do I have here? What gaps in my resume should I proactively address for this role?"></textarea>
                 <div class="jc-btn-row" style="align-items:center;gap:var(--jc-2)">
+                  <select id="askMode" class="jc-select" data-size="sm" title="Ask a question, or have the AI change a document">
+                    <option value="ask">Ask about this jawb</option>
+                    <option value="letter">Edit the cover letter</option>
+                    <option value="resume">Edit the resume</option>
+                  </select>
                   <select id="askProvider" class="jc-select" data-size="sm" title="Which model runs this ask">
                     <option value="auto">Auto (routing)</option>
                     <option value="local">Force local (Ollama)</option>

@@ -1052,3 +1052,44 @@ html { background: var(--jc-bg); }
   display: grid; gap: var(--jc-3); padding: var(--jc-5);
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
+
+/* ---------- Documents as units (lib/unitView.js), Jawbar and Recall ---------- */
+.jc-units { display: flex; flex-direction: column; gap: 2px; margin-top: var(--jc-2); }
+.jc-units__head { display: block; margin-top: var(--jc-3); }
+.jc-units__list { margin: 0; padding-left: var(--jc-4); }
+.jc-units__skills { display: flex; flex-wrap: wrap; gap: 4px; position: relative; padding-top: 4px; }
+/* A chip is too narrow for its actions: they sit on the skills row's edge. */
+.jc-units__skills > .jc-unit { position: static; }
+.jc-unit { position: relative; padding: 4px 6px; border-radius: var(--jc-radius-sm, 4px); border: 1px solid transparent;
+  font: 400 var(--jc-text-sm)/1.5 var(--jc-font); color: var(--jc-text-2); }
+.jc-unit[data-kind='header'], .jc-unit[data-kind='role'] { color: var(--jc-text); font-weight: 600; white-space: pre-line; }
+.jc-unit[data-kind='opening'], .jc-unit[data-kind='body'], .jc-unit[data-kind='closing'],
+.jc-unit[data-kind='greeting'], .jc-unit[data-kind='signoff'] { color: var(--jc-text); margin-bottom: var(--jc-2); }
+.jc-unit[data-kind='skill'] { background: var(--jc-surface-2); border-color: var(--jc-border); padding: 2px 8px; }
+li.jc-unit { margin-bottom: 2px; }
+.jc-unit:hover, .jc-unit:focus-within { border-color: var(--jc-border-strong); background: var(--jc-surface-2); }
+.jc-unit[data-removed='true'] .jc-unit__text { text-decoration: line-through; opacity: .5; }
+mark.jc-flagged { background: none; color: inherit; cursor: help;
+  text-decoration: underline wavy var(--jc-caution); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+/* Actions sit on the part's top edge and only show on hover or keyboard focus. */
+.jc-unit__bar { position: absolute; top: -10px; right: 4px; display: flex; gap: 2px; opacity: 0; pointer-events: none; z-index: 2; }
+.jc-unit:hover > .jc-unit__bar, .jc-unit:focus-within > .jc-unit__bar { opacity: 1; pointer-events: auto; }
+.jc-unit__act { appearance: none; cursor: pointer; padding: 1px 6px; border-radius: 3px;
+  border: 1px solid var(--jc-border-strong); background: var(--jc-surface-1); color: var(--jc-text-2);
+  font: 600 var(--jc-text-3xs, 10px)/1.4 var(--jc-font-display); letter-spacing: .06em; text-transform: uppercase; }
+.jc-unit__act:hover, .jc-unit__act:focus-visible { color: var(--jc-accent); border-color: var(--jc-accent); }
+.jc-unit__act:disabled { opacity: .5; cursor: progress; }
+.jc-unit__form { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.jc-unit__input { width: 100%; box-sizing: border-box; padding: 6px; border-radius: 4px; resize: vertical;
+  border: 1px solid var(--jc-border-strong); background: var(--jc-surface-1); color: var(--jc-text); font: inherit; font-weight: 400; }
+.jc-history { display: flex; align-items: center; flex-wrap: wrap; gap: var(--jc-2); margin-top: var(--jc-2); }
+.jc-history details { flex: 1; min-width: 0; }
+.jc-history summary { cursor: pointer; font-size: var(--jc-text-xs); color: var(--jc-text-2); text-align: right; }
+.jc-history__list { list-style: none; margin: var(--jc-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.jc-history__list li { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--jc-2); align-items: center;
+  padding: 6px 8px; border: 1px solid var(--jc-border); border-radius: 4px; }
+.jc-history__list li[data-current='true'] { border-color: var(--jc-accent-line, var(--jc-accent)); }
+.jc-history__cause { font-weight: 600; color: var(--jc-text); font-size: var(--jc-text-sm); }
+.jc-history__when { grid-column: 1; font-size: var(--jc-text-xs); color: var(--jc-text-3); }
+.jc-history__note { grid-column: 1; font-size: var(--jc-text-xs); color: var(--jc-text-2); }
+.jc-history__list li > :last-child { grid-column: 2; grid-row: 1 / span 3; }

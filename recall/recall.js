@@ -6,7 +6,8 @@ import { roundFitToTens } from '../lib/strength.js';
 import { $, els, send, escapeHtml, fmtDate } from '../lib/pageBoot.js';
 import { h } from '../lib/h.js';
 import { orderRequirements } from '../lib/requirementMatch.js';
-import { markFlagged } from '../lib/flagMarks.js';
+import { renderDocUnits, renderDocHistory } from '../lib/unitView.js';
+import { docFromJob } from '../lib/documentHistory.js';
 import { quietness, followUpDue, isStale, FOLLOW_UP_AFTER_DAYS, MAX_FOLLOW_UPS } from '../lib/followups.js';
 
 const params = new URLSearchParams(location.search);
@@ -35,6 +36,34 @@ async function load() {
   }
   render();
   send('recall-active', { jobId }).catch(() => {});
+}
+
+// Cover letter and tailored resume as editable parts, with Undo and
+// History (lib/unitView.js). A change re-renders this section only.
+function renderDocuments() {
+  const box = els.documentsReadout;
+  box.innerHTML = '';
+  const docs = [
+    ['letter', 'coverLetter', (a) => `Cover letter · ${a.tone || 'warm'} tone · generated ${fmtDate(a.generatedAt)}`],
+    ['resume', 'resume', (a) => `Tailored resume · generated ${fmtDate(a.generatedAt)}`],
+  ].map(([kind, key, label]) => [kind, docFromJob(job, kind), job.analyses?.[key], label]).filter(([, doc]) => doc);
+  if (!docs.length) { box.textContent = 'No cover letter or tailored resume on record.'; return; }
+  for (const [kind, doc, rec, label] of docs) {
+    const err = h('p', { class: 'jc-footnote', style: 'color:var(--jc-neg)', hidden: '' });
+    const opts = {
+      kind, jobId, send, fmt: fmtDate,
+      onChange: (res) => {
+        job.documents = { ...(job.documents || {}), [kind]: res.doc };
+        if (res.record?.result) job.analyses = { ...job.analyses, [kind === 'letter' ? 'coverLetter' : 'resume']: res.record };
+        renderDocuments();
+        box.querySelector(`[data-doc-kind="${kind}"]`)?.setAttribute('open', '');
+      },
+      onError: (m) => { err.hidden = false; err.textContent = m; },
+    };
+    box.append(h('details', { dataset: { docKind: kind } },
+      h('summary', {}, label(rec || {})),
+      renderDocHistory(doc, opts), renderDocUnits(doc, opts), err));
+  }
 }
 
 function render() {
@@ -93,29 +122,7 @@ function render() {
   renderCompReadout();
   renderApplicationAnswers();
 
-  // Documents
-  const letter = job.analyses?.coverLetter?.result?.letter;
-  const resume = job.analyses?.resume?.result;
-  els.documentsReadout.innerHTML = '';
-  if (letter || resume) {
-    if (letter) {
-      const details = h('details', {},
-        h('summary', {}, `Cover letter · ${job.analyses.coverLetter.tone || 'warm'} tone · generated ${fmtDate(job.analyses.coverLetter.generatedAt)}`),
-        h('pre', { class: 'doc-body' }, markFlagged(letter, job.analyses.coverLetter.factGuard?.flags)),
-      );
-      els.documentsReadout.append(details);
-    }
-    if (resume) {
-      const summary = resume.summaryParagraph || '';
-      const details = h('details', {},
-        h('summary', {}, `Tailored resume · generated ${fmtDate(job.analyses.resume.generatedAt)}`),
-        h('div', { class: 'doc-body' }, summary),
-      );
-      els.documentsReadout.append(details);
-    }
-  } else {
-    els.documentsReadout.textContent = 'No cover letter or tailored resume on record.';
-  }
+  renderDocuments();
 
   // Timeline
   els.timeline.innerHTML = '';

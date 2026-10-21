@@ -151,6 +151,7 @@ Then load the `jawbs` folder as an unpacked extension using **Step 3** above. Se
 | **Fit Analysis** | Strict, calibrated score (0-100) with alignments, gaps, remote-authenticity check, and outreach guidance. Reasons against your specific positioning anchors — not generic keyword matching. |
 | **Requirement map** | Each requirement the posting states, marked covered, partial or gap. The model only points at excerpts of your own resume, profile and knowledge base; code checks the excerpts exist and decides the state, so evidence can't be invented. Gaps become one-click asks above the Chat box. |
 | **Fact guard** | Every generated letter, resume, follow-up and drafted answer is checked for numbers, years, acronyms, names and credentials that appear nowhere in your resume, profile, knowledge base or the posting. Flagged sentences are underlined with the reason on hover, and the tab shows the count. Turn on **Strict facts** (AI settings) to have the model told up front and retried once when something slips through. |
+| **Editable documents with history** | The tailored resume and cover letter are stored as parts (a bullet, a skill, a paragraph). Hover a part to Edit, Regenerate (one AI call, with an optional instruction) or Remove it; removed parts stay, struck through, with Put back. In Chat, switch to *Edit the cover letter* or *Edit the resume* to describe a change in words. Every change is a version: Undo the last one, or open History and Restore any of the last 25. |
 | **Compensation Analysis** | Reads the posted range first, then research, then a title-benchmark fallback. Always shows the source. Flags postings below your floor. |
 | **Connection Analysis** | Surfaces 1st-degree contacts at the company plus anyone on the hiring team (recruiter, hiring manager, poster, interviewer). Rolled into the composite Strength score so an in-network role reads visibly stronger. Also fixes LinkedIn's "who to follow" gap with concrete outreach suggestions. |
 | **Interview Question Prep** | Configure a list of interview questions in Settings. One "Bait" click generates answers for the specific role in your voice. |
@@ -206,6 +207,9 @@ lib/
   keywords.js          ATS keyword matching (pure)
   factGuard.js         Typed fact extraction and checks on generated text (pure)
   flagMarks.js         Underlines flagged sentences in rendered text
+  documentUnits.js     Resume and letter split into parts, joined back, diffed (pure)
+  documentHistory.js   Versions: commit, undo, restore, 25-version cap (pure)
+  unitView.js          Editable parts + History, shared by the Jawbar and Recall
   freshness.js         Posting age and applicant counts (pure)
   followups.js         Quiet-application rules (pure)
   calibration.js       Fit track record from your own outcomes (pure)
@@ -225,6 +229,7 @@ lib/
     ask.js
     interviewRound.js
     extractRequirements.js, matchRequirements.js  Requirement map, two steps
+    documentEdit.js    Rewrite one part; apply a Chat edit request
     followUpEmail.js, applicationFollowUp.js, letterReview.js, bootstrap.js
 tests/                 node:test files for every pure lib/ module
   fixtures/            Real-shaped posting and profile for eyeballing prompts

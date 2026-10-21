@@ -11,7 +11,9 @@ import { compVerdict, rangeBar } from '../lib/compVerdict.js';
 import { trackRecordLine } from '../lib/calibration.js';
 import { orderRequirements } from '../lib/requirementMatch.js';
 import { refineSuggestions } from '../lib/refineSuggestions.js';
-import { markFlagged, flagReason } from '../lib/flagMarks.js';
+import { flagReason } from '../lib/flagMarks.js';
+import { renderDocUnits, renderDocHistory, flaggedCount } from '../lib/unitView.js';
+import { docFromJob } from '../lib/documentHistory.js';
 
 let currentJob = null;
 let letterTone = 'warm';
@@ -1033,6 +1035,7 @@ async function renderJob(job) {
         currentJob = {
           ...job,
           analyses: r.data.analyses || {},
+          documents: r.data.documents,
           userNotes: r.data.userNotes,
           status: r.data.status,
           statusUpdatedAt: r.data.statusUpdatedAt,
@@ -1595,7 +1598,7 @@ function renderAskChips() {
   for (const c of chips) {
     box.append(h('button', {
       class: 'jc-chip', type: 'button', dataset: { target: c.target }, title: c.message,
-      onClick: () => { els.askInput.value = c.message; els.askSend.click(); },
+      onClick: () => { els.askMode.value = c.target === 'chat' ? 'ask' : c.target; syncAskMode(); els.askInput.value = c.message; els.askSend.click(); },
     }, c.label));
   }
 }
@@ -2044,23 +2047,15 @@ function renderLetterCard(record) {
   if (els.letterCopyTop) els.letterCopyTop.hidden = false;
 
   const flags = record.factGuard?.flags || [];
-  const letterEl = h('div', { class: 'jc-doc-body', contenteditable: 'true' }, markFlagged(r.letter || '', flags));
-  setTabCount('letter', new Set(flags.map((f) => f.unit)).size);
-  // Inline edits used to vanish on the next render. Save them when the
-  // user leaves the letter, so Copy, PDF and the review all see them.
-  letterEl.addEventListener('blur', async () => {
-    const text = letterEl.innerText.trim();
-    if (!currentJob?.jobId || text === (r.letter || '').trim()) return;
-    const res = await send('update-letter', { jobId: currentJob.jobId, letter: text }).catch(() => null);
-    if (res?.record) { currentJob.analyses = { ...currentJob.analyses, coverLetter: res.record }; renderLetterCard(res.record); }
-  });
-  els.letterOutput.append(letterEl);
+  const doc = docFromJob(currentJob, 'letter');
+  setTabCount('letter', flaggedCount(doc));
+  els.letterOutput.append(...docView(doc, 'letter', els.letterError));
 
   // Inline copy link — sits at the bottom of the letter body so it's obvious
   // where to click when the user is done reading and wants to paste into an
   // application form. Duplicates the top-right Copy button intentionally;
   // this location is where the user's eye naturally lands after reading.
-  const copyText = () => navigator.clipboard.writeText(letterEl.innerText);
+  const copyText = () => navigator.clipboard.writeText(r.letter || '');
   const copyLink = h('a', {
     href: '#', class: 'jc-copy-link',
     onClick: async (e) => {
@@ -2097,7 +2092,7 @@ function renderLetterCard(record) {
       kind: 'CoverLetter',
       company: (currentJob?.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, ''),
       candidateName: name,
-      body: letterEl.innerText,
+      body: r.letter || '',
     });
   };
 }
@@ -2118,8 +2113,6 @@ function renderResumeCard(record) {
     return;
   }
   const r = record.result || {};
-  const resumeFlags = record.factGuard?.flags || [];
-  setTabCount('resume', new Set(resumeFlags.map((f) => f.unit)).size);
   els.resumeMeta.innerHTML = '';
   els.resumeMeta.append(h('span', { class: 'jc-footnote' }, `Generated ${fmtWhen(record.generatedAt)}`));
   setActionLabel(els.generateResume, 'Regenerate');
@@ -2130,89 +2123,10 @@ function renderResumeCard(record) {
 
   const out = els.resumeOutput;
 
-  // v2 schema uses `summary`; v1 used `summaryParagraph`. Support both
-  // so already-archived resumes still render in the card.
-  const summaryText = r.summary || r.summaryParagraph;
+  const doc = docFromJob(currentJob, 'resume');
+  setTabCount('resume', flaggedCount(doc));
   out.append(...renderAtsCheck(r, record.keywordCheck));
-  if (r.headline) out.append(h('div', { class: 'jc-resume-role' }, r.headline));
-  if (summaryText) {
-    out.append(h('span', { class: 'jc-eyebrow' }, 'Summary'));
-    out.append(h('p', { class: 'jc-prose' }, summaryText));
-  }
-
-  if (Array.isArray(r.skills) && r.skills.length) {
-    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Skills'));
-    out.append(h('p', { class: 'jc-prose' }, r.skills.join(' | ')));
-  }
-
-  // v2 shape: experience[] + earlierExperience[] + certifications[] + education[]
-  if (Array.isArray(r.experience) && r.experience.length) {
-    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Experience'));
-    for (const role of r.experience) {
-      const roleLine = [role.title, role.dates].filter(Boolean).join(' · ');
-      out.append(h('div', { class: 'jc-resume-role' }, roleLine));
-      const sub = [role.company, role.location].filter(Boolean).join(', ');
-      if (sub) out.append(h('div', { class: 'jc-footnote', style: 'margin-top:-2px' }, sub));
-      const ul = h('ul');
-      for (const b of role.bullets || []) {
-        const text = typeof b === 'string' ? b : (b?.text || '');
-        const hit = resumeFlags.filter((f) => f.text === text);
-        ul.append(h('li', hit.length ? { class: 'jc-flagged', title: flagReason(hit) } : {}, text));
-      }
-      out.append(ul);
-    }
-  }
-  if (Array.isArray(r.earlierExperience) && r.earlierExperience.length) {
-    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Earlier Experience'));
-    const ul = h('ul');
-    for (const role of r.earlierExperience) {
-      const bits = [role.company, role.detail, role.location, role.dates].filter(Boolean);
-      ul.append(h('li', {}, `${role.title || ''}, ${bits.join(', ')}`));
-    }
-    out.append(ul);
-  }
-  if (Array.isArray(r.certifications) && r.certifications.length) {
-    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Certifications & Awards'));
-    const ul = h('ul');
-    for (const c of r.certifications) ul.append(h('li', {}, typeof c === 'string' ? c : (c?.text || '')));
-    out.append(ul);
-  }
-  if (Array.isArray(r.education) && r.education.length) {
-    out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, 'Education'));
-    const ul = h('ul');
-    for (const e of r.education) ul.append(h('li', {}, `${e.degree || ''}, ${e.school || ''}`));
-    out.append(ul);
-  }
-
-  // Legacy v1 shape fallback — only kicks in for already-archived resumes
-  // (new generations produce v2 and skip this entirely).
-  if (!r.summary && !r.experience && Array.isArray(r.sections)) {
-    for (const section of r.sections) {
-      out.append(h('span', { class: 'jc-eyebrow', style: 'margin-top:var(--jc-3);display:block' }, section.heading || ''));
-      for (const entry of section.entries || []) {
-        out.append(h('div', { class: 'jc-resume-role' }, entry.role || ''));
-        const ul = h('ul');
-        for (const b of entry.bullets || []) {
-          const li = h('li', {}, b.text || '');
-          if (b.action) li.append(h('span', { class: 'jc-bullet-tag', dataset: { action: b.action } }, b.action));
-          ul.append(li);
-        }
-        out.append(ul);
-      }
-    }
-    if (r.cutBullets?.length) {
-      const details = h('details', { style: 'margin-top:var(--jc-3)' },
-        h('summary', { style: 'cursor:pointer;font-size:var(--jc-text-xs);color:var(--jc-text-2)' }, `Cut bullets (${r.cutBullets.length})`),
-      );
-      for (const c of r.cutBullets) {
-        details.append(h('div', { style: 'padding:6px 0;border-bottom:1px dashed var(--jc-border)' },
-          h('div', { class: 'jc-prose' }, c.text || ''),
-          h('div', { class: 'jc-footnote' }, `Reason: ${c.reason || ''}`),
-        ));
-      }
-      out.append(details);
-    }
-  }
+  out.append(...docView(doc, 'resume', els.resumeError));
 
   if (r.flags?.length) {
     out.append(h('div', { class: 'jc-footnote', style: 'color:var(--jc-caution)' }, `Flags: ${r.flags.join('; ')}`));
@@ -2340,8 +2254,11 @@ function renderLetterReview(letterRecord) {
         class: 'jc-btn', 'data-size': 'sm', type: 'button',
         onClick: async () => {
           apply.disabled = true;
-          const res = await send('update-letter', { jobId: currentJob.jobId, letter: letter.replace(e.old, e.new) }).catch(() => null);
-          if (res?.record) { currentJob.analyses = { ...currentJob.analyses, coverLetter: res.record }; renderLetterCard(res.record); }
+          const unit = docFromJob(currentJob, 'letter')?.units.find((u) => !u.removed && u.text.includes(e.old));
+          if (!unit) { apply.textContent = 'No longer applies'; return; }
+          const res = await send('document-commit', { jobId: currentJob.jobId, kind: 'letter',
+            changes: [{ id: unit.id, text: unit.text.replace(e.old, e.new) }], note: 'Hiring manager review edit' }).catch(() => null);
+          if (res?.doc) docChanged('letter', res);
         },
       }, 'Apply');
       out.push(h('div', { class: 'jc-review-edit' },
@@ -2359,6 +2276,70 @@ function renderLetterReview(letterRecord) {
     out.push(h('ul', { class: 'jc-list' }, ...notes.map(([k, label]) => h('li', {}, `${label}: ${review.result.notes[k]}`))));
   }
   return out;
+}
+
+// ---------- Documents as units (lib/unitView.js) ----------
+
+// The mode picker relabels the box; edits run on the document's own
+// routing, so the provider picker only applies to questions.
+function syncAskMode() {
+  const mode = els.askMode.value;
+  els.askSend.textContent = mode === 'ask' ? 'Ask' : 'Edit';
+  els.askProvider.hidden = mode !== 'ask';
+  els.askInput.placeholder = mode === 'ask'
+    ? 'e.g. What negotiation angles do I have here? What gaps in my resume should I proactively address for this role?'
+    : `e.g. ${mode === 'letter' ? 'Make the opening paragraph shorter.' : 'Add a bullet about the payments migration under Acme Pay.'} Every change can be undone.`;
+}
+els.askMode?.addEventListener('change', syncAskMode);
+
+// Chat in "Edit the letter / resume" mode: the request becomes a refined
+// version of the document, with Undo right here.
+async function refineDocument(kind, request) {
+  const jobId = currentJob.jobId;
+  noteAnalysisStart(jobId, 'refine-document');
+  try {
+    const res = await send('refine-document', { jobId, kind, request });
+    if (currentJob?.jobId !== jobId) return;
+    docChanged(kind, res);
+    els.askInput.value = '';
+    const label = kind === 'letter' ? 'cover letter' : 'resume';
+    const undo = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: async () => {
+      undo.disabled = true;
+      try { docChanged(kind, await send('document-undo', { jobId, kind })); undo.textContent = 'Undone'; }
+      catch (e) { undo.disabled = false; els.askError.hidden = false; els.askError.textContent = e.message; }
+    } }, 'Undo');
+    const see = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: () => selectPane(kind) }, `See the ${label}`);
+    els.askOutput.prepend(h('div', { class: 'jc-notice', dataset: { tone: res.changed ? 'pos' : 'caution' } },
+      h('div', { class: 'jc-notice__body' },
+        h('span', { class: 'jc-notice__title' }, res.changed ? `Changed ${res.changed} part${res.changed === 1 ? '' : 's'} of the ${label}` : `The ${label} is unchanged`),
+        res.note ? h('span', {}, res.note) : null,
+        h('span', { class: 'jc-btn-row' }, res.changed ? undo : null, see))));
+  } catch (e) {
+    if (currentJob?.jobId === jobId) { els.askError.hidden = false; els.askError.textContent = `Failed: ${e.message || 'unknown error'}`; }
+  } finally {
+    noteAnalysisEnd(jobId, 'refine-document');
+  }
+}
+
+// The document's parts plus Undo and History. Every change comes back
+// from the service worker as { doc, record }.
+function docView(doc, kind, errorEl) {
+  const opts = {
+    kind, jobId: currentJob?.jobId, send,
+    onChange: (res) => docChanged(kind, res),
+    onError: (m) => { errorEl.hidden = false; errorEl.textContent = m; },
+    fmt: fmtWhen,
+  };
+  return [renderDocHistory(doc, opts), renderDocUnits(doc, opts)].filter(Boolean);
+}
+
+function docChanged(kind, res) {
+  if (!res?.doc || !currentJob) return;
+  const key = kind === 'letter' ? 'coverLetter' : 'resume';
+  currentJob.documents = { ...(currentJob.documents || {}), [kind]: res.doc };
+  if (res.record?.result) currentJob.analyses = { ...currentJob.analyses, [key]: res.record };
+  if (kind === 'letter') renderLetterCard(currentJob.analyses.coverLetter);
+  else renderResumeCard(currentJob.analyses.resume);
 }
 
 // ---------- Fact-guard marks (lib/flagMarks.js) ----------
@@ -2465,6 +2446,7 @@ const PROGRESS_MESSAGE = {
   'generate-letter':  'Drafting cover letter…',
   'generate-resume':  'Tailoring your resume…',
   'ask-llm':          'Asking the model…',
+  'refine-document':  'Editing the document…',
   'review-letter':    'Reviewing your cover letter as the hiring manager…',
   'analyze-requirements': 'Mapping the posting\'s requirements to your material…',
 };
@@ -2560,6 +2542,7 @@ const ACTION_BUTTONS_BY_MSGTYPE = {
   'generate-letter': 'generateLetter',
   'generate-resume': 'generateResume',
   'ask-llm':         'askSend',
+  'refine-document': 'askSend',
 };
 
 // Idempotent — safe to call repeatedly with the same working state.
@@ -2606,6 +2589,7 @@ const PROCESSING_CARDS = {
   'generate-letter': ['letterCard'],
   'generate-resume': ['resumeCard'],
   'ask-llm':         ['askCard'],
+  'refine-document': ['askCard'],
   'review-letter':   ['letterCard'],
 };
 // Map card-button IDs to action-bar action names so we can mirror state.
@@ -2646,7 +2630,7 @@ async function runAnalysis(button, errorEl, msgType, payload, onSuccess) {
     if (currentJob?.jobId === jobId) {
       const refreshed = await send('get-job', { jobId });
       if (refreshed.data) {
-        currentJob = { ...currentJob, analyses: refreshed.data.analyses, warmth: refreshed.data.warmth ?? currentJob.warmth };
+        currentJob = { ...currentJob, analyses: refreshed.data.analyses, documents: refreshed.data.documents, warmth: refreshed.data.warmth ?? currentJob.warmth };
         renderVerdict(currentJob);
         renderAnalysisSection(currentJob);
       }
@@ -2675,6 +2659,7 @@ els.askSend?.addEventListener('click', async () => {
   if (!prompt || !currentJob) { els.askInput.focus(); return; }
   const jobId = currentJob.jobId;
   els.askError.hidden = true;
+  if (els.askMode.value !== 'ask') return refineDocument(els.askMode.value, prompt);
   noteAnalysisStart(jobId, 'ask-llm');
   try {
     // Ensure the job is in the archive so the prior-analyses context works.
@@ -2774,7 +2759,7 @@ chrome.runtime.onMessage.addListener((msg) => {
       try {
         const r = await send('get-job', { jobId: msg.jobId });
         if (r.data) {
-          currentJob = { ...currentJob, analyses: r.data.analyses };
+          currentJob = { ...currentJob, analyses: r.data.analyses, documents: r.data.documents };
           renderVerdict(currentJob);
           renderAnalysisSection(currentJob);
         }

@@ -84,6 +84,12 @@ import { matchInbound } from './lib/search.js';
 import { postingAgeDays, applicantCount } from './lib/freshness.js';
 import { sharedTerms, verifyResume, resumeText } from './lib/keywords.js';
 import { guard, buildCorpus } from './lib/factGuard.js';
+import { splitLetter, joinUnits, resumeFromUnits, unitsFromResume, applyRefine, keptUnits, EDITABLE_KINDS } from './lib/documentUnits.js';
+import { newDoc, commit as commitVersion, undo as undoVersion, restore as restoreVersion, docFromJob } from './lib/documentHistory.js';
+import {
+  REGENERATE_UNIT_SYSTEM, REGENERATE_UNIT_PROMPT_VERSION, buildRegenerateUnitUserMessage,
+  REFINE_DOCUMENT_SYSTEM, REFINE_DOCUMENT_PROMPT_VERSION, buildRefineDocumentUserMessage,
+} from './lib/prompts/documentEdit.js';
 
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
@@ -296,7 +302,11 @@ const handlers = {
     return { ok: true };
   },
   'review-letter': (msg) => instrumentAnalysis('review-letter', msg.jobId, () => runLetterReview(msg.jobId)),
-  'update-letter': (msg) => updateLetterText(msg.jobId, msg.letter),
+  'document-commit': (msg) => commitDocumentChanges(msg.jobId, msg.kind, msg.changes, msg.cause, msg.note),
+  'document-undo': (msg) => changeDocument(msg.jobId, msg.kind, (doc) => undoVersion(doc)),
+  'document-restore': (msg) => changeDocument(msg.jobId, msg.kind, (doc) => restoreVersion(doc, msg.versionId)),
+  'regenerate-unit': (msg) => instrumentAnalysis('regenerate-unit', msg.jobId, () => runRegenerateUnit(msg.jobId, msg.kind, msg.unitId, msg.instruction)),
+  'refine-document': (msg) => instrumentAnalysis('refine-document', msg.jobId, () => runRefineDocument(msg.jobId, msg.kind, msg.request)),
   'generate-resume': (msg) => instrumentAnalysis('generate-resume', msg.jobId, () => runResume(msg.jobId, msg.mustInclude)),
   'ask-llm': (msg) => instrumentAnalysis('ask-llm', msg.jobId, () => runAsk(msg.jobId, msg.prompt, msg.provider)),
   'get-chats': (msg) => getChats(msg.jobId),
@@ -2030,9 +2040,13 @@ async function runLetter(jobId, tone = 'warm') {
   });
   const { r, factGuard } = await generateGuarded({
     feature: 'coverLetter', model: ctx.models.coverLetter, system: LETTER_SYSTEM, userMessage, maxTokens: 2500,
-    ctx, textOf: (res) => res?.letter,
+    ctx, textOf: (res) => joinUnits(letterUnits(res)),
   });
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
+  const units = letterUnits(r.result);
+  if (!Array.isArray(r.result?.units)) {
+    await logActivity({ type: 'units-fallback', jobId, ok: true, note: 'Letter came back as prose; split into paragraphs' });
+  }
   const record = {
     result: r.result, tone, model: modelLabel, usage: r.usage, retried: r.retried,
     provider: r.provider, fellback: r.fellback,
@@ -2041,7 +2055,18 @@ async function runLetter(jobId, tone = 'warm') {
     factGuard,
   };
   await setJobAnalysis(jobId, 'coverLetter', record);
-  return { ok: true, record };
+  const saved = await changeDocument(jobId, 'letter', (doc) => writeVersion(doc, units, `${tone} tone`), ctx);
+  return { ok: true, record: saved.record };
+}
+
+// The letter prompt (v5+) returns paragraphs as units; older or local
+// models may still return prose, which is split on blank lines.
+function letterUnits(res) {
+  if (Array.isArray(res?.units)) {
+    return res.units.filter((u) => typeof u?.text === 'string' && u.text.trim())
+      .map((u, i) => ({ id: `u${i + 1}`, kind: ['opening', 'body', 'closing', 'greeting', 'signoff'].includes(u.kind) ? u.kind : 'body', text: u.text.trim() }));
+  }
+  return splitLetter(res?.letter || '');
 }
 
 // mustInclude — terms the last draft's keyword check found missing; the
@@ -2219,23 +2244,6 @@ async function runLetterReview(jobId) {
   return { ok: true, record };
 }
 
-// The user edited the letter (inline, or by applying a review edit). Keep
-// it, and re-run the free number check against the new text.
-async function updateLetterText(jobId, letter) {
-  const job = await getJob(jobId);
-  const rec = job?.analyses?.coverLetter;
-  if (!rec || typeof letter !== 'string') return { ok: false, error: 'No cover letter to update' };
-  const ctx = await loadContext(jobId);
-  const updated = {
-    ...rec,
-    result: { ...rec.result, letter: letter.slice(0, 20000) },
-    editedAt: new Date().toISOString(),
-    factGuard: guard(letter, factCorpus(ctx, job)),
-  };
-  await setJobAnalysis(jobId, 'coverLetter', updated);
-  return { ok: true, record: updated };
-}
-
 async function runResume(jobId, mustInclude) {
   const ctx = await loadContext(jobId);
   if (!ctx.resume) throw new Error('Master resume not uploaded. Add it in Settings first.');
@@ -2260,12 +2268,154 @@ async function runResume(jobId, mustInclude) {
     provider: r.provider, fellback: r.fellback,
     generatedAt: new Date().toISOString(),
     promptVersion: RESUME_PROMPT_VERSION,
-    keywordCheck: verifyResume({
-      result: r.result, posting: postingText, masterResume: ctx.resume, profile: ctx.profile, shared,
-    }),
+    shared,
   };
   await setJobAnalysis(jobId, 'resume', record);
-  return { ok: true, record };
+  const units = unitsFromResume(r.result);
+  const saved = await changeDocument(jobId, 'resume', (doc) => writeVersion(doc, units, Array.isArray(mustInclude) && mustInclude.length ? 'Including left-out terms' : ''), ctx);
+  return { ok: true, record: saved.record };
+}
+
+// ---------- Documents as units (lib/documentUnits.js, lib/documentHistory.js) ----------
+//
+// job.documents.{resume,letter} hold the units and their versions. Every
+// change is saved through saveDocument, which also writes the joined
+// text back into analyses.{resume,coverLetter}.result, so Copy, PDF, the
+// keyword check, the letter review and follow-ups read the document as
+// it now stands without knowing about units.
+
+const DOC_ANALYSIS = { letter: 'coverLetter', resume: 'resume' };
+const DOC_LABEL = { letter: 'cover letter', resume: 'tailored resume' };
+
+const writeVersion = (doc, units, note) => (doc ? commitVersion(doc, units, 'written', note) : newDoc(units, 'written', note));
+
+function withFlags(u, flags) {
+  const { flags: _old, ...rest } = u;
+  return flags.length ? { ...rest, flags } : rest;
+}
+
+function resumeKeywordCheck(ctx, result, shared) {
+  const p = ctx.job.posting || {};
+  return verifyResume({
+    result, posting: `${p.title || ''}\n${p.descriptionText || ''}`, masterResume: ctx.resume, profile: ctx.profile,
+    shared: shared || sharedTerms(`${p.title || ''}\n${p.descriptionText || ''}`, ctx.resume || ''),
+  });
+}
+
+// Every save re-checks every part (regex only, no AI), so an undo or
+// restore shows the flags the restored text deserves.
+async function saveDocument(ctx, kind, saved) {
+  const job = await getJob(ctx.job.jobId);
+  const corpus = factCorpus(ctx, job);
+  const doc = { ...saved, units: saved.units.map((u) => withFlags(u, guard(u.text, corpus).flags)) };
+  const key = DOC_ANALYSIS[kind];
+  const rec = job.analyses?.[key] || {};
+  const flags = keptUnits(doc.units).flatMap((u) => (u.flags || []).map((f) => ({ ...f, unitId: u.id })));
+  const record = { ...rec, editedAt: new Date().toISOString(), factGuard: { ...(rec.factGuard || {}), flags, clean: !flags.length } };
+  if (kind === 'letter') {
+    const { units: _u, ...result } = rec.result || {};
+    record.result = { ...result, letter: joinUnits(doc.units) };
+  } else {
+    record.result = { ...(rec.result || {}), ...resumeFromUnits(doc.units) };
+    record.keywordCheck = resumeKeywordCheck({ ...ctx, job }, record.result, rec.shared);
+  }
+  await upsertJob(job.jobId, { documents: { ...(job.documents || {}), [kind]: doc }, analyses: { [key]: record } });
+  return { ok: true, doc, record };
+}
+
+// Load the document (migrating an old one), apply fn, save.
+async function changeDocument(jobId, kind, fn, ctx) {
+  if (!DOC_ANALYSIS[kind]) throw new Error(`Unknown document: ${kind}`);
+  ctx = ctx || await loadContext(String(jobId || ''));
+  const job = await getJob(ctx.job.jobId);
+  const before = docFromJob(job, kind);
+  const doc = fn(before);
+  if (!doc) throw new Error(`No ${DOC_LABEL[kind]} yet. Generate one first.`);
+  if (doc === before && job.documents?.[kind]) return { ok: true, doc, record: job.analyses?.[DOC_ANALYSIS[kind]], unchanged: true };
+  return saveDocument(ctx, kind, doc);
+}
+
+// The user's own changes: edit a part's text, remove a part, or put a
+// removed part back. changes: [{ id, text?, removed? }].
+async function commitDocumentChanges(jobId, kind, changes, cause = 'edited', note = '') {
+  const ctx = await loadContext(String(jobId || ''));
+  return changeDocument(jobId, kind, (doc) => {
+    if (!doc) return null;
+    let changed = false;
+    const units = doc.units.map((u) => {
+      const c = (Array.isArray(changes) ? changes : []).find((x) => x?.id === u.id);
+      if (!c) return u;
+      const next = { ...u };
+      if (typeof c.text === 'string' && c.text.trim() && EDITABLE_KINDS.has(u.kind) && c.text.trim() !== u.text) {
+        next.text = c.text.trim().slice(0, 5000);
+        changed = true;
+      }
+      if (typeof c.removed === 'boolean' && c.removed !== !!u.removed && u.kind !== 'header') {
+        next.removed = c.removed;
+        changed = true;
+      }
+      return next;
+    });
+    if (!changed) return doc;
+    const ok = ['edited', 'trimmed', 'restored'].includes(cause) ? cause : 'edited';
+    return commitVersion(doc, units, ok, String(note || '').slice(0, 300));
+  }, ctx);
+}
+
+// Rewrite one part. The model sees the whole document and returns only
+// the new text, which is fact-checked like everything else it writes.
+async function runRegenerateUnit(jobId, kind, unitId, instruction) {
+  const ctx = await loadContext(String(jobId || ''));
+  const doc = docFromJob(ctx.job, kind);
+  const unit = doc?.units.find((u) => u.id === unitId);
+  if (!unit || !EDITABLE_KINDS.has(unit.kind)) throw new Error('That part cannot be regenerated.');
+  const feature = kind === 'letter' ? 'coverLetter' : 'resume';
+  const userMessage = buildRegenerateUnitUserMessage({
+    units: doc.units, unit, instruction: typeof instruction === 'string' ? instruction.trim() : '', docLabel: DOC_LABEL[kind],
+    profile: ctx.profile, masterResume: ctx.resume, job: ctx.job,
+  });
+  const r = await routeCall(feature, {
+    local: (model) => callOllamaJson({ model, system: REGENERATE_UNIT_SYSTEM, userMessage, maxTokens: 800 }),
+    cloud: () => callJsonAnthropic({ apiKey: ctx.apiKey, model: ctx.models[feature], system: REGENERATE_UNIT_SYSTEM, userMessage, maxTokens: 800 }),
+  });
+  const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
+  await addUsage({ model: modelLabel, usage: r.usage });
+  const text = typeof r.result?.text === 'string' ? r.result.text.trim() : '';
+  if (!text) throw new Error('The model returned no text. Try again.');
+  const saved = await changeDocument(jobId, kind, (d) => {
+    const units = d.units.map((u) => (u.id === unitId ? { ...u, text } : u));
+    return commitVersion(d, units, 'regenerated', instruction ? String(instruction).slice(0, 300) : `Regenerated a ${unit.kind}`, undefined, { promptVersion: REGENERATE_UNIT_PROMPT_VERSION });
+  }, ctx);
+  return { ...saved, note: r.result?.note || '',
+    record: { ...saved.record, model: modelLabel, provider: r.provider, usage: r.usage } };
+}
+
+// The Chat tab's "Edit the letter / resume" mode: the request becomes a
+// refined version with the request as its note, undoable in one click.
+async function runRefineDocument(jobId, kind, request) {
+  const ask = typeof request === 'string' ? request.trim() : '';
+  if (!ask) throw new Error('Say what to change.');
+  const ctx = await loadContext(String(jobId || ''));
+  const doc = docFromJob(ctx.job, kind);
+  if (!doc) throw new Error(`No ${DOC_LABEL[kind]} yet. Generate one first.`);
+  const feature = kind === 'letter' ? 'coverLetter' : 'resume';
+  const userMessage = buildRefineDocumentUserMessage({
+    units: doc.units, request: ask, docLabel: DOC_LABEL[kind], profile: ctx.profile, masterResume: ctx.resume, job: ctx.job,
+  });
+  const r = await routeCall(feature, {
+    local: (model) => callOllamaJson({ model, system: REFINE_DOCUMENT_SYSTEM, userMessage, maxTokens: 3000 }),
+    cloud: () => callJsonAnthropic({ apiKey: ctx.apiKey, model: ctx.models[feature], system: REFINE_DOCUMENT_SYSTEM, userMessage, maxTokens: 3000 }),
+  });
+  const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
+  await addUsage({ model: modelLabel, usage: r.usage });
+  let changed = 0;
+  const saved = await changeDocument(jobId, kind, (d) => {
+    const { units, touched } = applyRefine(d.units, r.result);
+    changed = touched.length;
+    return changed ? commitVersion(d, units, 'refined', ask.slice(0, 300), undefined, { promptVersion: REFINE_DOCUMENT_PROMPT_VERSION }) : d;
+  }, ctx);
+  return { ...saved, changed, note: r.result?.note || (changed ? '' : 'No change was made.'),
+    record: { ...saved.record, model: modelLabel, provider: r.provider, usage: r.usage } };
 }
 
 // ---------- Recall view launcher ----------
