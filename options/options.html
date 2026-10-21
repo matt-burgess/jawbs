@@ -86,7 +86,7 @@
               <textarea id="profile" class="jc-textarea" rows="12" spellcheck="false"></textarea>
               <div class="jc-btn-row">
                 <button id="saveProfile" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
-                <button class="jc-btn" data-size="sm" data-prompt-key="profile" type="button" title="Copy a prompt to paste into Claude, ChatGPT, or Gemini — it'll either draft this file directly or ask you a few questions first.">✨ Get AI prompt</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="profile" type="button" title="Copy a prompt to paste into Claude, ChatGPT, or Gemini; it'll either draft this file directly or ask you a few questions first.">✨ Get AI prompt</button>
                 <button id="generateProfile" class="jc-btn" data-size="sm" type="button" title="Generate a fresh Profile from your Master Resume using Anthropic. Overwrites the textarea; nothing is saved until you click Save.">Generate from resume</button>
                 <label for="loadProfileFile" class="jc-btn" data-size="sm">Load .md file</label>
                 <input id="loadProfileFile" type="file" accept=".md,text/markdown,text/plain" hidden />
@@ -104,7 +104,7 @@
               <textarea id="knowledgeBase" class="jc-textarea" rows="10" spellcheck="false" placeholder="Paste or load a markdown knowledge document…"></textarea>
               <div class="jc-btn-row">
                 <button id="saveKnowledge" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
-                <button class="jc-btn" data-size="sm" data-prompt-key="knowledge" type="button" title="Copy a prompt for your AI chat product — it produces a longer knowledge-base document going deeper than the Profile.">✨ Get AI prompt</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="knowledge" type="button" title="Copy a prompt for your AI chat product; it produces a longer knowledge-base document going deeper than the Profile.">✨ Get AI prompt</button>
                 <button id="generateKnowledge" class="jc-btn" data-size="sm" type="button" title="Generate a fresh Knowledge Base from your Master Resume using Anthropic. Overwrites the textarea; nothing is saved until you click Save.">Generate from resume</button>
                 <label for="loadKnowledgeFile" class="jc-btn" data-size="sm">Load .md file</label>
                 <input id="loadKnowledgeFile" type="file" accept=".md,text/markdown,text/plain" hidden />
@@ -155,7 +155,7 @@
               <textarea id="resume" class="jc-textarea" rows="12" spellcheck="false" placeholder="Paste your full master resume as plain text or markdown…"></textarea>
               <div class="jc-btn-row">
                 <button id="saveResume" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
-                <button class="jc-btn" data-size="sm" data-prompt-key="resume" type="button" title="Copy a prompt for your AI chat product — it produces a full master-resume Markdown document.">✨ Get AI prompt</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="resume" type="button" title="Copy a prompt for your AI chat product; it produces a full master-resume Markdown document.">✨ Get AI prompt</button>
                 <button id="generateResumeField" class="jc-btn" data-size="sm" type="button" title="Clean up formatting on the pasted resume. Preserves every specific claim; normalizes headings, bullets, and line breaks.">Clean up formatting</button>
                 <span id="resumeStatus" class="jc-footnote"></span>
                 <span id="resumeLen" class="jc-footnote"></span>
@@ -168,10 +168,10 @@
                 <p class="jc-footnote">Two or three paragraphs you've actually written. Anchors your voice
                   for cover letters and question answers.</p>
               </div>
-              <textarea id="samples" class="jc-textarea" rows="8" spellcheck="false" placeholder="Paste 2–3 paragraphs in your voice…"></textarea>
+              <textarea id="samples" class="jc-textarea" rows="8" spellcheck="false" placeholder="Paste 2-3 paragraphs in your voice…"></textarea>
               <div class="jc-btn-row">
                 <button id="saveSamples" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
-                <button class="jc-btn" data-size="sm" data-prompt-key="samples" type="button" title="Copy a prompt for your AI chat product — it collects 2–3 paragraphs in your own voice.">✨ Get AI prompt</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="samples" type="button" title="Copy a prompt for your AI chat product; it collects 2-3 paragraphs in your own voice.">✨ Get AI prompt</button>
                 <span id="samplesStatus" class="jc-footnote"></span>
               </div>
             </section>
@@ -179,14 +179,14 @@
             <section class="options-section">
               <div class="section-head">
                 <h2>Question Prep questions</h2>
-                <p class="jc-footnote">One question per line. Order matters — the Jawbar's Bait
+                <p class="jc-footnote">One question per line. Order matters: the Jawbar's Bait
                   hands the whole list to the model and gets back an answer per question,
                   in order, grounded in your profile, resume, writing samples, and the specific posting.</p>
               </div>
               <textarea id="prepQuestions" class="jc-textarea" rows="12" spellcheck="false" placeholder="Why are you interested in this role?&#10;Describe a time you scaled a team.&#10;…"></textarea>
               <div class="jc-btn-row">
                 <button id="savePrepQuestions" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
-                <button class="jc-btn" data-size="sm" data-prompt-key="prepQuestions" type="button" title="Copy a prompt for your AI chat product — it produces a fresh interview-question list for your target level.">✨ Get AI prompt</button>
+                <button class="jc-btn" data-size="sm" data-prompt-key="prepQuestions" type="button" title="Copy a prompt for your AI chat product; it produces a fresh interview-question list for your target level.">✨ Get AI prompt</button>
                 <button id="resetPrepQuestions" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Reset to defaults</button>
                 <span id="prepQuestionsStatus" class="jc-footnote"></span>
                 <span id="prepQuestionsCount" class="jc-footnote"></span>
@@ -271,7 +271,7 @@
             <section class="options-section" id="compTargets">
               <div class="section-head">
                 <h2>Compensation target</h2>
-                <p class="jc-footnote">Your target base salary — the number you're pursuing. Comp gauge in
+                <p class="jc-footnote">Your target base salary: the number you're pursuing. Comp gauge in
                   the Jawbar is tinted based on where each posting's range lands vs this.</p>
               </div>
               <div class="comp-grid">
@@ -338,7 +338,7 @@
                 <h2>Contact quick-fill</h2>
                 <p class="jc-footnote">A floating toolbar appears above any focused text field on extension pages
                   and known ATS domains, with one pill per value below that's set. Click a pill to paste that value
-                  into the field. Field context is intentionally ignored — the toolbar shows every value you've saved.</p>
+                  into the field. Field context is intentionally ignored; the toolbar shows every value you've saved.</p>
               </div>
               <label>
                 <span>Email</span>
@@ -416,7 +416,7 @@
           <p class="tab-intro">
             Two providers, one jawb. <strong>Cloud (Anthropic)</strong> handles anything you don't
             route locally and is the fallback when Ollama fails. <strong>Local (Ollama)</strong>
-            is opt-in per feature — great for routine tasks, keeps tokens off your bill.
+            is opt-in per feature: great for routine tasks, keeps tokens off your bill.
           </p>
 
           <!-- ============================================================
@@ -424,7 +424,7 @@
                ============================================================ -->
           <div class="settings-group" id="ai-cloud" data-group="cloud">
             <div class="settings-group__head">
-              <h3 class="settings-group__title">Cloud provider — Anthropic</h3>
+              <h3 class="settings-group__title">Cloud provider: Anthropic</h3>
               <span class="settings-group__hint">Required. Handles everything not routed locally.</span>
             </div>
 
@@ -432,7 +432,7 @@
               <div class="section-head">
                 <h2>Cloud provider &amp; API key</h2>
                 <p class="jc-footnote">Pick which cloud AI runs the analyses. Each provider's key is
-                  stored locally in <code>chrome.storage.local</code> — never included in exports.</p>
+                  stored locally in <code>chrome.storage.local</code>, never included in exports.</p>
               </div>
               <label>
                 <span>Provider</span>
@@ -482,7 +482,7 @@
                     <strong>Create an API key.</strong>
                     Under <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Settings → API keys</a>,
                     click <em>Create Key</em>, give it a name (e.g. "Jawbs"), and copy the
-                    <code>sk-ant-…</code> value. <strong>You will not see this key again</strong> — copy it now.
+                    <code>sk-ant-…</code> value. <strong>You will not see this key again</strong>. Copy it now.
                   </li>
                   <li>
                     <strong>Paste it above and click Save key.</strong>
@@ -515,7 +515,7 @@
                ============================================================ -->
           <div class="settings-group" id="ai-local" data-group="local">
             <div class="settings-group__head">
-              <h3 class="settings-group__title">Local provider — Ollama</h3>
+              <h3 class="settings-group__title">Local provider: Ollama</h3>
               <span class="settings-group__hint">Optional. Runs on this machine at <code>localhost:11434</code>. Falls back to cloud on any failure.</span>
             </div>
 
@@ -577,7 +577,7 @@ sudo systemctl restart ollama
                   </li>
                   <li>
                     <strong>Enable the local provider above</strong> and check which features to route
-                    locally. Cover Letter and Tailored Resume stay cloud-only by default — they benefit
+                    locally. Cover Letter and Tailored Resume stay cloud-only by default; they benefit
                     from the stronger model.
                   </li>
                 </ol>
@@ -760,7 +760,7 @@ sudo systemctl restart ollama
           <section class="options-section" id="sys-log">
             <div class="section-head">
               <h2>Activity log</h2>
-              <p class="jc-footnote">Local ring buffer of the last 500 actions the extension has taken — analyses, captures, syncs, enrichments. Never leaves your machine.</p>
+              <p class="jc-footnote">Local ring buffer of the last 500 actions the extension has taken: analyses, captures, syncs, enrichments. Never leaves your machine.</p>
             </div>
             <div class="jc-btn-row">
               <button id="refreshActivity" class="jc-btn" data-variant="primary" data-size="sm" type="button">Refresh</button>

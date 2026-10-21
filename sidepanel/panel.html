@@ -42,7 +42,7 @@
            any tab. Auto-shows when the active tab is a LinkedIn or
            Google Jobs search results URL with meaningful filters. -->
       <div id="searchContext" class="jc-search-bar" hidden>
-        <span class="jc-search-bar__label">Save this search —</span>
+        <span class="jc-search-bar__label">Save this search:</span>
         <span id="searchContextSummary" class="jc-search-bar__title"></span>
         <button id="saveThisSearch" type="button"
                 class="jc-icon-btn jc-search-bar__save"
@@ -102,7 +102,7 @@
              into the full Jawboard archive at the top. -->
         <section id="tabRecent" class="jc-tab-pane" data-tab-only="recent" hidden>
           <div class="jc-tab-pane__group">
-            <button id="tabRecentOpenJawboard" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Open the Jawboard — every archived jawb, filters, and analytics.">
+            <button id="tabRecentOpenJawboard" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Open the Jawboard: every archived jawb, filters, and analytics.">
               <img src="../assets/jawboard-white.png" alt="" width="18" height="18" style="display:block">
               <span>Open <span class="jc-brand">Jawboard</span></span>
             </button>
@@ -168,27 +168,27 @@
                    moment on the left. Shark tier icon sits next to it
                    as the visual anchor. -->
               <span class="jc-meta-strip__strength" id="metaStrength" title="Strength = fit 50% · comp 30% · connections 20%">
-                <span class="jc-meta-strip__strength-num" id="metaStrengthNum">—</span>
+                <span class="jc-meta-strip__strength-num" id="metaStrengthNum">-</span>
               </span>
               <span class="jc-meta-strip__item" id="metaShark" title="">
                 <span class="jc-meta-strip__shark-icon" id="metaSharkIcon">
                   <img id="metaSharkImg" src="" alt="" width="20" height="20" />
                 </span>
-                <span class="jc-meta-strip__label" id="metaSharkLabel">—</span>
+                <span class="jc-meta-strip__label" id="metaSharkLabel">-</span>
               </span>
-              <span class="jc-meta-strip__item" title="Fit score — LLM's holistic match against your profile">
+              <span class="jc-meta-strip__item" title="Fit score: LLM's holistic match against your profile">
                 <svg class="jc-gauge" id="fitGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Fit score">
                   <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
                   <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="fitGaugeFill" stroke-dasharray="0 75.4"></circle>
-                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="fitGaugeText">—</text>
+                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="fitGaugeText">-</text>
                 </svg>
                 <span class="jc-meta-strip__label">Fit</span>
               </span>
-              <span class="jc-meta-strip__item" title="Connections — actionable people in your network for this role">
+              <span class="jc-meta-strip__item" title="Connections: actionable people in your network for this role">
                 <svg class="jc-gauge" id="connectionsGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Connections score">
                   <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
                   <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="connectionsGaugeFill" stroke-dasharray="0 75.4"></circle>
-                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="connectionsGaugeText">—</text>
+                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="connectionsGaugeText">-</text>
                 </svg>
                 <span class="jc-meta-strip__label">Connections</span>
               </span>
@@ -196,7 +196,7 @@
                 <svg class="jc-gauge" id="compGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Comp vs target">
                   <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
                   <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="compGaugeFill" stroke-dasharray="0 75.4"></circle>
-                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="compGaugeText">—</text>
+                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="compGaugeText">-</text>
                 </svg>
                 <span class="jc-meta-strip__label">Comp</span>
               </span>
@@ -211,8 +211,8 @@
                  Row 3: Bait (Cover letter, Resume, Prep brief) -->
             <div class="jc-jobcard__actions">
               <div class="jc-btn-row">
-                <button id="openFullView" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" type="button" aria-label="Open full page view for this jawb" title="Open the full page view for this jawb — interview rounds, timeline, comp, offer form, and everything else that doesn't fit in the Jawbar."><span class="jc-details-arrow" aria-hidden="true">←</span>Details</button>
-                <a id="companyCareersSearch" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" title="Google search for '[Company] Careers - [Jawb Title]' — often lands directly on the same role on the company's own careers site.">
+                <button id="openFullView" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" type="button" aria-label="Open full page view for this jawb" title="Open the full page view for this jawb: interview rounds, timeline, comp, offer form, and everything else that doesn't fit in the Jawbar."><span class="jc-details-arrow" aria-hidden="true">←</span>Details</button>
+                <a id="companyCareersSearch" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" title="Google search for '[Company] Careers - [Jawb Title]'. It often lands directly on the same role on the company's own careers site.">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path>
                   </svg>
@@ -244,7 +244,7 @@
                    dismissed it by clicking through once (state is
                    persisted at ui.confirmedLinkedIn). -->
               <div class="jc-btn-row jc-btn-row--secondary">
-                <a id="confirmOnLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="highlight" data-size="sm" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" aria-label="Confirm applied on LinkedIn tracker" title="Open LinkedIn's tracker at the Clicked Apply stage — find this jawb and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>
+                <a id="confirmOnLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="highlight" data-size="sm" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" aria-label="Confirm applied on LinkedIn tracker" title="Open LinkedIn's tracker at the Clicked Apply stage, find this jawb, and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>
                   <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
                   <span>Transition to 'Applied' on LinkedIn</span>
                 </a>
@@ -295,7 +295,7 @@
               <div class="action-row action-row--outputs">
                 <span class="action-row__label" aria-hidden="true"></span>
                 <button id="letterCopyTop" class="jc-btn" data-size="sm" type="button" title="Copy the generated cover letter" hidden>📋 Copy cover letter</button>
-                <button id="resumeDownloadTop" class="jc-btn" data-size="sm" type="button" title="Open the tailored resume as a formatted PDF — the browser's print dialog opens automatically with 'Save as PDF' preselected." hidden>↓ Download resume</button>
+                <button id="resumeDownloadTop" class="jc-btn" data-size="sm" type="button" title="Open the tailored resume as a formatted PDF; the browser's print dialog opens automatically with 'Save as PDF' preselected." hidden>↓ Download resume</button>
               </div>
             </div>
             <!-- Comp source note + one-line fit summary retired — the
@@ -345,7 +345,7 @@
               </span>
               <span class="jc-empty-card__body">
                 <span class="jc-empty-card__title"><span class="jc-brand">Jawbridge</span></span>
-                <span class="jc-empty-card__desc">Every analytics chart on one screen — funnel, voyage log, aging, calibration, cadence, and more.</span>
+                <span class="jc-empty-card__desc">Every analytics chart on one screen: funnel, voyage log, aging, calibration, cadence, and more.</span>
               </span>
             </button>
             <button class="jc-empty-card" data-empty-tab="you" type="button">
@@ -431,7 +431,7 @@
           <div class="jc-card jc-card--tone" data-category="level" id="levelCard" data-open="false">
             <button class="jc-card__head" data-card="level" type="button">
               <span>Level signals</span>
-              <span class="jc-card__glance" id="levelGlance"><span class="jc-footnote">—</span></span>
+              <span class="jc-card__glance" id="levelGlance"><span class="jc-footnote">-</span></span>
               <span class="jc-card__chev">▸</span>
             </button>
             <div class="jc-card__body">
@@ -444,7 +444,7 @@
           <div class="jc-card jc-card--tone" data-category="flags" id="flagsCard" data-open="false">
             <button class="jc-card__head" data-card="flags" type="button">
               <span>Red flags</span>
-              <span class="jc-card__glance" id="flagsGlance"><span class="jc-footnote">—</span></span>
+              <span class="jc-card__glance" id="flagsGlance"><span class="jc-footnote">-</span></span>
               <span class="jc-card__chev">▸</span>
             </button>
             <div class="jc-card__body" id="flagsBody"></div>
@@ -524,7 +524,7 @@
                 <div class="jc-btn-row">
                   <button id="generateResume" class="jc-btn" data-variant="primary" data-size="sm" type="button">Generate</button>
                   <button id="resumeCopy" class="jc-btn" data-size="sm" type="button" hidden>Copy</button>
-                  <button id="resumeDownload" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Open the tailored resume as a formatted PDF — the browser's print dialog opens automatically with 'Save as PDF' preselected." hidden>↓ Download</button>
+                  <button id="resumeDownload" class="jc-btn" data-variant="primary" data-size="sm" type="button" title="Open the tailored resume as a formatted PDF; the browser's print dialog opens automatically with 'Save as PDF' preselected." hidden>↓ Download</button>
                   <!-- resumePdf retained hidden for backward compat; Download now
                        triggers the PDF flow directly. See panel.js. -->
                   <button id="resumePdf" class="jc-btn" data-size="sm" type="button" hidden>PDF</button>

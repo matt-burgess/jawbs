@@ -714,7 +714,7 @@ function renderHero() {
   const fit = job.analyses?.fit?.result;
   const score = typeof fit?.fitScore === 'number' ? roundFitToTens(fit.fitScore) : null;
   const scoreEl = els.heroScoreNum;
-  scoreEl.textContent = score != null ? String(score) : '—';
+  scoreEl.textContent = score != null ? String(score) : '-';
   // Color the big score by tier
   const tier = score == null ? 'none'
     : score >= 75 ? 'pos'
@@ -737,7 +737,7 @@ function renderHero() {
       class: 'jc-badge',
       'data-tone': 'neg',
       'data-terminal': heroNorm,
-      title: 'Scarred — this jawb is a battle you fought. Pursuit closed.',
+      title: 'Scarred: this jawb is a battle you fought. Pursuit closed.',
     }, statusLabel(heroNorm)));
   }
 
@@ -803,7 +803,7 @@ function renderVoyageLog() {
   };
   stagesEl.innerHTML = STAGES.map((s, i) => {
     const state = stageAtIdx < 0 ? 'past' : (i < stageAtIdx ? 'past' : i === stageAtIdx ? 'now' : 'next');
-    const date = state === 'next' ? '—' : (stageDate(i) || '—');
+    const date = state === 'next' ? '-' : (stageDate(i) || '-');
     return `<li class="voyage-stage" data-state="${state}">
       <div class="voyage-stage__row">
         <span class="voyage-stage__mark"></span>
@@ -876,7 +876,7 @@ function renderWhatsNext() {
     const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
     const bits = [`Next round: ${upcoming.r.topic || 'Interview'}`];
     if (upcoming.r.interviewerName) bits.push(`with ${upcoming.r.interviewerName}`);
-    bits.push(`— ${when}`);
+    bits.push(when);
     el.dataset.tone = days <= 2 ? 'urgent' : 'info';
     el.innerHTML = `<span class="whats-next__label">Coming up</span> <span class="whats-next__msg">${escapeHtml(bits.join(' '))}</span>`;
     el.hidden = false;
@@ -963,7 +963,7 @@ function renderFitReadout() {
   const out = fit.outreach;
   if (out?.hasNetwork && out?.bestContact) {
     const block = h('div', { class: 'outreach-block' },
-      h('div', { class: 'label' }, 'Outreach — first move'),
+      h('div', { class: 'label' }, 'Outreach: first move'),
       h('div', { class: 'outreach-block__contact' }, out.bestContact),
     );
     if (out.why) block.append(h('div', { class: 'outreach-block__why' }, out.why));
@@ -994,17 +994,17 @@ function renderCompReadout() {
   // v4 salary structure: salary.base = {low, high}, salary.source, sourceLabel
   const salary = comp.salary || {};
   const base = salary.base || {};
-  const fmtUsd = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`;
+  const fmtUsd = (n) => n == null ? '-' : `$${Math.round(n).toLocaleString()}`;
   if (base.low != null || base.high != null) {
     els.compReadout.append(h('div', { class: 'comp-range' },
-      h('span', { class: 'comp-range__num' }, `${fmtUsd(base.low)} – ${fmtUsd(base.high)}`),
+      h('span', { class: 'comp-range__num' }, `${fmtUsd(base.low)} to ${fmtUsd(base.high)}`),
       h('span', { class: 'comp-range__lbl' }, 'base'),
     ));
   } else if (comp.marketEstimate) {
     // Legacy v3 fallback
     const m = comp.marketEstimate;
     els.compReadout.append(h('div', { class: 'comp-range' },
-      h('span', { class: 'comp-range__num' }, `${fmtUsd(m.baseLow)} – ${fmtUsd(m.baseHigh)}`),
+      h('span', { class: 'comp-range__num' }, `${fmtUsd(m.baseLow)} to ${fmtUsd(m.baseHigh)}`),
       h('span', { class: 'comp-range__lbl' }, 'base (legacy estimate)'),
     ));
   }
@@ -1165,7 +1165,7 @@ function renderPeople() {
       const url = person.linkedInUrl || person.profileUrl;
       els.panelList.append(h('div', { class: 'panel-person' },
         renderPersonName(person.name, url),
-        person.role ? h('span', { class: 'jc-footnote' }, ` — ${person.role}`) : null,
+        person.role ? h('span', { class: 'jc-footnote' }, `· ${person.role}`) : null,
         followBadge(url),
       ));
     }
@@ -1182,7 +1182,7 @@ function renderPersonRow(person, opts = {}) {
     'data-priority': String(person.priorityScore),
   },
     renderPersonName(person.name, person.profileUrl),
-    person.headline ? h('span', { class: 'jc-footnote' }, ` — ${person.headline}`) : null,
+    person.headline ? h('span', { class: 'jc-footnote' }, `· ${person.headline}`) : null,
     ...tags.map((t, i) => h('span', {
       class: 'hero-badge',
       'data-tone': i === 0 ? primaryTone : 'neutral',

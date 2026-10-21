@@ -201,7 +201,7 @@ export function renderStrikeFunnel(container, jobsList, opts = {}) {
   const callout = worst
     ? `<div class="chart-callout" data-tone="${worst.pct < 20 ? 'neg' : 'caution'}">
          Weakest conversion: <strong>${worst.from} → ${worst.to}</strong> at ${worst.pct}%.
-         ${worst.pct < 20 ? 'Big leak — investigate.' : ''}
+         ${worst.pct < 20 ? 'Big leak: investigate.' : ''}
        </div>`
     : '';
 
@@ -296,7 +296,7 @@ export function renderVoyageLog(container, jobsList, opts = {}) {
   const mortalityMax = Math.max(1, ...Object.values(mortalityBuckets));
   const mortalityHtml = mortalityKeys.length
     ? `<div class="voyage-mortality">
-         <div class="voyage-mortality__title">Round mortality — where processes die</div>
+         <div class="voyage-mortality__title">Round mortality: where processes die</div>
          ${mortalityKeys.map((k) => `
            <div class="voyage-mortality__row">
              <span class="voyage-mortality__lbl">${ROUND_TYPE_LABEL[k] || k}</span>
@@ -482,7 +482,7 @@ export function renderCalibration(container, jobsList) {
   const callout = gap > 15
     ? `<div class="chart-callout" data-tone="pos">Fit score IS predictive (top buckets +${Math.round(gap)}pp on interview rate). Consider raising your minimum-fit threshold.</div>`
     : gap < -5
-    ? `<div class="chart-callout" data-tone="neg">Fit score is INVERSELY correlated with outcomes — don't over-rely on it.</div>`
+    ? `<div class="chart-callout" data-tone="neg">Fit score is INVERSELY correlated with outcomes; don't over-rely on it.</div>`
     : `<div class="chart-callout" data-tone="caution">Fit score isn't strongly predictive yet (gap ${Math.round(gap)}pp). Score is a hint, not a filter.</div>`;
 
   const legend = `
@@ -568,7 +568,7 @@ export function renderTrophyBoard(container, jobsList, opts = {}) {
     const h = Math.max(2, yLo - yHi);
     const yMid = yFor(s.mid);
     const color = statusColor[s.status] || 'var(--jaw-amber)';
-    const title = `${s.title} @ ${s.company} · ${fmtK(s.low)}–${fmtK(s.high)}`;
+    const title = `${s.title} @ ${s.company} · ${fmtK(s.low)}-${fmtK(s.high)}`;
     const bar = `<rect x="${x.toFixed(1)}" y="${yHi.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" opacity="0.85" style="fill:${color};cursor:${opts.links ? 'pointer' : 'default'}"><title>${escapeHtml(title)}</title></rect>`;
     const midMark = `<line x1="${(x - 2).toFixed(1)}" y1="${yMid.toFixed(1)}" x2="${(x + barW + 2).toFixed(1)}" y2="${yMid.toFixed(1)}" stroke="var(--jc-text)" stroke-width="1.5" opacity="0.7" />`;
     // Rotated company label along the x-axis
@@ -833,7 +833,7 @@ export function renderCapturedLine(container, jobsList) {
 
   const lags = collectInterviewLags(jobsList);
   const lagCaption = lags.length
-    ? `Avg <strong>${Math.round(lags.reduce((a, b) => a + b, 0) / lags.length)}</strong> days from Applied → first Interview (range ${Math.min(...lags)}–${Math.max(...lags)}, n=${lags.length})`
+    ? `Avg <strong>${Math.round(lags.reduce((a, b) => a + b, 0) / lags.length)}</strong> days from Applied → first Interview (range ${Math.min(...lags)}-${Math.max(...lags)}, n=${lags.length})`
     : 'No Applied → Interview timing recorded yet';
 
   container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
@@ -887,11 +887,11 @@ export function renderFitHistogram(container, jobsList) {
   }
 
   const buckets = [
-    { label: '0–19',   color: 'var(--jc-neg)',     min: 0,  max: 19 },
-    { label: '20–39',  color: 'var(--jc-neg)',     min: 20, max: 39 },
-    { label: '40–59',  color: 'var(--jc-caution)', min: 40, max: 59 },
-    { label: '60–79',  color: 'var(--jc-caution)', min: 60, max: 79 },
-    { label: '80–100', color: 'var(--jc-pos)',     min: 80, max: 100 },
+    { label: '0-19',   color: 'var(--jc-neg)',     min: 0,  max: 19 },
+    { label: '20-39',  color: 'var(--jc-neg)',     min: 20, max: 39 },
+    { label: '40-59',  color: 'var(--jc-caution)', min: 40, max: 59 },
+    { label: '60-79',  color: 'var(--jc-caution)', min: 60, max: 79 },
+    { label: '80-100', color: 'var(--jc-pos)',     min: 80, max: 100 },
   ];
   for (const b of buckets) b.count = scores.filter((s) => s >= b.min && s <= b.max).length;
   const maxCount = Math.max(...buckets.map((b) => b.count));
@@ -936,9 +936,9 @@ export function renderSalaryHistogram(container, jobsList) {
 
   const buckets = [
     { label: '<$150K',    min: 0,      max: 149999 },
-    { label: '$150–200K', min: 150000, max: 199999 },
-    { label: '$200–250K', min: 200000, max: 249999 },
-    { label: '$250–300K', min: 250000, max: 299999 },
+    { label: '$150-200K', min: 150000, max: 199999 },
+    { label: '$200-250K', min: 200000, max: 249999 },
+    { label: '$250-300K', min: 250000, max: 299999 },
     { label: '$300K+',    min: 300000, max: Infinity },
   ];
   for (const b of buckets) b.count = anchors.filter((a) => a >= b.min && a <= b.max).length;
@@ -964,7 +964,7 @@ export function renderSalaryHistogram(container, jobsList) {
     <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" style="stroke: var(--jc-border-strong)" stroke-width="1" />
     ${bars}
   </svg>
-  <div class="chart-caption">${anchors.length} anchors · median <strong style="color:var(--jc-text)">$${Math.round(median/1000)}K</strong> · range $${Math.round(lo/1000)}K–$${Math.round(hi/1000)}K</div>`;
+  <div class="chart-caption">${anchors.length} anchors · median <strong style="color:var(--jc-text)">$${Math.round(median/1000)}K</strong> · range $${Math.round(lo/1000)}K-$${Math.round(hi/1000)}K</div>`;
 }
 
 // ================================================================

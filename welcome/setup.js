@@ -90,12 +90,12 @@ const STEPS = [
     key: 'samples',
     kind: 'textarea',
     title: 'Writing samples',
-    lead: '2–3 paragraphs in your own voice. Use anything you\'ve actually written.',
+    lead: '2-3 paragraphs in your own voice. Use anything you\'ve actually written.',
     promptKey: 'samples',
     getter: getWritingSamples,
     setter: setWritingSamples,
     rows: 6,
-    placeholder: 'Paste 2–3 paragraphs of your own writing — a Slack post, a LinkedIn post, an email…',
+    placeholder: 'Paste 2-3 paragraphs of your own writing: a Slack post, a LinkedIn post, an email…',
     optional: false,
   },
   {
@@ -302,18 +302,18 @@ async function renderTextareaStep(root, step) {
                       : 'Claude';
 
   root.innerHTML = `
-    <!-- AI helper — one path.
+    <!-- AI helper: one path.
          Button opens the Get-AI-Prompt modal so the user copies the
          prompt and takes it to their AI product, where their account
          memory / Projects / Custom Instructions can actually
          personalize the draft. A stateless API auto-draft was tried
-         earlier and pulled — it invented details and set the wrong
+         earlier and pulled: it invented details and set the wrong
          expectation vs the chat product. -->
     <div class="setup-ai-helper">
       <div class="setup-ai-helper__row">
         <div class="setup-ai-helper__body">
           <h3 class="setup-ai-helper__title">Draft this in ${providerLabel}.</h3>
-          <span class="setup-ai-helper__desc">${providerLabel} sees your account's memory, projects, and preferences — the personalized draft goes fastest here.</span>
+          <span class="setup-ai-helper__desc">${providerLabel} sees your account's memory, projects, and preferences; the personalized draft goes fastest here.</span>
         </div>
         <div class="setup-ai-helper__actions">
           <button class="jc-btn setup-ai-helper__cta" data-variant="highlight" type="button" data-prompt-key="${step.promptKey}">Draft in ${providerLabel} →</button>
@@ -364,7 +364,7 @@ async function renderCompStep(root, step) {
   root.innerHTML = `
     <label class="setup-field setup-field--single">
       <span class="setup-field__label">Target salary (USD, base)</span>
-      <span class="setup-field__hint">The number you're pursuing — where you'd be genuinely excited to negotiate. Jawbs's Comp gauge is tinted based on where each posting's range lands vs this.</span>
+      <span class="setup-field__hint">The number you're pursuing: where you'd be genuinely excited to negotiate. Jawbs's Comp gauge is tinted based on where each posting's range lands vs this.</span>
       <input id="wCompTarget" type="number" min="0" step="1000" class="jc-input setup-comp-input" placeholder="For example, $123,456" />
     </label>
     <p class="setup-note">Optional advanced anchors (Floor, Walk-away, Current benchmark) live in Settings → You → Search parameters.</p>

@@ -158,11 +158,11 @@ function renderCompGauge(job) {
   if (gaugeWrap) {
     renderGauge(els.compGauge, els.compGaugeFill, els.compGaugeText, score);
     // Tooltip: full compare so the user can inspect without clicking.
-    const rangeText = (low != null && high != null) ? `${fmtMoneyK(low)}–${fmtMoneyK(high)}`
+    const rangeText = (low != null && high != null) ? `${fmtMoneyK(low)}-${fmtMoneyK(high)}`
                     : (high != null) ? `up to ${fmtMoneyK(high)}`
                     : (low != null) ? `from ${fmtMoneyK(low)}` : 'unknown range';
     const targetText = target ? fmtMoneyK(target) : 'not set';
-    gaugeWrap.title = `Comp ${rangeText} vs your target ${targetText}. Score ${score}/100 — `
+    gaugeWrap.title = `Comp ${rangeText} vs your target ${targetText}. Score ${score}/100, `
       + (score >= 70 ? 'strong.' : score >= 40 ? 'fair.' : 'weak.');
     gaugeWrap.hidden = false;
   }
@@ -711,7 +711,7 @@ async function renderRecentTab() {
         class: 'jc-recent-tab__link',
         href: safeExternalUrl(j.url || `https://www.linkedin.com/jobs/view/${j.jobId}/`),
         target: '_blank', rel: 'noopener noreferrer',
-        title: rawCompany ? `${rawTitle} — ${rawCompany}` : rawTitle,
+        title: rawCompany ? `${rawTitle} at ${rawCompany}` : rawTitle,
       }, ...linkChildren,
         h('img', {
           class: 'jc-li-icon', src: '../assets/linkedin.svg',
@@ -1213,7 +1213,7 @@ function renderVerdict(job) {
     if (els.metaSharkIcon) els.metaSharkIcon.setAttribute('data-tier', strength.tier);
     if (els.metaSharkLabel) els.metaSharkLabel.textContent = strength.tierLabel;
     if (els.metaShark) {
-      els.metaShark.title = `${strength.tierLabel} shark — ${strength.tierDescription || 'strength tier'}. `
+      els.metaShark.title = `${strength.tierLabel} shark: ${strength.tierDescription || 'strength tier'}. `
         + `Strength ${strength.score}/100 = fit ${strength.breakdown.fit.note} · `
         + `comp ${strength.breakdown.comp.note} · connections ${strength.breakdown.connections.note}. `
         + `Weights: fit 50% · comp 30% · connections 20%.`;
@@ -1261,7 +1261,7 @@ function renderFreshnessBadges(p) {
     }, age === 0 ? 'Posted today' : `Posted ${age}d ago`));
   }
   if (p.isReposted) {
-    els.verdictBadges.append(h('span', { class: 'jc-badge', dataset: { tone: 'caution' }, title: 'LinkedIn marks this as reposted — the real age is older than shown.' }, 'Reposted'));
+    els.verdictBadges.append(h('span', { class: 'jc-badge', dataset: { tone: 'caution' }, title: 'LinkedIn marks this as reposted; the real age is older than shown.' }, 'Reposted'));
   }
   if (p.applicantCount) {
     const count = applicantCount(p.applicantCount);
@@ -1326,7 +1326,7 @@ function paintCompanySite(el, job, site) {
   }
   const pay = m.salary && (m.salary.min || m.salary.max);
   if (pay) {
-    const range = [m.salary.min, m.salary.max].filter(Boolean).map((n) => fmtMoneyK(n)).join(' – ');
+    const range = [m.salary.min, m.salary.max].filter(Boolean).map((n) => fmtMoneyK(n)).join(' to ');
     el.append(h('p', { class: 'jc-company-site__note' },
       `Pay on the company posting: ${range}${m.salary.currency && m.salary.currency !== 'USD' ? ` ${m.salary.currency}` : ''}${m.salary.period && m.salary.period !== 'year' ? ` per ${m.salary.period}` : ''} (as read by freehire). Comp uses it when you run it.`));
   }
@@ -1646,7 +1646,7 @@ function renderFitCard(record) {
       style: 'align-items: flex-start',
     },
       h('div', { class: 'jc-notice__body' },
-        h('span', { class: 'jc-notice__title' }, '⚠ Fit couldn\'t run — description wasn\'t captured cleanly'),
+        h('span', { class: 'jc-notice__title' }, '⚠ Fit couldn\'t run: description wasn\'t captured cleanly'),
         h('p', { class: 'jc-prose', style: 'margin-top: 4px' },
           'This jawb was likely analyzed from LinkedIn\'s search-results view, which mixes multiple postings into one blob. Open the jawb in a single-job view (linkedin.com/jobs/view/...) and click ',
           h('strong', {}, 'Re-run fit'),
@@ -1665,13 +1665,13 @@ function renderFitCard(record) {
   }
 
   const tier = scoreTier(r.fitScore);
-  replaceGlance(els.fitGlance, h('span', { style: `color:var(--jc-${tier})` }, `${r.fitScore ?? '—'}/100`));
+  replaceGlance(els.fitGlance, h('span', { style: `color:var(--jc-${tier})` }, `${r.fitScore ?? '-'}/100`));
 
   // 1. The answer: score and verdict on one line.
   const rec = r.verdict?.recommendation || '';
   out.append(h('div', { class: 'jc-fit-head' },
     h('span', { class: `jc-score jc-score--${tier}` },
-      h('span', { class: 'jc-score__num' }, String(r.fitScore ?? '—')),
+      h('span', { class: 'jc-score__num' }, String(r.fitScore ?? '-')),
       h('span', { class: 'jc-score__den' }, '/100')),
     rec ? h('span', { class: 'jc-verdict-inline', dataset: { tone: rec === 'apply-now' ? 'pos' : rec === 'skip' ? 'neg' : 'caution' } },
       rec === 'apply-now' ? 'Apply' : rec === 'skip' ? 'Skip' : 'Apply if nothing better') : null,
@@ -1867,9 +1867,9 @@ function renderCompCard(record) {
   const base = s.base || {};
   const estimate = s.source !== 'posting';
   const rangeText = (base.low != null && base.high != null)
-    ? `${fmtMoneyK(base.low)} – ${fmtMoneyK(base.high)}`
-    : (base.low != null ? `${fmtMoneyK(base.low)}+` : (base.high != null ? `up to ${fmtMoneyK(base.high)}` : '—'));
-  replaceGlance(els.compGlance, h('span', {}, `${estimate && rangeText !== '—' ? '~' : ''}${rangeText}`));
+    ? `${fmtMoneyK(base.low)} to ${fmtMoneyK(base.high)}`
+    : (base.low != null ? `${fmtMoneyK(base.low)}+` : (base.high != null ? `up to ${fmtMoneyK(base.high)}` : '-'));
+  replaceGlance(els.compGlance, h('span', {}, `${estimate && rangeText !== '-' ? '~' : ''}${rangeText}`));
 
   // 1. The answer: does it clear YOUR floor and target? Computed from
   // Settings, not by the model, so it matches the numbers on screen.
@@ -1892,7 +1892,7 @@ function renderCompCard(record) {
   // passes for a posted number.
   const confShort = { high: 'High', medium: 'Med', low: 'Low' }[s.confidence] || '';
   const badge = s.source === 'posting' ? ['pos', `Posted${confShort ? ` · ${confShort}` : ''}`]
-    : s.source === 'unknown' || rangeText === '—' ? ['neg', 'Unknown']
+    : s.source === 'unknown' || rangeText === '-' ? ['neg', 'Unknown']
     : ['caution', `Estimate${confShort ? ` · ${confShort}` : ''}`];
   out.append(h('div', { class: 'jc-comp-hero', dataset: { estimate: String(estimate) } },
     h('div', { class: 'jc-comp-hero__top' },
@@ -1900,8 +1900,8 @@ function renderCompCard(record) {
       h('span', { class: 'jc-badge', dataset: { tone: badge[0] } }, badge[1])),
     h('span', {
       class: 'jc-comp-hero__num',
-      title: base.low != null && base.high != null ? `$${base.low.toLocaleString()} – $${base.high.toLocaleString()}` : '',
-    }, `${estimate && rangeText !== '—' ? '~' : ''}${rangeText}`)));
+      title: base.low != null && base.high != null ? `$${base.low.toLocaleString()} to $${base.high.toLocaleString()}` : '',
+    }, `${estimate && rangeText !== '-' ? '~' : ''}${rangeText}`)));
 
   // 3. Where it sits against your floor and target.
   const bar = rangeBar(base, compTargets || {});
@@ -2067,7 +2067,7 @@ function renderLetterCard(record) {
     onClick: async (e) => {
       e.preventDefault();
       await copyText();
-      copyLink.textContent = '✓ Copied — paste into the application';
+      copyLink.textContent = '✓ Copied: paste into the application';
       setTimeout(() => (copyLink.textContent = '📋 Copy cover letter to clipboard'), 1800);
     },
   }, '📋 Copy cover letter to clipboard');
@@ -2224,7 +2224,7 @@ function renderAtsCheck(r, kc) {
     regen,
     ...renderHonestyChecks(currentJob?.analyses?.resume?.factGuard?.flags, r.stretches, kc?.unknownRoles),
     kc?.unverifiedSkills.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
-      `Skills listed that aren't on your master resume in those exact words — check each is true before sending: ${kc.unverifiedSkills.join(', ')}.`) : null,
+      `Skills listed that aren't on your master resume in those exact words; check each is true before sending: ${kc.unverifiedSkills.join(', ')}.`) : null,
     missing.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
       `Posting keywords not on your master resume, so left off: ${missing.join(', ')}. If you have any of these, add them to your master resume in Settings and regenerate.`) : null,
   ].filter(Boolean);
@@ -2488,8 +2488,8 @@ function renderHonestyChecks(flags = [], stretches = [], roles = []) {
   if (stretches?.length) {
     out.push(h('div', { class: 'jc-notice', dataset: { tone: 'caution' } },
       h('div', { class: 'jc-notice__body' },
-        h('span', { class: 'jc-notice__title' }, 'Stretches — keep, soften or drop?'),
-        h('ul', { class: 'jc-list' }, ...stretches.map((x) => h('li', {}, `“${x.text}” — ${x.why}`))),
+        h('span', { class: 'jc-notice__title' }, 'Stretches: keep, soften or drop?'),
+        h('ul', { class: 'jc-list' }, ...stretches.map((x) => h('li', {}, `“${x.text}”: ${x.why}`))),
       )));
   }
   return out;
@@ -3134,7 +3134,7 @@ async function init() {
 const TIP_SILENCE_DAYS = 30;
 const TIP_BMAC_URL = 'https://buymeacoffee.com/mattburgess';
 const TIP_SHARE_URL = 'https://github.com/mattburgess/aijobhuntingbrowserextension';
-const TIP_SHARE_TEXT = 'Jawbs — a browser extension that reads LinkedIn job postings, scores fit, and helps you prep. Local-first, no telemetry.';
+const TIP_SHARE_TEXT = 'Jawbs: a browser extension that reads LinkedIn job postings, scores fit, and helps you prep. Local-first, no telemetry.';
 
 async function evaluateTipNudge() {
   const wrap = $('tipNudge');

@@ -148,7 +148,7 @@
     const unit = (value.unitText || 'YEAR').toLowerCase();
     const currency = baseSalary.currency || 'USD';
     if (value.minValue != null && value.maxValue != null) {
-      return `${currency} ${Number(value.minValue).toLocaleString()}–${Number(value.maxValue).toLocaleString()} / ${unit}`;
+      return `${currency} ${Number(value.minValue).toLocaleString()}-${Number(value.maxValue).toLocaleString()} / ${unit}`;
     }
     if (value.value != null) return `${currency} ${Number(value.value).toLocaleString()} / ${unit}`;
     return null;
@@ -2929,7 +2929,7 @@
     // LinkedIn's SPA has since replaced the title (indicating a nav).
     try {
       const original = document.title;
-      const flagged = `✓ Found — ${original}`;
+      const flagged = `✓ Found: ${original}`;
       document.title = flagged;
       setTimeout(() => {
         if (document.title === flagged) document.title = original;
@@ -3300,7 +3300,7 @@
           const links = document.querySelectorAll('a[href*="/jobs/view/"]').length;
           const urns = document.querySelectorAll('[data-entity-urn*="jobPosting"], [data-urn*="jobPosting"]').length;
           reportUnmatched(`status dialog Save (picked "${label}", job ${jobId || 'unknown'}; ${links} job links, ${urns} job URNs on page; last row ${lastTrackerRow ? `${Math.round((Date.now() - lastTrackerRow.at) / 1000)}s ago` : 'never'})`, btn);
-          showToast(jobId ? `Jawbs: didn't recognize "${label}"` : "Jawbs: couldn't tell which job this was — status not changed");
+          showToast(jobId ? `Jawbs: didn't recognize "${label}"` : "Jawbs: couldn't tell which job this was. Status not changed.");
         }
         return;
       }

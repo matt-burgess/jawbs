@@ -399,7 +399,7 @@
         const j = dup.data.match;
         const when = j.capturedAt ? new Date(j.capturedAt).toLocaleDateString() : 'earlier';
         const via = jobSourceLabel(j.source);
-        const msg = `Already circling this one — captured from ${via} on ${when}. Bait anyway?`;
+        const msg = `Already circling this one: captured from ${via} on ${when}. Bait anyway?`;
         if (!confirm(msg)) {
           btn.disabled = false;
           setLabel(original);

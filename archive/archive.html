@@ -25,7 +25,7 @@
                to the existing #reconcileLinkedIn button (kept in the
                grid-actions bar) so all reconcile wiring stays in one
                place. -->
-          <button id="syncLinkedInTop" class="jc-btn" data-variant="highlight" type="button" title="Sync with LinkedIn — walks every tracker stage and shows a diff you can resolve per-row.">
+          <button id="syncLinkedInTop" class="jc-btn" data-variant="highlight" type="button" title="Sync with LinkedIn: walks every tracker stage and shows a diff you can resolve per-row.">
             <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true">
             <span>Sync with LinkedIn</span>
           </button>
@@ -87,14 +87,14 @@
           <span class="reconcile-running__spinner" aria-hidden="true"></span>
           <div class="reconcile-running__body">
             <div class="reconcile-running__title">Syncing with LinkedIn</div>
-            <div class="reconcile-running__sub jc-footnote">Watch the LinkedIn tab — the walker is clicking through every stage. Do not close it.</div>
+            <div class="reconcile-running__sub jc-footnote">Watch the LinkedIn tab: the walker is clicking through every stage. Do not close it.</div>
           </div>
           <div class="reconcile-running__timer" aria-live="polite">
             <span class="reconcile-running__timer-value" id="reconcileElapsed">0:00</span>
             <span class="reconcile-running__timer-label">elapsed</span>
           </div>
         </div>
-        <div id="reconcileEmpty" class="jc-footnote" hidden>No drift detected — LinkedIn and Jawboard agree.</div>
+        <div id="reconcileEmpty" class="jc-footnote" hidden>No drift detected: LinkedIn and Jawboard agree.</div>
         <!-- Per-stage audit: LinkedIn's own tab-bar count vs what
              the walker captured. Any non-zero delta means we didn't
              read every job LinkedIn claims exists. -->
@@ -186,8 +186,8 @@
               <th data-sort="peopleCount" title="1st- and 2nd-degree contacts at the company, plus hiring team">People</th>
               <th data-sort="capturedAt">Captured</th>
               <th data-sort="interviewAt" title="Next scheduled interview (or most recent if all rounds are past)">Interview</th>
-              <th data-sort="compLow" title="Analyzed base-salary range — low end">Comp Lo</th>
-              <th data-sort="compHigh" title="Analyzed base-salary range — high end">Comp Hi</th>
+              <th data-sort="compLow" title="Analyzed base-salary range: low end">Comp Lo</th>
+              <th data-sort="compHigh" title="Analyzed base-salary range: high end">Comp Hi</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>

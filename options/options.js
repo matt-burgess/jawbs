@@ -503,7 +503,7 @@ $('tipResetState')?.addEventListener('click', async () => {
   await chrome.storage.local.set({ tip: kept });
   const status = $('tipStateStatus');
   if (status) {
-    status.textContent = 'Dismiss state cleared — next eligible check will re-show the CTA.';
+    status.textContent = 'Dismiss state cleared: next eligible check will re-show the CTA.';
     setTimeout(() => { status.textContent = ''; }, 4000);
   }
 });
@@ -517,7 +517,7 @@ $('tipForceShow')?.addEventListener('click', async () => {
   });
   const status = $('tipStateStatus');
   if (status) {
-    status.textContent = 'Tip prompt queued — open (or re-open) the Jawbar to see it.';
+    status.textContent = 'Tip prompt queued: open (or re-open) the Jawbar to see it.';
     setTimeout(() => { status.textContent = ''; }, 5000);
   }
 });
@@ -534,7 +534,7 @@ async function runFieldGenerator({ handler, payload = {}, textarea, statusEl, bu
   const original = button.textContent;
   button.disabled = true;
   button.textContent = '✨ Generating…';
-  statusEl.textContent = 'Calling Anthropic — this takes 10-20s.';
+  statusEl.textContent = 'Calling Anthropic: this takes 10-20s.';
   try {
     const r = await send(handler, payload);
     const text = r.data?.text || '';
@@ -675,7 +675,7 @@ function renderLocationsList() {
   if (!cachedLocations.length) {
     const li = document.createElement('li');
     li.className = 'location-empty';
-    li.textContent = 'No locations yet — add at least one so analysis can flag postings that don\'t match.';
+    li.textContent = 'No locations yet: add at least one so analysis can flag postings that don\'t match.';
     els.workLocationsList.appendChild(li);
     return;
   }
@@ -818,7 +818,7 @@ els.diagnostic.addEventListener('click', async () => {
     const response = await chrome.runtime.sendMessage({ type: 'diagnostic' });
     if (response?.ok) {
       const lines = [
-        `OK — round-trip ${response.elapsedMs}ms`,
+        `OK: round-trip ${response.elapsedMs}ms`,
         `Model:  ${response.model}`,
         `Reply:  ${response.text}`,
       ];
@@ -832,7 +832,7 @@ els.diagnostic.addEventListener('click', async () => {
     }
     await loadUsage();
   } catch (e) {
-    els.diagnosticOutput.textContent = `FAIL — service worker unreachable\n${e.message}`;
+    els.diagnosticOutput.textContent = `FAIL: service worker unreachable\n${e.message}`;
   } finally {
     els.diagnostic.disabled = false;
   }
@@ -850,7 +850,7 @@ async function loadUsage() {
     `Lifetime calls:  ${u.calls}`,
     `Input tokens:    ${u.inputTokens.toLocaleString()}`,
     `Output tokens:   ${u.outputTokens.toLocaleString()}`,
-    `Estimated cost:  ${formatUsd(totalUsd)}  (approximate — verify in Anthropic console)`,
+    `Estimated cost:  ${formatUsd(totalUsd)}  (approximate: verify in Anthropic console)`,
     '',
     'By model:',
     ...Object.entries(u.byModel || {}).map(([model, x]) => {
@@ -1029,7 +1029,7 @@ function refreshSetupHelper() {
     const li = document.createElement('li');
     li.dataset.done = done ? 'true' : 'false';
     if (done) {
-      li.textContent = `${step.label} — ready`;
+      li.textContent = `${step.label}: ready`;
     } else {
       const link = document.createElement('a');
       link.href = step.anchor;
@@ -1037,8 +1037,8 @@ function refreshSetupHelper() {
       li.appendChild(link);
       const rest = document.createElement('span');
       rest.textContent = step.required
-        ? ' — required. Click ✨ Get AI prompt next to the field.'
-        : ' — optional, but the Bait analyses get much better with it.';
+        ? ': required. Click ✨ Get AI prompt next to the field.'
+        : ': optional, but the Bait analyses get much better with it.';
       li.appendChild(rest);
     }
     list.appendChild(li);

@@ -203,7 +203,7 @@
       setTimeout(() => { el.style.outline = was; }, 8000);
     }
     note(todo.length
-      ? `Jawbs filled ${todo.length} field${todo.length === 1 ? '' : 's'} (outlined in gold). Check each one — nothing has been submitted.`
+      ? `Jawbs filled ${todo.length} field${todo.length === 1 ? '' : 's'} (outlined in gold). Check each one: nothing has been submitted.`
       : 'Jawbs found nothing left to fill here.');
     if (todo.length) chrome.runtime.sendMessage({ type: 'application-filled', count: todo.length }).catch(() => {});
     refresh();

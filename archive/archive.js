@@ -182,7 +182,7 @@ function renderPipelineStrip(rows) {
     btn.className = 'jc-jb-pipeline__seg';
     btn.dataset.stage = stage.key;
     btn.style.flex = String(n);
-    btn.title = `${stage.label}: ${n} jawbs — click to filter`;
+    btn.title = `${stage.label}: ${n} jawbs. Click to filter`;
     btn.setAttribute('aria-pressed', current === stage.key ? 'true' : 'false');
     // Count leads (big number, primary scan target); label sits under
     // it in small mono; proportional bar renders at the bottom.
@@ -250,7 +250,7 @@ function renderQuietApplications(el) {
         if (!confirm(`Close these as no response? They'll move to Scar; you can change any of them later.\n\n${names}`)) return;
         btn.disabled = true;
         for (const { j, q } of stale) {
-          await send('update-job-status', { jobId: j.jobId, status: 'notMovingForward', note: `No response after ${q.daysQuiet} days — closed from the Jawboard` });
+          await send('update-job-status', { jobId: j.jobId, status: 'notMovingForward', note: `No response after ${q.daysQuiet} days, closed from the Jawboard` });
         }
         await load();
       },
@@ -326,7 +326,7 @@ function fmtK(n) {
 // not another status pill. Only degrees present in the record show up.
 function renderPeopleCell(job) {
   const people = derivePeople(job, { followMap });
-  if (!people.length) return h('span', { class: 'col-empty' }, '—');
+  if (!people.length) return h('span', { class: 'col-empty' }, '-');
 
   const buckets = new Map();
   for (const p of people) {
@@ -349,7 +349,7 @@ function renderPeopleCell(job) {
   const tipLines = people.slice(0, 20).map((p) => {
     const tags = relationshipTags(p);
     const bits = [`[${tags[0] || 'Contact'}]`, p.name || '(unnamed)'];
-    if (p.headline) bits.push(`— ${p.headline.slice(0, 60)}`);
+    if (p.headline) bits.push(`· ${p.headline.slice(0, 60)}`);
     return bits.join(' ');
   });
 
@@ -376,7 +376,7 @@ function renderStrengthCell(job) {
   const s = computeStrengthScore(job, { compTargets, followMap });
   const b = s.breakdown;
   const tip = [
-    `${s.tierLabel} — ${s.tierDescription}`,
+    `${s.tierLabel}: ${s.tierDescription}`,
     ``,
     `Fit:         ${Math.round(b.fit.score)}/${b.fit.max}   ${b.fit.note}`,
     `Comp:        ${Math.round(b.comp.score)}/${b.comp.max}   ${b.comp.note}`,
@@ -419,7 +419,7 @@ function renderStrengthCell(job) {
 // consistent with the Jawbar meta-strip layout so both surfaces read
 // as the same visual system.
 function strengthMiniGaugeGroup(label, score) {
-  const wrap = h('span', { class: 'strength-mini', title: `${label}: ${score == null ? '—' : `${Math.round(score)}/100`}` });
+  const wrap = h('span', { class: 'strength-mini', title: `${label}: ${score == null ? '-' : `${Math.round(score)}/100`}` });
   wrap.appendChild(miniGaugeSvg(score));
   wrap.appendChild(h('span', { class: 'strength-mini__label' }, label));
   return wrap;
@@ -469,7 +469,7 @@ function miniGaugeSvg(score) {
   text.setAttribute('font-family', 'system-ui, -apple-system, sans-serif');
   text.setAttribute('font-size', '9');
   text.setAttribute('font-weight', '700');
-  text.textContent = n == null ? '—' : String(n);
+  text.textContent = n == null ? '-' : String(n);
   svg.appendChild(text);
   return svg;
 }
@@ -487,10 +487,10 @@ function renderRow(job) {
   const compHigh = base?.high ?? comp?.marketEstimate?.baseHigh ?? null;
   const compLoCell = compLow != null
     ? h('span', { class: 'col-comp-num' }, fmtK(compLow))
-    : h('span', { class: 'col-empty' }, '—');
+    : h('span', { class: 'col-empty' }, '-');
   const compHiCell = compHigh != null
     ? h('span', { class: 'col-comp-num col-comp-num--hi' }, fmtK(compHigh))
-    : h('span', { class: 'col-empty' }, '—');
+    : h('span', { class: 'col-empty' }, '-');
 
   const checkbox = h('input', {
     type: 'checkbox', class: 'row-select',
@@ -513,7 +513,7 @@ function renderRow(job) {
           ? `Next interview: ${interviewInfo.iso}`
           : `Most recent interview: ${interviewInfo.iso}`,
       }, fmtDate(interviewInfo.iso))
-    : h('span', { class: 'col-empty' }, '—');
+    : h('span', { class: 'col-empty' }, '-');
 
   const source = job.source || 'linkedin';
   const sourceHint = source === 'google_jobs' ? 'Captured from Google Jobs' : 'Captured from LinkedIn';
@@ -546,7 +546,7 @@ function renderRow(job) {
               rel: 'noopener noreferrer',
               title: `Search Google for ${p.company}`,
             }, p.company)
-          : h('span', { class: 'col-title__company col-title__company--empty' }, '—'),
+          : h('span', { class: 'col-title__company col-title__company--empty' }, '-'),
         renderRowActions(job, openRecall),
       ),
     ),
@@ -708,7 +708,7 @@ function renderCorpSiteBtn(job) {
       type: 'button',
       class: 'jc-icon-btn',
       'aria-label': 'Find on corp career site',
-      title: 'No company recorded — nothing to search for.',
+      title: 'No company recorded: nothing to search for.',
       disabled: 'disabled',
     }, magnifier());
     return btn;
@@ -1051,7 +1051,7 @@ function renderReconcileAudit(audit) {
     const knownDelta = typeof a.delta === 'number';
     if (knownDelta && a.delta !== 0) tr.dataset.tone = 'caution';
     const liCell = a.linkedInCount == null ? '?' : a.linkedInCount;
-    const deltaCell = !knownDelta ? '—' : (a.delta > 0 ? `+${a.delta}` : String(a.delta));
+    const deltaCell = !knownDelta ? '-' : (a.delta > 0 ? `+${a.delta}` : String(a.delta));
     for (const v of [k, a.walked, liCell, deltaCell]) {
       const td = document.createElement('td');
       td.textContent = String(v);
@@ -1078,7 +1078,7 @@ function reconcileRow({ jobId, title, company, current, right, choices, defaultC
   return h('div', { class: 'reconcile-row' },
     h('div', { class: 'reconcile-row__meta' },
       h('div', { class: 'reconcile-row__title' }, title || `(untitled ${jobId})`),
-      h('div', { class: 'reconcile-row__co jc-footnote' }, company || '—'),
+      h('div', { class: 'reconcile-row__co jc-footnote' }, company || '-'),
     ),
     h('div', { class: 'reconcile-row__states' },
       h('span', { class: 'jc-footnote' }, `local: ${statusLabel(current)}`),
@@ -1213,7 +1213,7 @@ els.importFile.addEventListener('change', async () => {
 let batchCancelled = false;
 
 async function runBatch({ targets, label, perJob, costEstimateUsd }) {
-  if (!targets.length) { alert(`Nothing to run — every eligible jawb already has a ${label} analysis.`); return; }
+  if (!targets.length) { alert(`Nothing to run: every eligible jawb already has a ${label} analysis.`); return; }
   const costText = costEstimateUsd
     ? `Rough cost estimate: $${(costEstimateUsd * targets.length).toFixed(2)} in Anthropic tokens.`
     : '';
@@ -1338,7 +1338,7 @@ async function checkExportReminder() {
   if (!jobs.length) { els.exportReminder.hidden = true; return; }
   if (!lastIso) {
     els.exportReminder.hidden = false;
-    els.exportReminder.textContent = 'No export yet. chrome.storage.local can be wiped by a profile reset — export a JSON backup.';
+    els.exportReminder.textContent = 'No export yet. chrome.storage.local can be wiped by a profile reset. Export a JSON backup.';
     return;
   }
   const daysSince = (Date.now() - new Date(lastIso).getTime()) / (1000 * 60 * 60 * 24);

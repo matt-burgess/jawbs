@@ -984,7 +984,7 @@ async function runFindOnTracker(jobId) {
   if (!job) return { ok: false, error: 'Job not found in Jawboard' };
   const stage = stageForStatus(job.status);
   if (!stage) {
-    return { ok: false, error: `Status "${job.status || 'unknown'}" isn't tracked on LinkedIn — nothing to find.` };
+    return { ok: false, error: `Status "${job.status || 'unknown'}" isn't tracked on LinkedIn: nothing to find.` };
   }
   // If the last sync recorded a page hint on the same stage, forward
   // it. If the stage doesn't match (job moved between stages since
@@ -1321,7 +1321,7 @@ async function applyReconciliation(resolutions) {
   if (!Array.isArray(resolutions)) return { ok: false, error: 'resolutions array required' };
   const r = await chrome.storage.session.get('reconciliationDiff');
   const diff = r.reconciliationDiff;
-  if (!diff) return { ok: false, error: 'no reconciliation diff cached — run reconcile first' };
+  if (!diff) return { ok: false, error: 'no reconciliation diff cached: run reconcile first' };
   const missingById = new Map((diff.missingOnLinkedIn || []).map((m) => [String(m.jobId), m]));
   const mismatchById = new Map((diff.statusMismatches || []).map((m) => [String(m.jobId), m]));
   const now = new Date().toISOString();
@@ -2022,7 +2022,7 @@ async function runGenerateMasterResume(resumeText) {
 
 async function runGenerateProfile(masterResume, existingProfile, hints = {}) {
   if (!masterResume || masterResume.trim().length < 200) {
-    throw new Error('Paste your Master Resume first — the Profile generator reads from it.');
+    throw new Error('Paste your Master Resume first; the Profile generator reads from it.');
   }
   return runFieldGenerator({
     system: PROFILE_SYSTEM,
@@ -2033,7 +2033,7 @@ async function runGenerateProfile(masterResume, existingProfile, hints = {}) {
 
 async function runGenerateKb(masterResume, existingProfile, existingKb, hints = {}) {
   if (!masterResume || masterResume.trim().length < 200) {
-    throw new Error('Paste your Master Resume first — the Knowledge Base generator reads from it.');
+    throw new Error('Paste your Master Resume first; the Knowledge Base generator reads from it.');
   }
   return runFieldGenerator({
     system: KB_SYSTEM,
@@ -2539,7 +2539,7 @@ async function handleSaveRound(jobId, round) {
     appendTimeline: [{
       at: now,
       type: 'status-auto',
-      note: `Interview round added — status promoted (${job.status || 'new'} → ${newStatus})`,
+      note: `Interview round added: status promoted (${job.status || 'new'} → ${newStatus})`,
     }],
   } : {};
   const updated = await upsertJob(jobId, patch, ops);
@@ -2606,7 +2606,7 @@ async function handleDraftApplicationAnswer({ question, url, jobId, maxChars }) 
     'VOICE: match the writing samples below if present. Otherwise write first-person, professional-but-warm.',
     '',
     limit
-      ? `LENGTH — HARD LIMIT: ${limit}. Count before answering; portals cut longer answers off silently. Aim for about 90% of the limit.`
+      ? `LENGTH, HARD LIMIT: ${limit}. Count before answering; portals cut longer answers off silently. Aim for about 90% of the limit.`
       : 'LENGTH: default to 150-250 words. Match the implied scope of the question. Short-answer prompts get a couple of sentences; essay-style prompts get 200-300 words.',
     '',
   ];
