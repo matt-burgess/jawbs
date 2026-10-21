@@ -1175,6 +1175,31 @@ body { background: var(--jc-bg); }
 #analysisSection .jc-card__head { cursor: default; }
 #analysisSection .jc-card__chev { display: none; }
 
+/* Requirements card — one row per posting requirement. */
+.jc-reqs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.jc-reqs details > summary { list-style: none; cursor: pointer; padding: 6px 0; border-bottom: 1px solid var(--jc-border); }
+.jc-reqs details > summary::-webkit-details-marker { display: none; }
+.jc-reqs__head { display: flex; align-items: baseline; gap: var(--jc-2); }
+.jc-reqs__mark { flex: none; width: 16px; text-align: center; font-weight: 700; }
+.jc-reqs__mark[data-state='covered'] { color: var(--jc-pos); }
+.jc-reqs__mark[data-state='partial'] { color: var(--jc-caution); }
+.jc-reqs__mark[data-state='gap'] { color: var(--jc-neg); }
+.jc-reqs__text { flex: 1; min-width: 0; font: 400 var(--jc-text-sm)/1.4 var(--jc-font); color: var(--jc-text); }
+.jc-reqs__kind { flex: none; font: 600 var(--jc-text-3xs)/1 var(--jc-font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--jc-text-3); }
+.jc-reqs__quote, .jc-reqs__ev { margin: 4px 0 4px 24px; font: 400 var(--jc-text-sm)/1.4 var(--jc-font); color: var(--jc-text-2); }
+.jc-reqs__quote { color: var(--jc-text-3); }
+
+/* Suggestion chips above the Chat box. */
+.jc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--jc-2); }
+.jc-chips[hidden] { display: none; }
+.jc-chip {
+  appearance: none; cursor: pointer; text-align: left;
+  padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--jc-accent-line, var(--jc-border)); background: var(--jc-surface-2);
+  color: var(--jc-text); font: 400 var(--jc-text-2xs)/1.3 var(--jc-font);
+}
+.jc-chip:hover { border-color: var(--jc-accent); color: var(--jc-accent); }
+
 /* On the company site — same job on the employer's own careers page. */
 .jc-company-site {
   display: flex; flex-direction: column; gap: 4px;

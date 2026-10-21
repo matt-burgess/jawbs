@@ -5,6 +5,7 @@ import { derivePeople, relationshipTags, relationshipTone } from '../lib/people.
 import { roundFitToTens } from '../lib/strength.js';
 import { $, els, send, escapeHtml, fmtDate } from '../lib/pageBoot.js';
 import { h } from '../lib/h.js';
+import { orderRequirements } from '../lib/requirementMatch.js';
 import { quietness, followUpDue, isStale, FOLLOW_UP_AFTER_DAYS, MAX_FOLLOW_UPS } from '../lib/followups.js';
 
 const params = new URLSearchParams(location.search);
@@ -909,6 +910,18 @@ function renderFitReadout() {
       h('div', { class: 'jc-notice__body' },
         h('span', { class: 'jc-notice__title' }, g.verdict === 'FAIL' ? `${label}: rules you out` : `${label}: check before applying`),
         g.quote ? h('span', {}, `“${g.quote}”`) : null)));
+  }
+
+  // Requirement map (v0.11+): must-have gaps first, with the evidence.
+  const reqs = job.analyses?.requirements;
+  if (reqs?.result?.length) {
+    const sm = reqs.summary || {};
+    const mark = { covered: '✓', partial: '◐', gap: '✗' };
+    els.fitReadout.append(h('div', { class: 'label' }, `Requirements: ${sm.covered} covered · ${sm.partial} partial · ${sm.gap} gaps`));
+    els.fitReadout.append(h('ul', { class: 'recall-reqs' }, ...orderRequirements(reqs.result).map((r) =>
+      h('li', { dataset: { state: r.state } },
+        h('span', { class: 'recall-reqs__mark' }, mark[r.state]), ' ', r.text, r.kind === 'must' ? ' (must)' : '',
+        ...(r.evidence || []).slice(0, 1).map((ev) => h('div', { class: 'recall-reqs__ev' }, `“${ev.text}”`))))));
   }
 
   // Alignments — v6 outputs plain string bullets

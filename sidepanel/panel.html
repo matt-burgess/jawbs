@@ -403,6 +403,24 @@
             </div>
           </div>
 
+          <!-- Requirements: the posting's asks, each covered / partial / gap,
+               decided by code from evidence in your own material. -->
+          <div class="jc-card jc-card--tone" data-category="fit" id="requirementsCard" data-open="false">
+            <button class="jc-card__head" data-card="requirements" type="button">
+              <span>Requirements</span>
+              <span class="jc-card__glance" id="requirementsGlance"><span class="jc-footnote">Not mapped</span></span>
+              <span class="jc-card__chev">▸</span>
+            </button>
+            <div class="jc-card__body">
+              <div id="requirementsOutput" class="jc-card__out"></div>
+              <div class="jc-card__foot">
+                <span id="requirementsMeta" class="jc-footnote"></span>
+                <button id="analyzeRequirements" class="jc-btn" data-variant="primary" data-size="sm" type="button">Map requirements</button>
+              </div>
+              <div id="requirementsError" class="jc-notice" data-tone="neg" hidden></div>
+            </div>
+          </div>
+
           <!-- Level signals -->
           <div class="jc-card jc-card--tone" data-category="level" id="levelCard" data-open="false">
             <button class="jc-card__head" data-card="level" type="button">
@@ -540,6 +558,8 @@
                 <span class="jc-card__chev">▸</span>
               </button>
               <div class="jc-card__body">
+                <!-- One-click asks built from requirement gaps (no AI call to make them). -->
+                <div id="askChips" class="jc-chips" hidden></div>
                 <textarea id="askInput" class="jc-textarea" rows="3" placeholder="e.g. What negotiation angles do I have here? What gaps in my resume should I proactively address for this role?"></textarea>
                 <div class="jc-btn-row" style="align-items:center;gap:var(--jc-2)">
                   <select id="askProvider" class="jc-select" data-size="sm" title="Which model runs this ask">

@@ -149,6 +149,7 @@ Then load the `jawbs` folder as an unpacked extension using **Step 3** above. Se
 | **Jawboard** | Full-page archive of every saved / applied job. Sort, filter, export CSV/JSON. Boat-gauge instrument-panel analytics for status, fit distribution, salaries, application-to-interview velocity. |
 | **Jawbridge** | A library of charts to review the jobs you have analyzed like standing on the bridge of a well-equipped ship. |
 | **Fit Analysis** | Strict, calibrated score (0-100) with alignments, gaps, remote-authenticity check, and outreach guidance. Reasons against your specific positioning anchors — not generic keyword matching. |
+| **Requirement map** | Each requirement the posting states, marked covered, partial or gap. The model only points at excerpts of your own resume, profile and knowledge base; code checks the excerpts exist and decides the state, so evidence can't be invented. Gaps become one-click asks above the Chat box. |
 | **Compensation Analysis** | Reads the posted range first, then research, then a title-benchmark fallback. Always shows the source. Flags postings below your floor. |
 | **Connection Analysis** | Surfaces 1st-degree contacts at the company plus anyone on the hiring team (recruiter, hiring manager, poster, interviewer). Rolled into the composite Strength score so an in-network role reads visibly stronger. Also fixes LinkedIn's "who to follow" gap with concrete outreach suggestions. |
 | **Interview Question Prep** | Configure a list of interview questions in Settings. One "Bait" click generates answers for the specific role in your voice. |
@@ -205,6 +206,8 @@ lib/
   freshness.js         Posting age and applicant counts (pure)
   followups.js         Quiet-application rules (pure)
   calibration.js       Fit track record from your own outcomes (pure)
+  requirementMatch.js  Requirement states decided from backed evidence (pure)
+  refineSuggestions.js Chat suggestion chips from requirement gaps (pure)
   compVerdict.js       Pay vs your floor and target (pure)
   applicationFill.js   ATS form field recognition for autofill (pure)
   freehire.js          Company-site lookup matching (freehire.me)
@@ -218,8 +221,10 @@ lib/
     resume.js
     ask.js
     interviewRound.js
+    extractRequirements.js, matchRequirements.js  Requirement map, two steps
     followUpEmail.js, applicationFollowUp.js, letterReview.js, bootstrap.js
 tests/                 node:test files for every pure lib/ module
+  fixtures/            Real-shaped posting and profile for eyeballing prompts
 assets/                Icons, PNGs
 styles/
   job-copilot.css      Shared design tokens + component styles

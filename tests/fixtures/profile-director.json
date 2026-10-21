@@ -1,0 +1,5 @@
+{
+  "profile": "Director-level engineering leader with 15 years in software, the last 7 leading platform and payments organizations in fintech. Known for stakeholder communication with executives and for building engineering management benches.",
+  "masterResume": "DIRECTOR OF ENGINEERING, Acme Pay (2019 - Present)\n- Led 45 engineers across platform and payments, including 6 engineering managers.\n- Ran the Kubernetes migration for 300 services on AWS, cutting cloud spend 30% ($2.1M a year).\n- Shipped PCI-DSS Level 1 certification in 2021.\n\nSENIOR ENGINEERING MANAGER, Initech (2015 - 2019)\n- Managed 3 teams building C#/.NET and Node.js services.\n- Introduced on-call and incident management across 12 services.",
+  "knowledgeBase": "Hiring: built a manager bench of 6 by promoting 4 internally. Event-driven: led a Kafka adoption for ledger events in 2020."
+}

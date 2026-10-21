@@ -858,3 +858,11 @@ details summary {
   font: 400 var(--jc-text-sm)/1.5 var(--jc-font);
   color: var(--jc-text);
 }
+
+/* Requirement map in the Fit readout. */
+.recall-reqs { list-style: none; margin: 0 0 var(--jc-3); padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: var(--jc-text-sm); }
+.recall-reqs__mark { display: inline-block; width: 14px; font-weight: 700; }
+.recall-reqs [data-state='covered'] .recall-reqs__mark { color: var(--jc-pos); }
+.recall-reqs [data-state='partial'] .recall-reqs__mark { color: var(--jc-caution); }
+.recall-reqs [data-state='gap'] .recall-reqs__mark { color: var(--jc-neg); }
+.recall-reqs__ev { margin-left: 18px; color: var(--jc-text-2); }

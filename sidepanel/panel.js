@@ -9,6 +9,8 @@ import { postingAgeDays, applicantCount } from '../lib/freshness.js';
 import { h } from '../lib/h.js';
 import { compVerdict, rangeBar } from '../lib/compVerdict.js';
 import { trackRecordLine } from '../lib/calibration.js';
+import { orderRequirements } from '../lib/requirementMatch.js';
+import { refineSuggestions } from '../lib/refineSuggestions.js';
 
 let currentJob = null;
 let letterTone = 'warm';
@@ -888,7 +890,7 @@ function recentWhen(iso) {
 // One pane of #analysisSection is visible at a time. Level and Flags
 // are derived from the Fit analysis, so they share its pane.
 const CARD_PANE = {
-  fitCard: 'fit', levelCard: 'fit', flagsCard: 'fit',
+  fitCard: 'fit', requirementsCard: 'fit', levelCard: 'fit', flagsCard: 'fit',
   compCard: 'comp', prepCard: 'prep', resumeCard: 'resume', letterCard: 'letter', askCard: 'ask',
 };
 let activePane = 'fit'; // kept across jobs so comparing comp job-to-job stays on Comp
@@ -1180,6 +1182,10 @@ function renderVerdict(job) {
       ? Math.round((conn.score / conn.max) * 100)
       : 0;
     renderGauge(els.fitGauge, els.fitGaugeFill, els.fitGaugeText, fitScore);
+    // Requirement counts in the Fit gauge's tooltip, when mapped.
+    const rs = job.analyses?.requirements?.summary;
+    els.fitGauge.closest('.jc-meta-strip__item').title = `Fit score: the model's overall match against your profile.${rs
+      ? ` Requirements: ${rs.covered} covered, ${rs.partial} partial, ${rs.gap} gaps of ${rs.total}${rs.mustGaps ? ` (${rs.mustGaps} must-have gap${rs.mustGaps === 1 ? '' : 's'})` : ''}.` : ''}`;
     renderGauge(els.connectionsGauge, els.connectionsGaugeFill, els.connectionsGaugeText, connectionsPct);
     // Big strength score on the left of the shark icon.
     if (els.metaStrengthNum) els.metaStrengthNum.textContent = String(strength.score);
@@ -1406,6 +1412,7 @@ function renderAnalysisSection(job) {
   const a = job.analyses || {};
 
   renderFitCard(a.fit);
+  renderRequirementsCard(a.requirements);
   renderLevelCard(a.fit?.result);
   renderFlagsCard(a.fit?.result);
   renderCompCard(a.comp);
@@ -1424,6 +1431,7 @@ function renderAnalysisSection(job) {
 // Fit has been run. Cards not in this map keep their default (undone) state.
 const CARD_DONE_TESTS = {
   fitCard:    (a) => !!a.fit,
+  requirementsCard: (a) => !!a.requirements,
   levelCard:  (a) => !!a.fit,
   flagsCard:  (a) => !!a.fit,
   compCard:   (a) => !!a.comp,
@@ -1444,6 +1452,7 @@ function updateCardStatuses(analyses) {
 // ---------- Ask (freeform LLM prompt for this job) ----------
 
 function renderAskCard(chats) {
+  renderAskChips();
   els.askOutput.innerHTML = '';
   els.askError.hidden = true;
   const items = chats?.items || [];
@@ -1532,6 +1541,62 @@ function settingsLink(text, anchor) {
     href: chrome.runtime.getURL(`options/options.html?tab=you#${anchor}`),
     target: '_blank', rel: 'noopener',
   }, text);
+}
+
+// ---------- Requirements ----------
+//
+// Each requirement the posting states, marked covered / partial / gap.
+// Must-have gaps are pinned first. Expanding a row shows the excerpt from
+// your own material that backs it; a gap has none by definition.
+const REQ_MARK = { covered: '✓', partial: '◐', gap: '✗' };
+const REQ_SOURCE = { resume: 'your resume', profile: 'your profile', knowledge: 'your knowledge base' };
+
+function renderRequirementsCard(record) {
+  const out = els.requirementsOutput;
+  out.innerHTML = '';
+  if (!record) {
+    setAnalyzedMeta(els.requirementsMeta, null);
+    setActionLabel(els.analyzeRequirements, 'Map requirements', 'primary');
+    replaceGlance(els.requirementsGlance, h('span', { class: 'jc-footnote' }, 'Not mapped'));
+    out.append(h('p', { class: 'jc-prose jc-fit-setting' }, 'Runs with Fit, or on its own here: lists what the posting asks for and checks each against your resume, profile and knowledge base.'));
+    return;
+  }
+  setAnalyzedMeta(els.requirementsMeta, record);
+  setActionLabel(els.analyzeRequirements, 'Re-map', 'outline');
+  const s = record.summary || {};
+  replaceGlance(els.requirementsGlance, h('span', {}, `${s.covered ?? 0}/${s.total ?? 0} covered`));
+  out.append(h('p', { class: 'jc-track' },
+    `${s.covered} covered · ${s.partial} partial · ${s.gap} gaps${s.mustGaps ? ` · ${s.mustGaps} must-have gap${s.mustGaps === 1 ? '' : 's'}` : ''}`));
+  out.append(h('ul', { class: 'jc-reqs' }, ...orderRequirements(record.result || []).map((r) => {
+    const head = h('span', { class: 'jc-reqs__head' },
+      h('span', { class: 'jc-reqs__mark', dataset: { state: r.state }, 'aria-label': r.state }, REQ_MARK[r.state]),
+      h('span', { class: 'jc-reqs__text' }, r.text),
+      h('span', { class: 'jc-reqs__kind' }, r.kind === 'must' ? 'Must' : 'Nice'));
+    const detail = [
+      r.quote ? h('p', { class: 'jc-reqs__quote' }, `Posting: “${r.quote}”`) : null,
+      ...(r.evidence || []).map((ev) => h('p', { class: 'jc-reqs__ev' }, `From ${REQ_SOURCE[ev.source] || 'your material'}: “${ev.text}”`)),
+      r.state === 'gap' ? h('p', { class: 'jc-reqs__ev' }, 'Nothing in your material shows this.') : null,
+    ].filter(Boolean);
+    return h('li', { dataset: { state: r.state } }, h('details', {}, h('summary', {}, head), ...detail));
+  })));
+}
+
+els.analyzeRequirements?.addEventListener('click', () => runAnalysis(els.analyzeRequirements, els.requirementsError, 'analyze-requirements', { jobId: currentJob?.jobId }, () => {}));
+
+// Chips above the Chat box, built from requirement gaps with no AI call.
+// Clicking one sends it as the message.
+function renderAskChips() {
+  const box = els.askChips;
+  if (!box) return;
+  box.innerHTML = '';
+  const chips = refineSuggestions(currentJob?.analyses?.requirements?.result || []);
+  box.hidden = !chips.length;
+  for (const c of chips) {
+    box.append(h('button', {
+      class: 'jc-chip', type: 'button', dataset: { target: c.target }, title: c.message,
+      onClick: () => { els.askInput.value = c.message; els.askSend.click(); },
+    }, c.label));
+  }
 }
 
 // ---------- Fit ----------
@@ -2378,6 +2443,7 @@ const PROGRESS_MESSAGE = {
   'generate-resume':  'Tailoring your resume…',
   'ask-llm':          'Asking the model…',
   'review-letter':    'Reviewing your cover letter as the hiring manager…',
+  'analyze-requirements': 'Mapping the posting\'s requirements to your material…',
 };
 
 // In-flight analysis state, keyed by jobId. Value is an ordered array of
@@ -2510,7 +2576,8 @@ const WORKING_LABEL = {
 // derive from the same call (levelCard/flagsCard both read fit.result)
 // are included so the shimmer lights the whole affected region.
 const PROCESSING_CARDS = {
-  'analyze-fit':     ['fitCard', 'levelCard', 'flagsCard'],
+  'analyze-fit':     ['fitCard', 'requirementsCard', 'levelCard', 'flagsCard'],
+  'analyze-requirements': ['requirementsCard'],
   'analyze-comp':    ['compCard'],
   'build-brief':     ['prepCard'],
   'generate-letter': ['letterCard'],

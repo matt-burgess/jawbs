@@ -68,6 +68,9 @@ import { APPLICATION_FOLLOWUP_SYSTEM, APPLICATION_FOLLOWUP_PROMPT_VERSION, build
 import { quietness } from './lib/followups.js';
 import { companiesUrl, jobsUrl, jobUrl, pickCompany, pickMatch, summarize, usableSalary } from './lib/freehire.js';
 import { LETTER_REVIEW_SYSTEM, LETTER_REVIEW_PROMPT_VERSION, buildLetterReviewUserMessage } from './lib/prompts/letterReview.js';
+import { EXTRACT_REQUIREMENTS_SYSTEM, EXTRACT_REQUIREMENTS_PROMPT_VERSION, buildExtractRequirementsUserMessage } from './lib/prompts/extractRequirements.js';
+import { MATCH_REQUIREMENTS_SYSTEM, MATCH_REQUIREMENTS_PROMPT_VERSION, buildMatchRequirementsUserMessage } from './lib/prompts/matchRequirements.js';
+import { decideRequirements, summarizeRequirements } from './lib/requirementMatch.js';
 import { fetchJobDetail } from './lib/enrich.js';
 import {
   isReachable as ollamaReachable,
@@ -261,7 +264,15 @@ const handlers = {
       { appendTimeline: [{ at: now, type: 'outreach', note: msg.sent ? `Messaged ${msg.contact || 'contact'}` : 'Outreach un-marked' }] });
     return { ok: true, data: record.outreach };
   },
-  'analyze-fit': (msg) => instrumentAnalysis('analyze-fit', msg.jobId, () => runFit(msg.jobId)),
+  // Fit, then the per-requirement map (two more calls). A requirements
+  // failure never fails the Fit the user asked for; it's logged and can be
+  // re-run on its own with 'analyze-requirements'.
+  'analyze-fit': (msg) => instrumentAnalysis('analyze-fit', msg.jobId, async () => {
+    const fit = await runFit(msg.jobId);
+    await instrumentAnalysis('analyze-requirements', msg.jobId, () => runRequirements(msg.jobId)).catch(() => {});
+    return fit;
+  }),
+  'analyze-requirements': (msg) => instrumentAnalysis('analyze-requirements', msg.jobId, () => runRequirements(msg.jobId)),
   'analyze-comp': (msg) => instrumentAnalysis('analyze-comp', msg.jobId, () => runComp(msg.jobId)),
   'build-brief': (msg) => instrumentAnalysis('build-brief', msg.jobId, () => runBrief(msg.jobId)),
   'generate-letter': (msg) => instrumentAnalysis('generate-letter', msg.jobId, () => runLetter(msg.jobId, msg.tone)),
@@ -1751,6 +1762,49 @@ async function runFit(jobId) {
     promptVersion: FIT_PROMPT_VERSION,
   };
   await setJobAnalysis(jobId, 'fit', record);
+  return { ok: true, record };
+}
+
+// Requirement map: the model lists the posting's requirements (quoting
+// it), then points at the user's own material for each; code checks the
+// quotes and decides covered / partial / gap (lib/requirementMatch.js).
+async function runRequirements(jobId) {
+  const ctx = await loadContext(jobId);
+  // loadContext folds the knowledge base into the profile; split it back
+  // out so evidence can be attributed to where it really came from.
+  const profile = String(ctx.profile || '').split('\n\n----- EXTENDED KNOWLEDGE BASE -----')[0];
+  const call = (system, userMessage, maxTokens) => routeCall('fit', {
+    local: (model) => callOllamaJson({ model, system, userMessage, maxTokens }),
+    cloud: () => callJsonAnthropic({ apiKey: ctx.apiKey, model: ctx.models.fit, system, userMessage, maxTokens }),
+  });
+  const ex = await call(EXTRACT_REQUIREMENTS_SYSTEM, buildExtractRequirementsUserMessage({ job: ctx.job }), 2000);
+  const posting = String(ctx.job.posting?.descriptionText || '').toLowerCase().replace(/\s+/g, ' ');
+  const requirements = (ex.result?.requirements || []).filter((r) => r?.id && r.text).slice(0, 15).map((r) => ({
+    ...r,
+    // A quote the posting doesn't contain isn't a quote.
+    quote: r.quote && posting.includes(String(r.quote).toLowerCase().replace(/\s+/g, ' ')) ? r.quote : null,
+  }));
+  if (!requirements.length) throw new Error('No requirements found in the posting');
+  const mt = await call(MATCH_REQUIREMENTS_SYSTEM, buildMatchRequirementsUserMessage({
+    requirements, profile, masterResume: ctx.resume, knowledgeBase: ctx.knowledgeBase,
+  }), 3000);
+  const result = decideRequirements(requirements, mt.result?.matches, { resume: ctx.resume, profile, knowledge: ctx.knowledgeBase });
+  const label = (r) => (r.provider === 'local' ? `local:${r.model}` : r.model);
+  await addUsage({ model: label(ex), usage: ex.usage });
+  await addUsage({ model: label(mt), usage: mt.usage });
+  const s = summarizeRequirements(result);
+  const record = {
+    result,
+    summary: { total: s.total, covered: s.covered, partial: s.partial, gap: s.gap, mustGaps: s.mustGaps.length },
+    model: label(mt), provider: mt.provider,
+    usage: {
+      input_tokens: (ex.usage?.input_tokens || 0) + (mt.usage?.input_tokens || 0),
+      output_tokens: (ex.usage?.output_tokens || 0) + (mt.usage?.output_tokens || 0),
+    },
+    generatedAt: new Date().toISOString(),
+    promptVersions: { extract: EXTRACT_REQUIREMENTS_PROMPT_VERSION, match: MATCH_REQUIREMENTS_PROMPT_VERSION },
+  };
+  await setJobAnalysis(jobId, 'requirements', record);
   return { ok: true, record };
 }
 
