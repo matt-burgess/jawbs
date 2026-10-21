@@ -153,6 +153,7 @@ Then load the `jawbs` folder as an unpacked extension using **Step 3** above. Se
 | **Fact guard** | Every generated letter, resume, follow-up and drafted answer is checked for numbers, years, acronyms, names and credentials that appear nowhere in your resume, profile, knowledge base or the posting. Flagged sentences are underlined with the reason on hover, and the tab shows the count. Turn on **Strict facts** (AI settings) to have the model told up front and retried once when something slips through. |
 | **Editable documents with history** | The tailored resume and cover letter are stored as parts (a bullet, a skill, a paragraph). Hover a part to Edit, Regenerate (one AI call, with an optional instruction) or Remove it; removed parts stay, struck through, with Put back. In Chat, switch to *Edit the cover letter* or *Edit the resume* to describe a change in words. Every change is a version: Undo the last one, or open History and Restore any of the last 25. |
 | **Page limit** | Settings → You → Documents: hold tailored resumes to 1 or 2 pages (US Letter or A4). Jawbs measures the resume as it will print and removes parts until it fits: the oldest role's last bullets, then that role, then skills the posting doesn't mention, then the summary's last sentence. Your latest role and anything that speaks to a must-have requirement stay. Restore puts trimmed parts back. No AI call. |
+| **Paste an email** | A recruiter or employer emailed? Paste it (Jawbar, or Recall's Timeline). Jawbs finds the jawb it is about with no AI call (the sender's domain, then the company name, then the job title) and shows why, with a picker to override. One AI call then says what it means (interview, rejection, question, offer, acknowledgement), lists its questions, and offers the next step: move the status (forward only; a jawb you closed by hand stays closed), add the interview round with its date, or draft a reply in your voice with the questions your material can't answer listed for you to fill in. The email goes on the Timeline and restarts the follow-up clock. No mailbox access. |
 | **Compensation Analysis** | Reads the posted range first, then research, then a title-benchmark fallback. Always shows the source. Flags postings below your floor. |
 | **Connection Analysis** | Surfaces 1st-degree contacts at the company plus anyone on the hiring team (recruiter, hiring manager, poster, interviewer). Rolled into the composite Strength score so an in-network role reads visibly stronger. Also fixes LinkedIn's "who to follow" gap with concrete outreach suggestions. |
 | **Interview Question Prep** | Configure a list of interview questions in Settings. One "Bait" click generates answers for the specific role in your voice. |
@@ -214,6 +215,9 @@ lib/
   pageLimit.js         Which resume part to trim next to fit a page limit (pure)
   pageMeasure.js       Counts printed pages in a hidden frame (browser only)
   resumeLayout.js      The printed resume layout, shared by print/ and pageMeasure
+  emailMatch.js        Which jawb a pasted email is about (pure)
+  emailView.js         Paste an email: match, classify, act, draft reply
+  rounds.js            Defaults for a new interview round
   freshness.js         Posting age and applicant counts (pure)
   followups.js         Quiet-application rules (pure)
   calibration.js       Fit track record from your own outcomes (pure)
@@ -234,6 +238,7 @@ lib/
     interviewRound.js
     extractRequirements.js, matchRequirements.js  Requirement map, two steps
     documentEdit.js    Rewrite one part; apply a Chat edit request
+    classifyEmail.js, draftReply.js  What an email means; the reply
     followUpEmail.js, applicationFollowUp.js, letterReview.js, bootstrap.js
 tests/                 node:test files for every pure lib/ module
   fixtures/            Real-shaped posting and profile for eyeballing prompts

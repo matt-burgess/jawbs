@@ -17,6 +17,7 @@ import { docFromJob } from '../lib/documentHistory.js';
 import { resumeFromUnits } from '../lib/documentUnits.js';
 import { nextTrim, trimNote } from '../lib/pageLimit.js';
 import { measurePages } from '../lib/pageMeasure.js';
+import { renderEmailFlow } from '../lib/emailView.js';
 
 let currentJob = null;
 let letterTone = 'warm';
@@ -1016,6 +1017,8 @@ document.querySelectorAll('#letterToneTabs .jc-tab').forEach((tab) => {
 // ---------- Main render ----------
 
 async function renderJob(job) {
+  // A pasted email belongs to the job it was opened on.
+  if (els.emailPanel && currentJob?.jobId !== job?.jobId) { els.emailPanel.hidden = true; els.emailPanel.replaceChildren(); els.pasteEmail?.setAttribute('aria-expanded', 'false'); }
   currentJob = job;
   // Publish the currently-viewed jawb id to storage so the external
   // ATS quick-fill toolbar (content/externalFill.js) knows which jawb
@@ -2342,6 +2345,19 @@ function docChanged(kind, res) {
   if (kind === 'letter') renderLetterCard(currentJob.analyses.coverLetter);
   else renderResumeCard(currentJob.analyses.resume);
 }
+
+// ---------- Paste an email (lib/emailView.js) ----------
+
+els.pasteEmail?.addEventListener('click', () => {
+  const open = els.emailPanel.hidden;
+  els.emailPanel.hidden = !open;
+  els.pasteEmail.setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  els.emailPanel.replaceChildren(renderEmailFlow({
+    send, jobId: currentJob?.jobId || null, jobLabel: currentJob?.posting?.title || 'This jawb',
+  }));
+  els.emailPanel.querySelector('textarea')?.focus();
+});
 
 // ---------- Page limit (lib/pageLimit.js, lib/pageMeasure.js) ----------
 

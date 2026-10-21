@@ -8,6 +8,8 @@ import { h } from '../lib/h.js';
 import { orderRequirements } from '../lib/requirementMatch.js';
 import { renderDocUnits, renderDocHistory } from '../lib/unitView.js';
 import { docFromJob } from '../lib/documentHistory.js';
+import { renderEmailFlow } from '../lib/emailView.js';
+import { defaultRoundType, defaultTopicFor } from '../lib/rounds.js';
 import { quietness, followUpDue, isStale, FOLLOW_UP_AFTER_DAYS, MAX_FOLLOW_UPS } from '../lib/followups.js';
 
 const params = new URLSearchParams(location.search);
@@ -676,25 +678,22 @@ function paneAfter(text) {
   );
 }
 
-// Standard interview funnel order. New rounds pre-fill their type
-// based on how many rounds already exist so the user's first click
-// gets a sensible label instead of a blank field. Everything past
-// slot 5 defaults to Final; the user can still overwrite any value.
-const ROUND_TYPE_DEFAULTS = [
-  'Recruiter',      // 1st
-  'Hiring Manager', // 2nd
-  'Technical',      // 3rd
-  'Panel',          // 4th
-  'Final',          // 5th+
-];
-function defaultRoundType(existingCount) {
-  return ROUND_TYPE_DEFAULTS[Math.min(existingCount, ROUND_TYPE_DEFAULTS.length - 1)];
-}
+// Paste an email (lib/emailView.js). Status moves and rounds re-render
+// the page; a round also switches to the Rounds tab.
+els.pasteEmail.addEventListener('click', () => {
+  const open = els.emailPanel.hidden;
+  els.emailPanel.hidden = !open;
+  els.pasteEmail.setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  els.emailPanel.replaceChildren(renderEmailFlow({
+    send, jobId, jobLabel: job?.posting?.title || 'This jawb',
+    onChanged: (id) => { if (id === jobId) load(); },
+    onRound: (id) => { if (id === jobId) load().then(() => showTab('rounds')); },
+  }));
+  els.emailPanel.querySelector('textarea')?.focus();
+});
 
-function defaultTopicFor(type) {
-  return /^recruiter$/i.test(String(type).trim()) ? 'Initial Fit' : '';
-}
-
+// New rounds pre-fill their type by position (lib/rounds.js).
 els.addRound.addEventListener('click', async () => {
   const today = new Date().toISOString().slice(0, 10);
   const existing = (job.interviewRounds || []).length;

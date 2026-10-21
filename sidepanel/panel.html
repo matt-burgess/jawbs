@@ -256,6 +256,9 @@
                   <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
                   <span>Network</span>
                 </a>
+                <!-- A recruiter emailed: match it to a jawb, read what it
+                     means, move the status, add the round, draft a reply. -->
+                <button id="pasteEmail" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-expanded="false" aria-controls="emailPanel" title="Paste an email from a recruiter or employer: Jawbs finds the jawb it's about, reads what it means and drafts a reply.">Paste an email</button>
               </div>
               <span id="jobMetaRest" class="jc-job-meta__rest"></span>
             </div>
@@ -307,6 +310,7 @@
           <!-- Same job on the employer's own careers site, via freehire.me
                (Settings → Shortcuts → Company-site lookup). -->
           <div id="companySite" class="jc-company-site" hidden></div>
+          <div id="emailPanel" class="jc-email-panel" hidden></div>
         </div>
 
         <!-- Notices (degraded, missing key, error) -->

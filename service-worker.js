@@ -59,7 +59,7 @@ import {
   PROFILE_SYSTEM, buildProfileUserMessage,
   KB_SYSTEM, buildKbUserMessage,
 } from './lib/prompts/bootstrap.js';
-import { upgradeStatus, resolveTransition, stageOf, undoTarget, normalizeTrackerStage, statusLabel, normalizeStatus, STATUS_ORDER } from './lib/statuses.js';
+import { upgradeStatus, resolveTransition, stageOf, undoTarget, normalizeTrackerStage, statusLabel, normalizeStatus, STATUS, STATUS_ORDER } from './lib/statuses.js';
 import { computeStrengthScore, computeCompGaugeScore, roundFitToTens } from './lib/strength.js';
 import { ROUND_SYSTEM, ROUND_PROMPT_VERSION, buildRoundUserMessage } from './lib/prompts/interviewRound.js';
 import { FOLLOWUP_SYSTEM, FOLLOWUP_PROMPT_VERSION, buildFollowUpUserMessage } from './lib/prompts/followUpEmail.js';
@@ -80,7 +80,10 @@ import {
   callOllamaJson, callOllamaText,
 } from './lib/ollamaClient.js';
 
-import { matchInbound } from './lib/search.js';
+import { parseEmail, matchEmail } from './lib/emailMatch.js';
+import { CLASSIFY_EMAIL_SYSTEM, CLASSIFY_EMAIL_PROMPT_VERSION, buildClassifyEmailUserMessage } from './lib/prompts/classifyEmail.js';
+import { DRAFT_REPLY_SYSTEM, DRAFT_REPLY_PROMPT_VERSION, buildDraftReplyUserMessage } from './lib/prompts/draftReply.js';
+import { defaultRoundType, defaultTopicFor } from './lib/rounds.js';
 import { postingAgeDays, applicantCount } from './lib/freshness.js';
 import { sharedTerms, verifyResume, resumeText } from './lib/keywords.js';
 import { guard, buildCorpus } from './lib/factGuard.js';
@@ -317,7 +320,11 @@ const handlers = {
   'generate-round-prep': (msg) => runRoundPrep(msg.jobId, msg.roundId),
   'generate-round-followup': (msg) => runRoundFollowUp(msg.jobId, msg.roundId),
   'open-recall': (msg) => handleOpenRecall(msg.jobId, msg.data),
-  'inbound-match': (msg) => runInboundMatch(msg.message),
+  'email-match': (msg) => runEmailMatch(msg.text),
+  'classify-email': (msg) => instrumentAnalysis('classify-email', msg.jobId, () => runClassifyEmail(msg.jobId, msg.email)),
+  'draft-reply': (msg) => instrumentAnalysis('draft-reply', msg.jobId, () => runDraftReply(msg.jobId, msg.at)),
+  'email-move-status': (msg) => moveStatusFromEmail(msg.jobId, msg.status),
+  'email-add-round': (msg) => addRoundFromEmail(msg.jobId, msg.at),
   'export-all': exportAll,
   'import-all': (msg) => importAll(msg.data),
   // Content-script-callable: closes the sender's own tab. Used by the
@@ -355,6 +362,9 @@ const EXTENSION_ONLY_HANDLERS = new Set([
   'backfill',
   // opens tabs / panel
   'open-recall',
+  // AI calls and edits on the user's own documents and mail
+  'classify-email', 'draft-reply', 'email-move-status', 'email-add-round',
+  'document-commit', 'document-undo', 'document-restore', 'regenerate-unit', 'refine-document',
 ]);
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -1990,11 +2000,12 @@ async function runGenerateKb(masterResume, existingProfile, existingKb, hints = 
 //
 // The material a generated document may draw facts from: the user's own
 // profile, resume, knowledge base and writing samples, plus the posting.
-function factCorpus(ctx, job = ctx.job) {
+// extra: other text the output may fairly repeat (the email a reply answers).
+function factCorpus(ctx, job = ctx.job, extra = '') {
   const p = job?.posting || {};
   return buildCorpus({
     profile: ctx.profile, masterResume: ctx.resume, knowledgeBase: ctx.knowledgeBase,
-    writingSamples: ctx.samples, posting: [p.title, p.company, p.descriptionText].filter(Boolean).join('\n'),
+    writingSamples: ctx.samples, posting: [p.title, p.company, p.descriptionText, extra].filter(Boolean).join('\n'),
   });
 }
 
@@ -2739,10 +2750,120 @@ async function runEnrich(jobId) {
 
 // ---------- Inbound matching ----------
 
-async function runInboundMatch(message) {
-  const jobs = await listJobs();
-  const matches = matchInbound(jobs, message, 5);
-  return { ok: true, matches };
+// ---------- Inbound email (paste) ----------
+//
+// The user pastes an email; it is matched to a saved job with no AI call
+// (lib/emailMatch.js), then classified on request. The email and its
+// classification become an 'email' timeline entry, which also restarts the
+// follow-up clock (lib/followups.js counts any dated entry as contact).
+
+const EMAIL_KINDS = new Set(['rejection', 'interview', 'question', 'offer', 'acknowledgement', 'other']);
+
+async function runEmailMatch(text) {
+  const email = parseEmail(String(text || '').slice(0, 20000));
+  if (!email.body && !email.subject) throw new Error('Paste the email first.');
+  const candidates = matchEmail(email, await listJobs()).map(({ job, score, reason }) => ({
+    jobId: job.jobId, title: job.posting?.title || '', company: job.posting?.company || '', status: job.status, score, reason,
+  }));
+  return { ok: true, email, candidates };
+}
+
+async function runClassifyEmail(jobId, raw) {
+  const email = { from: String(raw?.from || '').slice(0, 300), subject: String(raw?.subject || '').slice(0, 300), body: String(raw?.body || '').slice(0, 8000) };
+  const ctx = await loadContext(String(jobId || ''));
+  const userMessage = buildClassifyEmailUserMessage({ email, job: ctx.job, today: new Date().toDateString() });
+  const r = await routeCall('ask', {
+    local: (model) => callOllamaJson({ model, system: CLASSIFY_EMAIL_SYSTEM, userMessage, maxTokens: 800 }),
+    cloud: () => callJsonAnthropic({ apiKey: ctx.apiKey, model: ctx.models.fit, system: CLASSIFY_EMAIL_SYSTEM, userMessage, maxTokens: 800 }),
+  });
+  const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
+  await addUsage({ model: modelLabel, usage: r.usage });
+  const c = r.result || {};
+  const status = c.suggestedStatus && c.suggestedStatus in STATUS && c.suggestedStatus !== 'analyzed' ? c.suggestedStatus : null;
+  // A bare date stays a date: as an instant it would be UTC midnight,
+  // the day before in the Americas.
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(c.interviewAt || '');
+  const when = Date.parse(c.interviewAt || '');
+  const classification = {
+    kind: EMAIL_KINDS.has(c.kind) ? c.kind : 'other',
+    summary: String(c.summary || '').slice(0, 600),
+    questions: (Array.isArray(c.questions) ? c.questions : []).filter((q) => typeof q === 'string').slice(0, 10).map((q) => q.slice(0, 300)),
+    suggestedStatus: status,
+    interviewAt: dateOnly ? c.interviewAt : Number.isFinite(when) ? new Date(when).toISOString() : null,
+    interviewFormat: ['phone', 'video', 'onsite'].includes(c.interviewFormat) ? c.interviewFormat : null,
+    promptVersion: CLASSIFY_EMAIL_PROMPT_VERSION,
+  };
+  const at = new Date().toISOString();
+  await upsertJob(ctx.job.jobId, {}, { appendTimeline: [{
+    at, type: 'email', note: `${classification.kind[0].toUpperCase()}${classification.kind.slice(1)} email${email.subject ? `: ${email.subject}` : ''}. ${classification.summary}`.slice(0, 400),
+    email, classification,
+  }] });
+  return { ok: true, at, classification, record: { model: modelLabel, provider: r.provider, usage: r.usage } };
+}
+
+async function emailEntry(jobId, at) {
+  const job = await getJob(String(jobId || ''));
+  const entry = (job?.timeline || []).find((e) => e.type === 'email' && e.at === at);
+  if (!entry) throw new Error('That email is no longer on this jawb.');
+  return { job, entry };
+}
+
+async function runDraftReply(jobId, at) {
+  const { entry } = await emailEntry(jobId, at);
+  const ctx = await loadContext(String(jobId));
+  const userMessage = buildDraftReplyUserMessage({ email: entry.email, classification: entry.classification, job: ctx.job, profile: ctx.profile, writingSamples: ctx.samples });
+  const r = await routeCall('coverLetter', {
+    local: (model) => callOllamaJson({ model, system: DRAFT_REPLY_SYSTEM, userMessage, maxTokens: 1200 }),
+    cloud: () => callJsonAnthropic({ apiKey: ctx.apiKey, model: ctx.models.coverLetter, system: DRAFT_REPLY_SYSTEM, userMessage, maxTokens: 1200 }),
+  });
+  const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
+  await addUsage({ model: modelLabel, usage: r.usage });
+  const body = String(r.result?.body || '').slice(0, 6000);
+  if (!body) throw new Error('The model returned no reply. Try again.');
+  const reply = {
+    subject: String(r.result?.subject || '').slice(0, 300), body,
+    unanswered: (Array.isArray(r.result?.unanswered) ? r.result.unanswered : []).filter((q) => typeof q === 'string').slice(0, 10),
+    factGuard: guard(body, factCorpus(ctx, ctx.job, `${entry.email?.subject || ''}\n${entry.email?.body || ''}`)),
+    generatedAt: new Date().toISOString(), promptVersion: DRAFT_REPLY_PROMPT_VERSION,
+  };
+  // Re-read: the timeline may have moved on while the model ran.
+  const fresh = await getJob(String(jobId));
+  await upsertJob(fresh.jobId, { timeline: fresh.timeline.map((e) => (e.type === 'email' && e.at === at ? { ...e, reply } : e)) });
+  return { ok: true, reply, record: { model: modelLabel, provider: r.provider, usage: r.usage } };
+}
+
+// The user clicked "Move to X" on an email. resolveTransition decides
+// (lib/statuses.js, kind 'email'): forward only, and a job the user
+// closed by hand stays closed.
+async function moveStatusFromEmail(jobId, status) {
+  const job = await getJob(String(jobId || ''));
+  if (!job) throw new Error('Save this jawb first.');
+  const next = resolveTransition(job, { kind: 'email', explicit: true, status });
+  if (next.status === normalizeStatus(job.status)) {
+    return { ok: true, changed: false, status: next.status, label: statusLabel(next.status) };
+  }
+  const now = new Date().toISOString();
+  await upsertJob(job.jobId, { status: next.status, statusUpdatedAt: now, manualLock: next.manualLock }, {
+    appendTimeline: [{ at: now, type: 'status-change', to: next.status, source: 'email', note: `From an email: ${statusLabel(job.status)} to ${statusLabel(next.status)}` }],
+  });
+  chrome.runtime.sendMessage({ type: 'archive-updated' }).catch(() => {});
+  return { ok: true, changed: true, status: next.status, label: statusLabel(next.status) };
+}
+
+// "Add round" from an interview email: date and time as the email gave
+// them, type and topic by position like Recall's Add round.
+async function addRoundFromEmail(jobId, at) {
+  const { job, entry } = await emailEntry(jobId, at);
+  const at0 = entry.classification?.interviewAt || '';
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(at0);
+  const when = at0 ? new Date(dateOnly ? `${at0}T00:00` : at0) : null;
+  const pad = (n) => String(n).padStart(2, '0');
+  const type = defaultRoundType((job.interviewRounds || []).length);
+  return handleSaveRound(job.jobId, {
+    date: when ? `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}` : '',
+    time: when && !dateOnly ? `${pad(when.getHours())}:${pad(when.getMinutes())}` : '',
+    type, topic: defaultTopicFor(type) || (entry.classification?.interviewFormat ? `${entry.classification.interviewFormat} interview` : ''),
+  });
 }
 
 // ---------- Diagnostic ----------

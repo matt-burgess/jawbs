@@ -1102,3 +1102,17 @@ mark.jc-flagged { background: none; color: inherit; cursor: help;
   font-size: var(--jc-text-xs); color: var(--jc-text-2); }
 .jc-page-fit__list[hidden] { display: none; }
 .jc-page-fit__list label { display: flex; gap: 6px; align-items: baseline; }
+
+/* ---------- Paste an email (lib/emailView.js), Jawbar and Recall ---------- */
+.jc-email-panel { margin-top: var(--jc-3); }
+.jc-email-panel[hidden] { display: none; }
+.jc-email { display: flex; flex-direction: column; gap: var(--jc-2); }
+.jc-email__err { color: var(--jc-neg); }
+.jc-email__step { display: flex; flex-direction: column; gap: var(--jc-2); margin-top: var(--jc-2); }
+.jc-email__matches { display: flex; flex-direction: column; gap: 4px; }
+.jc-email__match { display: flex; gap: var(--jc-2); align-items: flex-start; padding: 6px 8px; cursor: pointer;
+  border: 1px solid var(--jc-border); border-radius: 4px; font-size: var(--jc-text-sm); color: var(--jc-text); }
+.jc-email__match:has(input:checked) { border-color: var(--jc-accent); }
+.jc-email__match > span { display: flex; flex-direction: column; gap: 2px; }
+.jc-email__unanswered { padding: 6px 8px; border-left: 3px solid var(--jc-caution); background: var(--jc-caution-weak); color: var(--jc-text); }
+.jc-email__reply { white-space: pre-wrap; }

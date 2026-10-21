@@ -95,3 +95,14 @@ test('undoTarget finds the latest reversible status change, one step only', () =
   assert.equal(undoTarget([{ type: 'status-change', to: 'applied' }]), null);                            // older entry, no "before"
   assert.equal(undoTarget([]), null);
 });
+
+test('email signal: moves forward, closes on rejection, never demotes, respects a hand-closed job', () => {
+  const t = (status, target, manualLock = false) => resolveTransition({ status, manualLock }, { kind: 'email', explicit: true, status: target });
+  assert.deepEqual(t('applied', 'interviewing'), { status: 'interviewing', linkedInStage: undefined, manualLock: true });
+  assert.equal(t('interviewing', 'notMovingForward').status, 'notMovingForward');
+  assert.equal(t('interviewing', 'applied').status, 'interviewing');
+  assert.equal(t('interviewing', 'applied').manualLock, false);
+  assert.equal(t('notMovingForward', 'interviewing', true).status, 'notMovingForward');
+  assert.equal(t('notMovingForward', 'interviewing', false).status, 'interviewing');
+  assert.equal(t('applied', 'nonsense').status, 'applied');
+});

@@ -49,3 +49,22 @@ written until the first change.
 
 **Not editable in place:** role and education units carry structured fields
 the PDF lays out, so they can be removed or put back but not reworded.
+
+## 2026-10-21 · Pasted emails move status forward only
+
+**Decided:** a status suggested by a pasted email goes through
+`resolveTransition` as a new `email` signal, applied only when the user
+clicks "Move to ...". It moves a jawb forward or closes it on a rejection,
+never demotes, and reopens a closed jawb only if the user did not close it
+by hand (`manualLock`). The result is locked like any status set in Jawbs.
+
+**Why:** emails arrive out of order and get pasted late; an old
+acknowledgement pasted after an interview invite must not knock the jawb
+back to Applied. A deliberate close by the user outranks an employer email.
+
+**Matching** is code, not a model: sender domain against domains the jawb
+has shown (apply links, careers site), then the domain named like the
+company, then the company name in the sender or subject, then the title in
+the opening. Freemail and shared ATS domains (Greenhouse, Lever, Workday and
+the like) never match by domain. This replaced the unused `inbound-match`
+handler and `lib/search.js#matchInbound`.
