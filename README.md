@@ -173,6 +173,7 @@ Then load the `jawbs` folder as an unpacked extension using **Step 3** above. Se
 - **All data is local.** `chrome.storage.local` on your machine.
 - **API key is plaintext**, per Chrome extension convention. Not for shared devices.
 - **No telemetry.** Nothing is logged or phoned home. Network calls go only to: the AI provider you chose (`api.anthropic.com`, `api.openai.com` or `generativelanguage.googleapis.com`) or your local Ollama at `localhost:11434`, when you click; LinkedIn and Google pages you are already on; and `freehire.me`, which receives a job's title and company (nothing about you) to find the same job on the employer's own careers site. That lookup is on by default and can be switched off in Settings.
+- **Pasted emails stay with the jawb.** Jawbs has no mailbox access. An email you paste is matched on your machine; its text goes to your AI provider only when you click to read it or draft a reply, and is then kept on that jawb's Timeline.
 - **Untrusted text stays data.** Job postings and pasted emails are fenced in prompts as material to read, never instructions (`lib/prompts/parts.js`).
 - **Manual export/import**. `Jawboard → Export JSON` gives you a portable dump minus the API key. Import restores it.
 - **Cost tracking is local** — token counts and cost estimates live in the Jawbar footer. Numbers are approximate; verify against your Anthropic console for billing.
@@ -352,3 +353,8 @@ Prefer a channel with a paper trail? [Open a GitHub issue](https://github.com/ma
 ## Credits
 
 Built by your captain, [Matt Burgess](https://www.linkedin.com/in/mattburgess/).
+
+Ideas borrowed with thanks, reimplemented in Jawbs' own code:
+- [Dossier](https://github.com/AienTech/dossier) (AGPL-3.0): requirement map, fact guard, documents as units with history, page-limit trimming, email classification, named progress steps, tone presets, profile strength. No Dossier code was copied.
+- [ai-job-search](https://github.com/MadsLorentzen/ai-job-search) (MIT): stretches and follow-up timing.
+- [humanizer](https://github.com/blader/humanizer) (MIT): the writing rules in `lib/prompts/humanStyle.js`.
