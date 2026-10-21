@@ -1,4 +1,4 @@
-import { getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getContactEmail, getContactPhone, getContactLocation, getCompTargets, getApplicationProfile, getCandidateName, getCandidateTagline, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
+import { getDocumentSettings, getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getContactEmail, getContactPhone, getContactLocation, getCompTargets, getApplicationProfile, getCandidateName, getCandidateTagline, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
 import { initQuickFill } from '../lib/contactFill.js';
 import { estimateCostUsd, formatUsd } from '../lib/pricing.js';
 import { normalizeStatus, statusLabel, STATUS_ORDER } from '../lib/statuses.js';
@@ -14,6 +14,9 @@ import { refineSuggestions } from '../lib/refineSuggestions.js';
 import { flagReason } from '../lib/flagMarks.js';
 import { renderDocUnits, renderDocHistory, flaggedCount } from '../lib/unitView.js';
 import { docFromJob } from '../lib/documentHistory.js';
+import { resumeFromUnits } from '../lib/documentUnits.js';
+import { nextTrim, trimNote } from '../lib/pageLimit.js';
+import { measurePages } from '../lib/pageMeasure.js';
 
 let currentJob = null;
 let letterTone = 'warm';
@@ -2126,6 +2129,7 @@ function renderResumeCard(record) {
   const doc = docFromJob(currentJob, 'resume');
   setTabCount('resume', flaggedCount(doc));
   out.append(...renderAtsCheck(r, record.keywordCheck));
+  if (doc) out.append(renderPageFit(doc));
   out.append(...docView(doc, 'resume', els.resumeError));
 
   if (r.flags?.length) {
@@ -2144,17 +2148,14 @@ function renderResumeCard(record) {
   // keyboard shortcut would be a nice-to-have; shift-click could do
   // that later if asked.
   const openPdf = async () => {
-    const [name, tagline, email, phone, location] = await Promise.all([
-      getCandidateName(), getCandidateTagline(),
-      getContactEmail(), getContactPhone(), getContactLocation(),
-    ]);
+    const header = await resumeHeader();
     const isV2 = r.summary != null || Array.isArray(r.experience);
     await openPrintTab({
       kind: 'Resume',
       company: (currentJob?.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, ''),
-      candidateName: name,
+      candidateName: header.name,
       resume: isV2 ? r : null,
-      header: isV2 ? { name, tagline, email, phone, location } : null,
+      header: isV2 ? header : null,
       body: isV2 ? null : resumeToPlainText(r),
     });
   };
@@ -2340,6 +2341,104 @@ function docChanged(kind, res) {
   if (res.record?.result) currentJob.analyses = { ...currentJob.analyses, [key]: res.record };
   if (kind === 'letter') renderLetterCard(currentJob.analyses.coverLetter);
   else renderResumeCard(currentJob.analyses.resume);
+}
+
+// ---------- Page limit (lib/pageLimit.js, lib/pageMeasure.js) ----------
+
+async function resumeHeader() {
+  const [name, tagline, email, phone, location] = await Promise.all([
+    getCandidateName(), getCandidateTagline(), getContactEmail(), getContactPhone(), getContactLocation(),
+  ]);
+  return { name, tagline, email, phone, location };
+}
+
+let fitAbort = null;
+const autoFitted = new Set(); // `${jobId}:${versionId}`, so a fresh draft is fitted once
+
+// The resume's printed length against Settings → Documents → Page limit:
+// a line with the page count, Fit to N pages when it runs over, the
+// notice after a trim, and the list to put trimmed parts back. Measured
+// in a hidden frame, no AI call.
+function renderPageFit(doc) {
+  const box = h('div', { class: 'jc-page-fit' });
+  fitAbort?.abort();
+  const ac = (fitAbort = new AbortController());
+  const jobId = currentJob?.jobId;
+  (async () => {
+    const { pageLimit, paper } = await getDocumentSettings();
+    if (pageLimit === 'none' || ac.signal.aborted) return;
+    const cur = doc.versions.find((v) => v.id === doc.current);
+    const key = `${jobId}:${doc.current}`;
+    if (cur?.cause === 'written' && !autoFitted.has(key)) {
+      autoFitted.add(key);
+      // A trim re-renders the card; if nothing had to go, show the count.
+      if (await fitResume(doc, pageLimit, paper, ac.signal).catch(() => 0)) return;
+    }
+    const pages = await measurePages(resumeFromUnits(doc.units), await resumeHeader(), { paper, signal: ac.signal });
+    if (ac.signal.aborted) return;
+    const limitLabel = pageLimit === 1 ? 'one page' : `${pageLimit} pages`;
+    const over = pages > pageLimit;
+    const fit = over ? h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: () => {
+      fit.disabled = true; fit.textContent = 'Fitting…';
+      fitResume(doc, pageLimit, paper).catch((e) => { els.resumeError.hidden = false; els.resumeError.textContent = e.message; });
+    } }, `Fit to ${limitLabel}`) : null;
+    const removed = doc.units.filter((u) => u.removed);
+    box.append(h('div', { class: 'jc-notice', dataset: { tone: over ? 'caution' : cur?.cause === 'trimmed' ? 'pos' : 'info' } },
+      h('div', { class: 'jc-notice__body' },
+        h('span', { class: 'jc-notice__title' }, cur?.cause === 'trimmed' ? cur.note : `Prints to ${pages} page${pages === 1 ? '' : 's'} (limit ${limitLabel})`),
+        over && cur?.cause === 'trimmed' ? h('span', {}, `Still ${pages} pages: nothing else can go without touching your latest role or a must-have.`) : null,
+        over && cur?.cause === 'restored' ? h('span', {}, `Over the limit again: ${pages} pages.`) : null,
+        h('span', { class: 'jc-btn-row' }, fit, removed.length ? restoreControl(removed) : null))));
+  })().catch(() => {});
+  return box;
+}
+
+// Measure, trim the next part (lib/pageLimit.js#nextTrim), measure again,
+// until it fits or nothing more can go; then save it as one trimmed version.
+async function fitResume(doc, limit, paper, signal) {
+  const jobId = currentJob.jobId;
+  const header = await resumeHeader();
+  const opts = {
+    posting: currentJob.posting?.descriptionText || '',
+    mustHaves: (currentJob.analyses?.requirements?.result || []).filter((r) => r.kind === 'must').map((r) => r.text),
+  };
+  let units = doc.units;
+  const trims = [];
+  let pages = await measurePages(resumeFromUnits(units), header, { paper, signal });
+  while (pages > limit && trims.length < 80) {
+    const t = nextTrim(units, opts);
+    if (!t) break;
+    trims.push(t);
+    units = units.map((u) => (u.id !== t.id ? u : t.text != null ? { ...u, text: t.text } : { ...u, removed: true }));
+    pages = await measurePages(resumeFromUnits(units), header, { paper, signal });
+  }
+  if (!trims.length || currentJob?.jobId !== jobId) return 0;
+  const res = await send('document-commit', {
+    jobId, kind: 'resume', cause: 'trimmed', note: trimNote(doc.units, trims, limit),
+    changes: trims.map((t) => (t.text != null ? { id: t.id, text: t.text } : { id: t.id, removed: true })),
+  });
+  docChanged('resume', res);
+  return trims.length;
+}
+
+function restoreControl(removed) {
+  const list = h('div', { class: 'jc-page-fit__list', hidden: '' }, ...removed.map((u) => h('label', {},
+    h('input', { type: 'checkbox', value: u.id }), ` ${u.kind}: ${u.kind === 'role' ? [u.meta?.title, u.meta?.company].filter(Boolean).join(', ') || u.text : u.text}`)));
+  const put = h('button', { class: 'jc-btn', 'data-size': 'sm', 'data-variant': 'primary', type: 'button', onClick: async () => {
+    const ids = [...list.querySelectorAll('input:checked')].map((i) => i.value);
+    if (!ids.length) return;
+    put.disabled = true;
+    try {
+      docChanged('resume', await send('document-commit', { jobId: currentJob.jobId, kind: 'resume', cause: 'restored',
+        note: `Put back ${ids.length} trimmed part${ids.length === 1 ? '' : 's'}`, changes: ids.map((id) => ({ id, removed: false })) }));
+    } catch (e) { put.disabled = false; els.resumeError.hidden = false; els.resumeError.textContent = e.message; }
+  } }, 'Put back selected');
+  list.append(put);
+  const toggle = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', 'aria-expanded': 'false', onClick: () => {
+    list.hidden = !list.hidden;
+    toggle.setAttribute('aria-expanded', String(!list.hidden));
+  } }, `Restore (${removed.length})`);
+  return h('span', { class: 'jc-page-fit__restore' }, toggle, list);
 }
 
 // ---------- Fact-guard marks (lib/flagMarks.js) ----------
@@ -2698,6 +2797,7 @@ els.askSend?.addEventListener('click', async () => {
 // ---------- Print / PDF ----------
 
 async function openPrintTab({ kind, company, body, resume, header, candidateName }) {
+  const { paper } = await getDocumentSettings();
   // Filename prefix uses the candidate's last name when stored in
   // Settings, falling back to "Candidate" so the download still works
   // for a user who hasn't filled in the Resume Header fields yet.
@@ -2709,7 +2809,7 @@ async function openPrintTab({ kind, company, body, resume, header, candidateName
   // Payload: cover letters pass `body` only; resumes pass `resume` +
   // `header` so print.js can render the structured layout. Both paths
   // keep working through the same session-storage handoff.
-  await chrome.storage.session.set({ [key]: { kind, filename, body, resume, header } });
+  await chrome.storage.session.set({ [key]: { kind, filename, body, resume, header, paper } });
   chrome.tabs.create({ url: `${url}?k=${encodeURIComponent(key)}` });
 }
 

@@ -1093,3 +1093,12 @@ mark.jc-flagged { background: none; color: inherit; cursor: help;
 .jc-history__when { grid-column: 1; font-size: var(--jc-text-xs); color: var(--jc-text-3); }
 .jc-history__note { grid-column: 1; font-size: var(--jc-text-xs); color: var(--jc-text-2); }
 .jc-history__list li > :last-child { grid-column: 2; grid-row: 1 / span 3; }
+
+/* Page limit on the Resume tab. */
+.jc-page-fit:empty { display: none; }
+.jc-page-fit { margin-top: var(--jc-2); }
+.jc-page-fit__restore { display: contents; }
+.jc-page-fit__list { flex-basis: 100%; display: flex; flex-direction: column; gap: 4px; margin-top: var(--jc-2);
+  font-size: var(--jc-text-xs); color: var(--jc-text-2); }
+.jc-page-fit__list[hidden] { display: none; }
+.jc-page-fit__list label { display: flex; gap: 6px; align-items: baseline; }

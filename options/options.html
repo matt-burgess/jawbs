@@ -57,6 +57,7 @@
           <nav class="settings-subnav" aria-label="You sections">
             <a href="#you-about"      class="settings-subnav__chip" data-subnav>About me</a>
             <a href="#you-materials"  class="settings-subnav__chip" data-subnav>Materials</a>
+            <a href="#you-documents"  class="settings-subnav__chip" data-subnav>Documents</a>
             <a href="#you-params"     class="settings-subnav__chip" data-subnav>Search parameters</a>
             <a href="#you-shortcuts"  class="settings-subnav__chip" data-subnav>Shortcuts</a>
           </nav>
@@ -183,6 +184,41 @@
                 <button id="resetPrepQuestions" class="jc-btn" data-variant="ghost" data-size="sm" type="button">Reset to defaults</button>
                 <span id="prepQuestionsStatus" class="jc-footnote"></span>
                 <span id="prepQuestionsCount" class="jc-footnote"></span>
+              </div>
+            </section>
+          </div>
+
+          <div class="settings-group" id="you-documents" data-group="documents">
+            <div class="settings-group__head">
+              <h3 class="settings-group__title">Documents</h3>
+              <span class="settings-group__hint">How tailored resumes are laid out when printed.</span>
+            </div>
+
+            <section class="options-section">
+              <div class="section-head">
+                <h2>Resume length</h2>
+                <p class="jc-footnote">With a page limit, Jawbs measures each tailored resume as it will print and,
+                  if it runs over, removes parts until it fits: the oldest role's last bullets first, then that role,
+                  then skills the posting doesn't mention, then the summary's last sentence. It never removes your most
+                  recent role or anything that speaks to a must-have requirement, and every removed part can be put back.
+                  No AI call.</p>
+              </div>
+              <div class="jc-btn-row" style="align-items:center;gap:var(--jc-3)">
+                <label>Page limit
+                  <select id="docPageLimit" class="jc-select" data-size="sm">
+                    <option value="none">No limit</option>
+                    <option value="1">1 page</option>
+                    <option value="2">2 pages</option>
+                  </select>
+                </label>
+                <label>Paper
+                  <select id="docPaper" class="jc-select" data-size="sm">
+                    <option value="letter">US Letter</option>
+                    <option value="a4">A4</option>
+                  </select>
+                </label>
+                <button id="saveDocSettings" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="docSettingsStatus" class="jc-footnote"></span>
               </div>
             </section>
           </div>

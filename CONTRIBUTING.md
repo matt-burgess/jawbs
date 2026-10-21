@@ -17,7 +17,7 @@ Thanks for taking a look. Jawbs is a personal-scale extension built to make my o
 - **Keep PRs focused.** Bug fix and refactor should be separate PRs.
 - **No new dependencies without discussion.** The project has zero runtime dependencies and no build step — I'd like to keep it that way.
 - **Touched the UI?** Include a before/after screenshot in the PR description.
-- **Test what you can, then verify by hand.** Pure logic under `lib/` has `node:test` files in `tests/`; run `node --test tests/` (no install). Then load the unpacked extension in Chrome and exercise both a LinkedIn job page and the standalone Jawboard.
+- **Test what you can, then verify by hand.** Pure logic under `lib/` has `node:test` files in `tests/`; run `node --test tests/*.mjs` (no install). Then load the unpacked extension in Chrome and exercise both a LinkedIn job page and the standalone Jawboard.
 - **Syntax check** any changed JS files with `node --check <file>` before pushing — the extension has no bundler to catch parse errors for you.
 
 ## Local dev
@@ -26,6 +26,19 @@ Thanks for taking a look. Jawbs is a personal-scale extension built to make my o
 2. Chrome → `chrome://extensions` → toggle **Developer mode** → **Load unpacked** → pick this folder.
 3. Edit files → reload the extension (arrow-circle button on the card) → refresh any open LinkedIn tabs so the content scripts re-inject.
 4. See [README.md](./README.md) → *Development* section for debug consoles and syntax-check commands.
+
+## Manual check: resume page measuring
+
+`lib/pageMeasure.js` (how many pages a tailored resume prints to) has no unit
+test because it needs a real layout engine. After changing it, `print/print.css`
+or `lib/resumeLayout.js`:
+
+1. In Settings → You → Documents, set the page limit to 1 page, paper US Letter.
+2. On a job with a long master resume (four or more roles, 20+ bullets), generate
+   a tailored resume. The Resume tab should say what it trimmed to fit one page.
+3. Click Download and print to PDF. The PDF must be one page. Then use Restore to
+   put a trimmed bullet back: the notice should warn that it is over the limit again.
+4. Repeat with A4 and with a 2-page limit.
 
 ## Code style
 

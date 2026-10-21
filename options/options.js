@@ -25,7 +25,7 @@ import {
   setContactEmail,
   getApplicationProfile, setApplicationProfile,
   getCompanySiteLookupEnabled, setCompanySiteLookupEnabled,
-  getStrictFacts, setStrictFacts,
+  getStrictFacts, setStrictFacts, getDocumentSettings, setDocumentSettings,
   getContactPhone,
   setContactPhone,
   getContactLocation,
@@ -720,6 +720,17 @@ els.savePreferences.addEventListener('click', async () => {
 
 // ---------- Auto-analyze toggle ----------
 
+async function loadDocSettings() {
+  const d = await getDocumentSettings();
+  els.docPageLimit.value = String(d.pageLimit);
+  els.docPaper.value = d.paper;
+}
+els.saveDocSettings.addEventListener('click', async () => {
+  const v = els.docPageLimit.value;
+  await setDocumentSettings({ pageLimit: v === 'none' ? 'none' : Number(v), paper: els.docPaper.value });
+  flash(els.docSettingsStatus, 'Saved.');
+});
+
 async function loadStrictFacts() {
   els.strictFacts.checked = await getStrictFacts();
 }
@@ -1036,7 +1047,7 @@ function refreshSetupHelper() {
 // ---------- Init ----------
 
 (async () => {
-  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadCompanySiteLookup(), loadStrictFacts(), loadShortcuts(), loadApplicationProfile(), loadModels(), loadUsage(), loadActivity()]);
+  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadCompanySiteLookup(), loadStrictFacts(), loadDocSettings(), loadShortcuts(), loadApplicationProfile(), loadModels(), loadUsage(), loadActivity()]);
   refreshOllamaStatus();
   refreshSetupHelper();
 })();
