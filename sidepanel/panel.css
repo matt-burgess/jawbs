@@ -1175,6 +1175,13 @@ body { background: var(--jc-bg); }
 #analysisSection .jc-card__head { cursor: default; }
 #analysisSection .jc-card__chev { display: none; }
 
+/* Fact guard: a sentence or bullet with a fact not found in the material. */
+mark.jc-flagged, li.jc-flagged {
+  background: none; color: inherit;
+  text-decoration: underline wavy var(--jc-caution); text-decoration-thickness: 1px; text-underline-offset: 3px;
+  cursor: help;
+}
+
 /* Requirements card — one row per posting requirement. */
 .jc-reqs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .jc-reqs details > summary { list-style: none; cursor: pointer; padding: 6px 0; border-bottom: 1px solid var(--jc-border); }

@@ -87,6 +87,11 @@
         url: location.href,
       });
       if (!r?.ok) throw new Error(r?.error || 'Draft failed');
+      // Facts the answer states that aren't in the user's material or the
+      // posting (lib/factGuard.js). Pasted anyway; flagged to check.
+      if (r.flags?.length) {
+        note(`Check before submitting: ${[...new Set(r.flags.map((f) => f.value))].join(', ')} ${r.flags.length === 1 ? 'is' : 'are'} not in your resume, profile or the posting.`);
+      }
       return r.answer;
     },
   });

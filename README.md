@@ -150,6 +150,7 @@ Then load the `jawbs` folder as an unpacked extension using **Step 3** above. Se
 | **Jawbridge** | A library of charts to review the jobs you have analyzed like standing on the bridge of a well-equipped ship. |
 | **Fit Analysis** | Strict, calibrated score (0-100) with alignments, gaps, remote-authenticity check, and outreach guidance. Reasons against your specific positioning anchors — not generic keyword matching. |
 | **Requirement map** | Each requirement the posting states, marked covered, partial or gap. The model only points at excerpts of your own resume, profile and knowledge base; code checks the excerpts exist and decides the state, so evidence can't be invented. Gaps become one-click asks above the Chat box. |
+| **Fact guard** | Every generated letter, resume, follow-up and drafted answer is checked for numbers, years, acronyms, names and credentials that appear nowhere in your resume, profile, knowledge base or the posting. Flagged sentences are underlined with the reason on hover, and the tab shows the count. Turn on **Strict facts** (AI settings) to have the model told up front and retried once when something slips through. |
 | **Compensation Analysis** | Reads the posted range first, then research, then a title-benchmark fallback. Always shows the source. Flags postings below your floor. |
 | **Connection Analysis** | Surfaces 1st-degree contacts at the company plus anyone on the hiring team (recruiter, hiring manager, poster, interviewer). Rolled into the composite Strength score so an in-network role reads visibly stronger. Also fixes LinkedIn's "who to follow" gap with concrete outreach suggestions. |
 | **Interview Question Prep** | Configure a list of interview questions in Settings. One "Bait" click generates answers for the specific role in your voice. |
@@ -202,7 +203,9 @@ lib/
   search.js            Fuzzy search across the Jawboard
   linkedInFill.js      Shared LinkedIn URL fill helper
   enrich.js            Fetch full posting via JSON-LD when scrape falls back
-  keywords.js          ATS keyword matching + fact check on generated documents (pure)
+  keywords.js          ATS keyword matching (pure)
+  factGuard.js         Typed fact extraction and checks on generated text (pure)
+  flagMarks.js         Underlines flagged sentences in rendered text
   freshness.js         Posting age and applicant counts (pure)
   followups.js         Quiet-application rules (pure)
   calibration.js       Fit track record from your own outcomes (pure)

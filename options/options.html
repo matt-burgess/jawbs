@@ -588,6 +588,24 @@ sudo systemctl restart ollama
 
             <section class="options-section">
               <div class="section-head">
+                <h2>Strict facts</h2>
+                <p class="jc-footnote">Every cover letter, resume, follow-up and drafted answer is already checked: any number,
+                  date, name or credential not found in your profile, resume, knowledge base, writing samples or the posting is
+                  marked for you. Strict mode also tells the model to use only those facts, and if any still slip through,
+                  regenerates once asking for them to be removed. That retry is a second AI call.</p>
+              </div>
+              <label class="toggle-row">
+                <input id="strictFacts" type="checkbox" />
+                <span>Use only facts from my material and the posting</span>
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveStrictFacts" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="strictFactsStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
                 <h2>Company-site lookup</h2>
                 <p class="jc-footnote">When you open a job, Jawbs checks freehire.me, a free public catalogue of
                   company career sites, for the same job on the employer's own site: a direct link, its real age and

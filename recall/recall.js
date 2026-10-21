@@ -6,6 +6,7 @@ import { roundFitToTens } from '../lib/strength.js';
 import { $, els, send, escapeHtml, fmtDate } from '../lib/pageBoot.js';
 import { h } from '../lib/h.js';
 import { orderRequirements } from '../lib/requirementMatch.js';
+import { markFlagged } from '../lib/flagMarks.js';
 import { quietness, followUpDue, isStale, FOLLOW_UP_AFTER_DAYS, MAX_FOLLOW_UPS } from '../lib/followups.js';
 
 const params = new URLSearchParams(location.search);
@@ -100,7 +101,7 @@ function render() {
     if (letter) {
       const details = h('details', {},
         h('summary', {}, `Cover letter · ${job.analyses.coverLetter.tone || 'warm'} tone · generated ${fmtDate(job.analyses.coverLetter.generatedAt)}`),
-        h('pre', { class: 'doc-body' }, letter),
+        h('pre', { class: 'doc-body' }, markFlagged(letter, job.analyses.coverLetter.factGuard?.flags)),
       );
       els.documentsReadout.append(details);
     }

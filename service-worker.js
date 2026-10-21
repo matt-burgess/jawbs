@@ -20,6 +20,7 @@ import {
   listJobs,
   getApplicationProfile,
   getCompanySiteLookupEnabled,
+  getStrictFacts,
   bulkGetJobsByIds,
   deleteJob,
   countJobs,
@@ -63,7 +64,7 @@ import { computeStrengthScore, computeCompGaugeScore, roundFitToTens } from './l
 import { ROUND_SYSTEM, ROUND_PROMPT_VERSION, buildRoundUserMessage } from './lib/prompts/interviewRound.js';
 import { FOLLOWUP_SYSTEM, FOLLOWUP_PROMPT_VERSION, buildFollowUpUserMessage } from './lib/prompts/followUpEmail.js';
 import { HUMAN_STYLE } from './lib/prompts/humanStyle.js';
-import { UNTRUSTED_POSTING } from './lib/prompts/parts.js';
+import { UNTRUSTED_POSTING, STRICT_FACTS } from './lib/prompts/parts.js';
 import { APPLICATION_FOLLOWUP_SYSTEM, APPLICATION_FOLLOWUP_PROMPT_VERSION, buildApplicationFollowUpUserMessage } from './lib/prompts/applicationFollowUp.js';
 import { quietness } from './lib/followups.js';
 import { companiesUrl, jobsUrl, jobUrl, pickCompany, pickMatch, summarize, usableSalary } from './lib/freehire.js';
@@ -81,7 +82,8 @@ import {
 
 import { matchInbound } from './lib/search.js';
 import { postingAgeDays, applicantCount } from './lib/freshness.js';
-import { sharedTerms, verifyResume, unsupportedFacts } from './lib/keywords.js';
+import { sharedTerms, verifyResume, resumeText } from './lib/keywords.js';
+import { guard, buildCorpus } from './lib/factGuard.js';
 
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
@@ -1974,6 +1976,51 @@ async function runGenerateKb(masterResume, existingProfile, existingKb, hints = 
   });
 }
 
+// ---------- Fact guard ----------
+//
+// The material a generated document may draw facts from: the user's own
+// profile, resume, knowledge base and writing samples, plus the posting.
+function factCorpus(ctx, job = ctx.job) {
+  const p = job?.posting || {};
+  return buildCorpus({
+    profile: ctx.profile, masterResume: ctx.resume, knowledgeBase: ctx.knowledgeBase,
+    writingSamples: ctx.samples, posting: [p.title, p.company, p.descriptionText].filter(Boolean).join('\n'),
+  });
+}
+
+// Generate a document and fact-guard it. With Strict facts on, the prompt
+// is told to use supplied facts only, and if the guard still flags any,
+// one regeneration lists them and asks for them to be removed or
+// rephrased. Never more than one retry. Usage is recorded per call.
+async function generateGuarded({ feature, model, system, userMessage, maxTokens, ctx, textOf }) {
+  const strict = await getStrictFacts();
+  const sys = strict ? `${system}\n\n${STRICT_FACTS}` : system;
+  const call = async (um) => {
+    const r = await routeCall(feature, {
+      local: (m) => callOllamaJson({ model: m, system: sys, userMessage: um, maxTokens }),
+      cloud: () => callJsonAnthropic({ apiKey: ctx.apiKey, model, system: sys, userMessage: um, maxTokens }),
+    });
+    await addUsage({ model: r.provider === 'local' ? `local:${r.model}` : r.model, usage: r.usage });
+    return r;
+  };
+  const corpus = factCorpus(ctx);
+  let r = await call(userMessage);
+  let fg = guard(textOf(r.result) || '', corpus);
+  let retried = false;
+  if (strict && !fg.clean) {
+    const facts = [...new Set(fg.flags.map((f) => f.value))].join(', ');
+    const first = r;
+    r = await call(`${userMessage}\n\nFACT CHECK: your previous draft stated these facts, which are not in the material or the posting: ${facts}. Write it again without them: remove each one, or rephrase using only facts the material contains.`);
+    r.usage = {
+      input_tokens: (first.usage?.input_tokens || 0) + (r.usage?.input_tokens || 0),
+      output_tokens: (first.usage?.output_tokens || 0) + (r.usage?.output_tokens || 0),
+    };
+    fg = guard(textOf(r.result) || '', corpus);
+    retried = true;
+  }
+  return { r, factGuard: { ...fg, strict, retried } };
+}
+
 async function runLetter(jobId, tone = 'warm') {
   const ctx = await loadContext(jobId);
   const fitResult = ctx.job.analyses?.fit?.result || null;
@@ -1981,27 +2028,17 @@ async function runLetter(jobId, tone = 'warm') {
     profile: ctx.profile, masterResume: ctx.resume, writingSamples: ctx.samples,
     fitResult, job: ctx.job, tone,
   });
-  const r = await routeCall('coverLetter', {
-    local: (model) => callOllamaJson({ model, system: LETTER_SYSTEM, userMessage, maxTokens: 2500 }),
-    cloud: () => callJsonAnthropic({
-      apiKey: ctx.apiKey, model: ctx.models.coverLetter,
-      system: LETTER_SYSTEM, userMessage, maxTokens: 2500,
-    }),
+  const { r, factGuard } = await generateGuarded({
+    feature: 'coverLetter', model: ctx.models.coverLetter, system: LETTER_SYSTEM, userMessage, maxTokens: 2500,
+    ctx, textOf: (res) => res?.letter,
   });
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
-  await addUsage({ model: modelLabel, usage: r.usage });
   const record = {
     result: r.result, tone, model: modelLabel, usage: r.usage, retried: r.retried,
     provider: r.provider, fellback: r.fellback,
     generatedAt: new Date().toISOString(),
     promptVersion: LETTER_PROMPT_VERSION,
-    // Numbers the letter states that the resume, profile and posting never
-    // do. The posting counts here — a letter may quote the company's own
-    // figures — unlike the resume check, where only his record does.
-    factCheck: {
-      unsupportedFacts: unsupportedFacts(r.result?.letter || '',
-        `${ctx.resume || ''}\n${ctx.profile || ''}\n${ctx.job.posting?.title || ''}\n${ctx.job.posting?.descriptionText || ''}`),
-    },
+    factGuard,
   };
   await setJobAnalysis(jobId, 'coverLetter', record);
   return { ok: true, record };
@@ -2034,6 +2071,7 @@ async function runApplicationFollowUp(jobId) {
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
   await addUsage({ model: modelLabel, usage: r.usage });
   const record = {
+    factGuard: guard(r.result?.body || '', factCorpus(ctx)),
     result: r.result, model: modelLabel, usage: r.usage,
     generatedAt: new Date().toISOString(), promptVersion: APPLICATION_FOLLOWUP_PROMPT_VERSION,
   };
@@ -2168,7 +2206,10 @@ async function runLetterReview(jobId) {
   });
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
   await addUsage({ model: modelLabel, usage: r.usage });
-  const edits = (r.result?.edits || []).filter((e) => e?.old && typeof e.new === 'string' && letter.split(e.old).length === 2);
+  const corpus = factCorpus(ctx);
+  const edits = (r.result?.edits || [])
+    .filter((e) => e?.old && typeof e.new === 'string' && letter.split(e.old).length === 2)
+    .map((e) => ({ ...e, flags: guard(e.new, corpus).flags }));
   const record = {
     result: { edits, notes: r.result?.notes || {} },
     reviewedLetter: letter, model: modelLabel, usage: r.usage,
@@ -2189,10 +2230,7 @@ async function updateLetterText(jobId, letter) {
     ...rec,
     result: { ...rec.result, letter: letter.slice(0, 20000) },
     editedAt: new Date().toISOString(),
-    factCheck: {
-      unsupportedFacts: unsupportedFacts(letter,
-        `${ctx.resume || ''}\n${ctx.profile || ''}\n${job.posting?.title || ''}\n${job.posting?.descriptionText || ''}`),
-    },
+    factGuard: guard(letter, factCorpus(ctx, job)),
   };
   await setJobAnalysis(jobId, 'coverLetter', updated);
   return { ok: true, record: updated };
@@ -2211,16 +2249,13 @@ async function runResume(jobId, mustInclude) {
     profile: ctx.profile, masterResume: ctx.resume, fitResult, job: ctx.job, shared,
     mustInclude: Array.isArray(mustInclude) ? mustInclude.filter((t) => typeof t === 'string').slice(0, 40).map((t) => t.slice(0, 80)) : [],
   });
-  const r = await routeCall('resume', {
-    local: (model) => callOllamaJson({ model, system: RESUME_SYSTEM, userMessage, maxTokens: 6000 }),
-    cloud: () => callJsonAnthropic({
-      apiKey: ctx.apiKey, model: ctx.models.resume,
-      system: RESUME_SYSTEM, userMessage, maxTokens: 6000,
-    }),
+  const { r, factGuard } = await generateGuarded({
+    feature: 'resume', model: ctx.models.resume, system: RESUME_SYSTEM, userMessage, maxTokens: 6000,
+    ctx, textOf: resumeText,
   });
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
-  await addUsage({ model: modelLabel, usage: r.usage });
   const record = {
+    factGuard,
     result: r.result, model: modelLabel, usage: r.usage, retried: r.retried,
     provider: r.provider, fellback: r.fellback,
     generatedAt: new Date().toISOString(),
@@ -2379,10 +2414,16 @@ async function handleDraftApplicationAnswer({ question, url, jobId, maxChars }) 
   const system = systemLines.join('\n');
 
   const started = performance.now();
-  const r = await callAI({
-    system,
-    messages: [{ role: 'user', content: 'Please draft this answer now.' }],
-    maxTokens: 1500,
+  // Through routeCall like every other analysis (local routing applies).
+  const r = await routeCall('brief', {
+    local: async (model) => {
+      const t = await callOllamaText({ model, system, userMessage: 'Please draft this answer now.', maxTokens: 1500 });
+      return { text: t.text, usage: t.usage, model: t.model };
+    },
+    cloud: async () => {
+      const c = await callAI({ system, messages: [{ role: 'user', content: 'Please draft this answer now.' }], maxTokens: 1500 });
+      return { text: c.text, usage: c.usage || null, model: c.model };
+    },
   });
   const durationMs = Math.round(performance.now() - started);
   let answer = (r.text || '').trim();
@@ -2394,6 +2435,13 @@ async function handleDraftApplicationAnswer({ question, url, jobId, maxChars }) 
     const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
     answer = (end > chars * 0.5 ? cut.slice(0, end + 1) : cut).trim();
   }
+  // Facts in the answer that the user's material and the posting don't
+  // contain. Returned so the form's toolbar can warn, and stored with it.
+  const p = job?.posting || {};
+  const factGuard = guard(answer, buildCorpus({
+    profile, masterResume: resume, writingSamples: samples,
+    posting: [p.title, p.company, p.descriptionText].filter(Boolean).join('\n'),
+  }));
 
   // Persist the Q&A on the jawb record if we have one. Cap the array so
   // a runaway loop can't balloon storage. Timeline gets a short note so
@@ -2410,6 +2458,7 @@ async function handleDraftApplicationAnswer({ question, url, jobId, maxChars }) 
       source: 'ai-drafted',
       model: r.model,
       provider: r.provider,
+      factGuard,
     };
     const nextAnswers = [...(job.applicationAnswers || []), entry].slice(-100);
     await upsertJob(effectiveJobId, { applicationAnswers: nextAnswers }, {
@@ -2433,7 +2482,7 @@ async function handleDraftApplicationAnswer({ question, url, jobId, maxChars }) 
     durationMs,
   });
   chrome.runtime.sendMessage({ type: 'usage-updated' }).catch(() => {});
-  return { ok: true, answer, jobId: effectiveJobId };
+  return { ok: true, answer, jobId: effectiveJobId, flags: factGuard.flags };
 }
 
 // Shared skeleton for any per-round LLM job (prep, follow-up email, …).
@@ -2445,24 +2494,28 @@ async function handleDraftApplicationAnswer({ question, url, jobId, maxChars }) 
 async function runRoundJob(jobId, roundId, {
   system, buildUserMessage, model, maxTokens, field, promptVersion,
 }) {
-  const [ctx, job] = await Promise.all([getContextSettings(), getJob(jobId)]);
-  if (!ctx.apiKey) throw new Error('API key is not set. Open Settings.');
-  if (!job) throw new Error(`Job ${jobId} not in Jawboard`);
+  const ctx = await loadContext(jobId);
+  const job = ctx.job;
   const round = (job.interviewRounds || []).find((r) => r.id === roundId);
   if (!round) throw new Error(`Round ${roundId} not found`);
 
   const fitResult = job.analyses?.fit?.result || null;
-  const { result, usage, model: usedModel, retried } = await callJsonAnthropic({
-    apiKey: ctx.apiKey,
-    model,
-    system,
-    userMessage: buildUserMessage({ profile: ctx.profile, masterResume: ctx.resume, fitResult, job, round }),
-    maxTokens,
+  const userMessage = buildUserMessage({ profile: ctx.profile, masterResume: ctx.resume, fitResult, job, round });
+  // Through routeCall like every other analysis, so the chosen provider
+  // and local routing apply (this used to call Anthropic directly).
+  const r = await routeCall('brief', {
+    local: (m) => callOllamaJson({ model: m, system, userMessage, maxTokens }),
+    cloud: () => callJsonAnthropic({ apiKey: ctx.apiKey, model, system, userMessage, maxTokens }),
   });
-  await addUsage({ model: usedModel, usage });
+  const usedModel = r.provider === 'local' ? `local:${r.model}` : r.model;
+  await addUsage({ model: usedModel, usage: r.usage });
 
   const generatedAt = new Date().toISOString();
-  const payload = { result, model: usedModel, usage, retried, generatedAt, promptVersion };
+  const payload = {
+    result: r.result, model: usedModel, usage: r.usage, retried: r.retried, provider: r.provider, generatedAt, promptVersion,
+    // The follow-up email is sent to a person, so its facts are checked.
+    ...(field === 'followUp' ? { factGuard: guard(r.result?.body || '', factCorpus(ctx)) } : {}),
+  };
   const rounds = (job.interviewRounds || []).map((r) =>
     r.id === roundId ? { ...r, [field]: payload } : r
   );

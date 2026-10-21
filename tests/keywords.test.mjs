@@ -62,5 +62,5 @@ test('factTokens normalises the ways a number gets written', () => {
 test('unsupportedFacts flags invented and inflated numbers only', () => {
   const source = 'Led 45 engineers at Acme from 2019. Cut cloud spend 30% ($2.1M). 15 years in platform roles.';
   assert.deepEqual(unsupportedFacts('Led 45 engineers since 2019, cutting spend 30%, saving $2.1 million.', source), []);
-  assert.deepEqual(unsupportedFacts('Led 60 engineers, cut spend 40% over 15+ years since 2018.', source), ['40%', '2018', '60']);
+  assert.deepEqual(unsupportedFacts('Led 60 engineers, cut spend 40% over 15+ years since 2018.', source).sort(), ['2018', '40%', '60']);  // now via factGuard.guard
 });

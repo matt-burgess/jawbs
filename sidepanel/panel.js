@@ -11,6 +11,7 @@ import { compVerdict, rangeBar } from '../lib/compVerdict.js';
 import { trackRecordLine } from '../lib/calibration.js';
 import { orderRequirements } from '../lib/requirementMatch.js';
 import { refineSuggestions } from '../lib/refineSuggestions.js';
+import { markFlagged, flagReason } from '../lib/flagMarks.js';
 
 let currentJob = null;
 let letterTone = 'warm';
@@ -2023,6 +2024,7 @@ function renderPrepCard(analyses) {
 
 function renderLetterCard(record) {
   els.letterOutput.innerHTML = '';
+  if (!record) setTabCount('letter', 0);
   if (!record) {
     els.letterMeta.innerHTML = '';
     els.letterMeta.append(h('span', { class: 'jc-footnote' }, 'Not generated'));
@@ -2041,7 +2043,9 @@ function renderLetterCard(record) {
   els.letterPdf.hidden = false;
   if (els.letterCopyTop) els.letterCopyTop.hidden = false;
 
-  const letterEl = h('div', { class: 'jc-doc-body', contenteditable: 'true' }, r.letter || '');
+  const flags = record.factGuard?.flags || [];
+  const letterEl = h('div', { class: 'jc-doc-body', contenteditable: 'true' }, markFlagged(r.letter || '', flags));
+  setTabCount('letter', new Set(flags.map((f) => f.unit)).size);
   // Inline edits used to vanish on the next render. Save them when the
   // user leaves the letter, so Copy, PDF and the review all see them.
   letterEl.addEventListener('blur', async () => {
@@ -2070,7 +2074,7 @@ function renderLetterCard(record) {
 
   if (r.wordCount) els.letterOutput.append(h('span', { class: 'jc-footnote' }, `Word count: ${r.wordCount}`));
   if (r.flags?.length) els.letterOutput.append(h('span', { class: 'jc-footnote', style: 'color:var(--jc-caution)' }, `Flags: ${r.flags.join('; ')}`));
-  els.letterOutput.append(...renderHonestyChecks(record.factCheck?.unsupportedFacts, r.stretches));
+  els.letterOutput.append(...renderHonestyChecks(flags, r.stretches));
   els.letterOutput.append(...renderLetterReview(record));
 
   els.letterCopy.onclick = async () => {
@@ -2102,6 +2106,7 @@ function renderLetterCard(record) {
 
 function renderResumeCard(record) {
   els.resumeOutput.innerHTML = '';
+  if (!record) setTabCount('resume', 0);
   if (!record) {
     els.resumeMeta.innerHTML = '';
     els.resumeMeta.append(h('span', { class: 'jc-footnote' }, 'Not generated'));
@@ -2113,6 +2118,8 @@ function renderResumeCard(record) {
     return;
   }
   const r = record.result || {};
+  const resumeFlags = record.factGuard?.flags || [];
+  setTabCount('resume', new Set(resumeFlags.map((f) => f.unit)).size);
   els.resumeMeta.innerHTML = '';
   els.resumeMeta.append(h('span', { class: 'jc-footnote' }, `Generated ${fmtWhen(record.generatedAt)}`));
   setActionLabel(els.generateResume, 'Regenerate');
@@ -2148,7 +2155,9 @@ function renderResumeCard(record) {
       if (sub) out.append(h('div', { class: 'jc-footnote', style: 'margin-top:-2px' }, sub));
       const ul = h('ul');
       for (const b of role.bullets || []) {
-        ul.append(h('li', {}, typeof b === 'string' ? b : (b?.text || '')));
+        const text = typeof b === 'string' ? b : (b?.text || '');
+        const hit = resumeFlags.filter((f) => f.text === text);
+        ul.append(h('li', hit.length ? { class: 'jc-flagged', title: flagReason(hit) } : {}, text));
       }
       out.append(ul);
     }
@@ -2295,7 +2304,7 @@ function renderAtsCheck(r, kc) {
     kc?.missed.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
       `On your master resume and in the posting, but left off this draft: ${kc.missed.join(', ')}.`) : null,
     regen,
-    ...renderHonestyChecks(kc?.unsupportedFacts, r.stretches, kc?.unknownRoles),
+    ...renderHonestyChecks(currentJob?.analyses?.resume?.factGuard?.flags, r.stretches, kc?.unknownRoles),
     kc?.unverifiedSkills.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
       `Skills listed that aren't on your master resume in those exact words — check each is true before sending: ${kc.unverifiedSkills.join(', ')}.`) : null,
     missing.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' },
@@ -2339,6 +2348,7 @@ function renderLetterReview(letterRecord) {
         h('p', { class: 'jc-footnote' }, e.reason || ''),
         h('p', { class: 'jc-prose' }, h('del', {}, e.old)),
         h('p', { class: 'jc-prose' }, h('ins', {}, e.new)),
+        e.flags?.length ? h('p', { class: 'jc-footnote', style: 'color:var(--jc-caution)' }, flagReason(e.flags)) : null,
         apply));
     }
   }
@@ -2351,19 +2361,32 @@ function renderLetterReview(letterRecord) {
   return out;
 }
 
+// ---------- Fact-guard marks (lib/flagMarks.js) ----------
+
+// "Letter (2)" on the analysis tab when the fact guard flagged two units.
+function setTabCount(pane, n) {
+  const tab = els.analysisTabs?.querySelector(`[data-pane="${pane}"]`);
+  if (!tab) return;
+  tab.dataset.label ||= tab.textContent;
+  tab.textContent = n ? `${tab.dataset.label} (${n})` : tab.dataset.label;
+  tab.title = n ? `${n} sentence${n === 1 ? '' : 's'} with facts not found in your material or the posting` : '';
+}
+
 // The checks that stand between a generated document and an employer:
 // numbers and roles the source never states (found by text search, so
 // certain), and stretches the model itself flagged (a judgement — the
 // user decides keep, soften or drop). Shown as notices, not footnotes:
 // these are the ones that cost credibility in an interview.
-function renderHonestyChecks(facts = [], stretches = [], roles = []) {
+function renderHonestyChecks(flags = [], stretches = [], roles = []) {
   const out = [];
-  if (facts?.length || roles?.length) {
+  const facts = [...new Set((flags || []).map((f) => f.value))];
+  if (facts.length || roles?.length) {
     out.push(h('div', { class: 'jc-notice', dataset: { tone: 'neg' } },
       h('div', { class: 'jc-notice__body' },
-        h('span', { class: 'jc-notice__title' }, 'Not in your master resume — check before sending'),
-        facts?.length ? h('span', {}, `Numbers or dates: ${facts.join(', ')}`) : null,
+        h('span', { class: 'jc-notice__title' }, 'Check before sending: not found in your material or the posting'),
+        facts.length ? h('span', {}, facts.join(', ')) : null,
         roles?.length ? h('span', {}, `Titles or employers: ${roles.join(', ')}`) : null,
+        facts.length ? h('span', { class: 'jc-footnote' }, 'Each flagged sentence or bullet is marked; hover it for the reason.') : null,
       )));
   }
   if (stretches?.length) {
