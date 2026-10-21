@@ -18,9 +18,10 @@ import { resumeFromUnits } from '../lib/documentUnits.js';
 import { nextTrim, trimNote } from '../lib/pageLimit.js';
 import { measurePages } from '../lib/pageMeasure.js';
 import { renderEmailFlow } from '../lib/emailView.js';
+import { stepList } from '../lib/progressSteps.js';
+import { TONES, toneKey } from '../lib/tones.js';
 
 let currentJob = null;
-let letterTone = 'warm';
 // profileUrl → { following: bool, mode: 'most-relevant'|'all' } for
 // LinkedIn people the user is already following. Populated once at boot
 // and updated by storage change events, then read synchronously by the
@@ -937,13 +938,7 @@ async function runAction(action) {
     case 'comp': return els.analyzeComp.click();
     case 'prep': return els.buildBrief.click();
     case 'resume': return els.generateResume.click();
-    case 'letter': {
-      // Force warm tone as the sensible default; the card's tone tabs remain
-      // available for other tones on demand.
-      const warmTab = document.querySelector('#letterToneTabs .jc-tab[data-tone-value="warm"]');
-      if (warmTab) warmTab.click();
-      return els.generateLetter.click();
-    }
+    case 'letter': return els.generateLetter.click();
     case 'reprocess': return reprocessCurrentJob();
   }
 }
@@ -1004,14 +999,17 @@ function updateActionBarState(job) {
   }
 }
 
-// ---------- Letter tone tabs ----------
+// ---------- Letter tone (lib/tones.js) ----------
 
-document.querySelectorAll('#letterToneTabs .jc-tab').forEach((tab) => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('#letterToneTabs .jc-tab').forEach((t) => t.setAttribute('aria-selected', 'false'));
-    tab.setAttribute('aria-selected', 'true');
-    letterTone = tab.dataset.toneValue;
-  });
+// The picker shows this job's tone, else the default in Settings →
+// Documents. A change is kept on the job (if it's saved) for next time.
+async function syncLetterTone(job) {
+  els.letterTone.value = job?.letterTone || (await getDocumentSettings()).letterTone;
+}
+els.letterTone?.addEventListener('change', () => {
+  if (!currentJob?.jobId) return;
+  currentJob.letterTone = els.letterTone.value;
+  send('set-letter-tone', { jobId: currentJob.jobId, tone: els.letterTone.value }).catch(() => {});
 });
 
 // ---------- Main render ----------
@@ -1042,6 +1040,7 @@ async function renderJob(job) {
           ...job,
           analyses: r.data.analyses || {},
           documents: r.data.documents,
+          letterTone: r.data.letterTone,
           userNotes: r.data.userNotes,
           status: r.data.status,
           statusUpdatedAt: r.data.statusUpdatedAt,
@@ -1052,6 +1051,7 @@ async function renderJob(job) {
     } catch {}
   }
 
+  syncLetterTone(currentJob).catch(() => {});
   renderVerdict(currentJob);
   renderAnalysisSection(currentJob);
   // Reconcile progress bar + working-button state to THIS job's active
@@ -2044,7 +2044,7 @@ function renderLetterCard(record) {
     return;
   }
   const r = record.result || {};
-  const tone = record.tone || 'warm';
+  const tone = TONES[toneKey(record.tone)].label;
   els.letterMeta.innerHTML = '';
   els.letterMeta.append(h('span', { class: 'jc-footnote' }, `Generated ${fmtWhen(record.generatedAt)} · ${tone}`));
   setActionLabel(els.generateLetter, 'Regenerate');
@@ -2574,6 +2574,40 @@ const PROGRESS_MESSAGE = {
 // keeps running silently; when you come back, the progress bar and
 // working-state buttons reappear for it.
 const inFlightByJob = new Map(); // jobId → msgType[]
+const stepByJob = new Map(); // jobId → { flow: stepId }, from the service worker's PROGRESS
+const restoredFlows = new Set(); // `${jobId}:${flow}` picked up from session storage on open
+
+// Reopened mid-flow: the service worker kept the step in session storage.
+chrome.storage.session.get('progress').then(({ progress }) => {
+  for (const [jobId, flows] of Object.entries(progress || {})) {
+    for (const [flow, { stepId, at }] of Object.entries(flows)) {
+      if (Date.now() - at > 10 * 60_000) continue;
+      stepByJob.set(jobId, { ...(stepByJob.get(jobId) || {}), [flow]: stepId });
+      restoredFlows.add(`${jobId}:${flow}`);
+      noteAnalysisStart(jobId, flow);
+    }
+  }
+}).catch(() => {});
+
+function onProgress({ jobId, flow, stepId }) {
+  const steps = { ...(stepByJob.get(jobId) || {}) };
+  if (stepId) steps[flow] = stepId; else delete steps[flow];
+  stepByJob.set(jobId, steps);
+  // A flow this panel only picked up on reopening has no caller waiting
+  // on it: end it here and show the result.
+  if (!stepId && restoredFlows.delete(`${jobId}:${flow}`)) {
+    noteAnalysisEnd(jobId, flow);
+    if (currentJob?.jobId === jobId) {
+      send('get-job', { jobId }).then((r) => {
+        if (!r.data || currentJob?.jobId !== jobId) return;
+        currentJob = { ...currentJob, analyses: r.data.analyses, documents: r.data.documents };
+        renderVerdict(currentJob);
+        renderAnalysisSection(currentJob);
+      }).catch(() => {});
+    }
+  }
+  applyProgressForCurrentJob();
+}
 
 function noteAnalysisStart(jobId, msgType) {
   if (!jobId) return;
@@ -2619,9 +2653,12 @@ function applyProgressForCurrentJob() {
   if (els.progressBar) els.progressBar.hidden = !anyActiveGlobal;
   if (els.progressMessage) {
     const latest = active[active.length - 1] || globalLatest;
+    const steps = active.length ? stepList(latest, stepByJob.get(jobId)?.[latest]) : null;
     els.progressMessage.textContent = anyActiveGlobal
-      ? (PROGRESS_MESSAGE[latest] || 'Working…')
+      ? (steps?.find((st) => st.state === 'active')?.label || PROGRESS_MESSAGE[latest] || 'Working…')
       : '';
+    els.progressSteps.hidden = !steps || steps.length < 2;
+    els.progressSteps.replaceChildren(...(steps || []).map((st) => h('li', { dataset: { state: st.state } }, st.label)));
   }
 
   // Buttons: reset every action button, then re-mark the ones whose
@@ -2766,7 +2803,7 @@ async function runAnalysis(button, errorEl, msgType, payload, onSuccess) {
 els.analyzeFit.addEventListener('click', () => runAnalysis(els.analyzeFit, els.fitError, 'analyze-fit', { jobId: currentJob?.jobId }, () => {}));
 els.analyzeComp.addEventListener('click', () => runAnalysis(els.analyzeComp, els.compError, 'analyze-comp', { jobId: currentJob?.jobId }, () => {}));
 els.buildBrief.addEventListener('click', () => runAnalysis(els.buildBrief, els.briefError, 'build-brief', { jobId: currentJob?.jobId }, () => {}));
-els.generateLetter.addEventListener('click', () => runAnalysis(els.generateLetter, els.letterError, 'generate-letter', { jobId: currentJob?.jobId, tone: letterTone }, () => {}));
+els.generateLetter.addEventListener('click', () => runAnalysis(els.generateLetter, els.letterError, 'generate-letter', { jobId: currentJob?.jobId, tone: els.letterTone.value }, () => {}));
 els.generateResume.addEventListener('click', () => runAnalysis(els.generateResume, els.resumeError, 'generate-resume', { jobId: currentJob?.jobId }, () => {}));
 
 els.askSend?.addEventListener('click', async () => {
@@ -2832,6 +2869,7 @@ async function openPrintTab({ kind, company, body, resume, header, candidateName
 // ---------- Init + listeners ----------
 
 chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === 'PROGRESS') { onProgress(msg); return; }
   if (msg?.type === 'current-job-updated') {
     // Only apply if this update belongs to the tab this panel is currently
     // watching. A LinkedIn tab in another window shouldn't repaint this

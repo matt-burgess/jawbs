@@ -20,7 +20,7 @@ import {
   listJobs,
   getApplicationProfile,
   getCompanySiteLookupEnabled,
-  getStrictFacts,
+  getStrictFacts, getDocumentSettings,
   bulkGetJobsByIds,
   deleteJob,
   countJobs,
@@ -84,6 +84,8 @@ import { parseEmail, matchEmail } from './lib/emailMatch.js';
 import { CLASSIFY_EMAIL_SYSTEM, CLASSIFY_EMAIL_PROMPT_VERSION, buildClassifyEmailUserMessage } from './lib/prompts/classifyEmail.js';
 import { DRAFT_REPLY_SYSTEM, DRAFT_REPLY_PROMPT_VERSION, buildDraftReplyUserMessage } from './lib/prompts/draftReply.js';
 import { defaultRoundType, defaultTopicFor } from './lib/rounds.js';
+import { FLOW_STEPS } from './lib/progressSteps.js';
+import { toneKey, signOffUnit } from './lib/tones.js';
 import { postingAgeDays, applicantCount } from './lib/freshness.js';
 import { sharedTerms, verifyResume, resumeText } from './lib/keywords.js';
 import { guard, buildCorpus } from './lib/factGuard.js';
@@ -305,6 +307,12 @@ const handlers = {
     return { ok: true };
   },
   'review-letter': (msg) => instrumentAnalysis('review-letter', msg.jobId, () => runLetterReview(msg.jobId)),
+  // The tone picked on the Letter tab, kept on the job if it's saved.
+  'set-letter-tone': async (msg) => {
+    const id = String(msg.jobId || '');
+    if (await getJob(id)) await upsertJob(id, { letterTone: toneKey(msg.tone) });
+    return { ok: true };
+  },
   'document-commit': (msg) => commitDocumentChanges(msg.jobId, msg.kind, msg.changes, msg.cause, msg.note),
   'document-undo': (msg) => changeDocument(msg.jobId, msg.kind, (doc) => undoVersion(doc)),
   'document-restore': (msg) => changeDocument(msg.jobId, msg.kind, (doc) => restoreVersion(doc, msg.versionId)),
@@ -1599,8 +1607,38 @@ async function handleCheckDuplicate({ title, company, excludeJobId }) {
 // Wraps every analysis runner with activity-log entries and a
 // usage-updated broadcast so the sidebar strip refreshes live.
 
+// ---------- Named progress steps (lib/progressSteps.js) ----------
+//
+// Flows with named steps report each one as it starts: a PROGRESS
+// message for open pages, and chrome.storage.session 'progress' so a
+// Jawbar reopened mid-flow can pick the checklist back up.
+const activeFlows = new Map(); // jobId → Set of flows running
+let progressWrites = Promise.resolve();
+
+function reportProgress(jobId, flow, stepId) {
+  chrome.runtime.sendMessage({ type: 'PROGRESS', jobId, flow, stepId }).catch(() => {});
+  progressWrites = progressWrites.then(async () => {
+    const all = (await chrome.storage.session.get('progress')).progress || {};
+    const job = { ...(all[jobId] || {}) };
+    if (stepId) job[flow] = { stepId, at: Date.now() }; else delete job[flow];
+    if (Object.keys(job).length) all[jobId] = job; else delete all[jobId];
+    await chrome.storage.session.set({ progress: all });
+  }).catch(() => {});
+}
+
+// The step every running flow of this job that has it is now on.
+function step(jobId, stepId) {
+  const id = String(jobId);
+  for (const flow of activeFlows.get(id) || []) {
+    if (FLOW_STEPS[flow].some((s) => s.id === stepId)) reportProgress(id, flow, stepId);
+  }
+}
+
 async function instrumentAnalysis(action, jobId, fn) {
   const started = performance.now();
+  const id = String(jobId || '');
+  const stepped = !!FLOW_STEPS[action] && !!id;
+  if (stepped) activeFlows.set(id, new Set([...(activeFlows.get(id) || []), action]));
   try {
     const result = await fn();
     const durationMs = Math.round(performance.now() - started);
@@ -1625,6 +1663,11 @@ async function instrumentAnalysis(action, jobId, fn) {
       durationMs: Math.round(performance.now() - started),
     });
     throw e;
+  } finally {
+    if (stepped) {
+      activeFlows.get(id)?.delete(action);
+      reportProgress(id, action, null);
+    }
   }
 }
 
@@ -1757,6 +1800,7 @@ async function enrichWarmthOnDemand(jobId) {
 }
 
 async function runFit(jobId) {
+  step(jobId, 'fit');
   // Fire off the connections-modal walk before the LLM call so the fit
   // prompt sees named contacts if any exist. Non-blocking — if the tab
   // isn't open or modal extraction fails, fit still runs with preview data.
@@ -1799,6 +1843,7 @@ async function runRequirements(jobId) {
     local: (model) => callOllamaJson({ model, system, userMessage, maxTokens }),
     cloud: () => callJsonAnthropic({ apiKey: ctx.apiKey, model: ctx.models.fit, system, userMessage, maxTokens }),
   });
+  step(jobId, 'extract');
   const ex = await call(EXTRACT_REQUIREMENTS_SYSTEM, buildExtractRequirementsUserMessage({ job: ctx.job }), 2000);
   const posting = String(ctx.job.posting?.descriptionText || '').toLowerCase().replace(/\s+/g, ' ');
   const requirements = (ex.result?.requirements || []).filter((r) => r?.id && r.text).slice(0, 15).map((r) => ({
@@ -1807,6 +1852,7 @@ async function runRequirements(jobId) {
     quote: r.quote && posting.includes(String(r.quote).toLowerCase().replace(/\s+/g, ' ')) ? r.quote : null,
   }));
   if (!requirements.length) throw new Error('No requirements found in the posting');
+  step(jobId, 'match');
   const mt = await call(MATCH_REQUIREMENTS_SYSTEM, buildMatchRequirementsUserMessage({
     requirements, profile, masterResume: ctx.resume, knowledgeBase: ctx.knowledgeBase,
   }), 3000);
@@ -2004,7 +2050,8 @@ async function runGenerateKb(masterResume, existingProfile, existingKb, hints = 
 function factCorpus(ctx, job = ctx.job, extra = '') {
   const p = job?.posting || {};
   return buildCorpus({
-    profile: ctx.profile, masterResume: ctx.resume, knowledgeBase: ctx.knowledgeBase,
+    // The user's own name (Resume header) is a fact about them, e.g. in a sign-off.
+    profile: [ctx.profile, ctx.candidateName].filter(Boolean).join('\n'), masterResume: ctx.resume, knowledgeBase: ctx.knowledgeBase,
     writingSamples: ctx.samples, posting: [p.title, p.company, p.descriptionText, extra].filter(Boolean).join('\n'),
   });
 }
@@ -2025,10 +2072,13 @@ async function generateGuarded({ feature, model, system, userMessage, maxTokens,
     return r;
   };
   const corpus = factCorpus(ctx);
+  step(ctx.job.jobId, 'write');
   let r = await call(userMessage);
+  step(ctx.job.jobId, 'check');
   let fg = guard(textOf(r.result) || '', corpus);
   let retried = false;
   if (strict && !fg.clean) {
+    step(ctx.job.jobId, 'retry');
     const facts = [...new Set(fg.flags.map((f) => f.value))].join(', ');
     const first = r;
     r = await call(`${userMessage}\n\nFACT CHECK: your previous draft stated these facts, which are not in the material or the posting: ${facts}. Write it again without them: remove each one, or rephrase using only facts the material contains.`);
@@ -2042,8 +2092,10 @@ async function generateGuarded({ feature, model, system, userMessage, maxTokens,
   return { r, factGuard: { ...fg, strict, retried } };
 }
 
-async function runLetter(jobId, tone = 'warm') {
+async function runLetter(jobId, toneIn) {
   const ctx = await loadContext(jobId);
+  // The tone asked for, else this job's last, else Settings → Documents.
+  const tone = toneKey(toneIn || ctx.job.letterTone || (await getDocumentSettings()).letterTone);
   const fitResult = ctx.job.analyses?.fit?.result || null;
   const userMessage = buildLetterUserMessage({
     profile: ctx.profile, masterResume: ctx.resume, writingSamples: ctx.samples,
@@ -2054,7 +2106,8 @@ async function runLetter(jobId, tone = 'warm') {
     ctx, textOf: (res) => joinUnits(letterUnits(res)),
   });
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
-  const units = letterUnits(r.result);
+  const units = [...letterUnits(r.result).filter((u) => u.kind !== 'signoff'), signOffUnit(tone, ctx.candidateName)]
+    .map((u, i) => ({ ...u, id: `u${i + 1}` }));
   if (!Array.isArray(r.result?.units)) {
     await logActivity({ type: 'units-fallback', jobId, ok: true, note: 'Letter came back as prose; split into paragraphs' });
   }
@@ -2065,7 +2118,7 @@ async function runLetter(jobId, tone = 'warm') {
     promptVersion: LETTER_PROMPT_VERSION,
     factGuard,
   };
-  await setJobAnalysis(jobId, 'coverLetter', record);
+  await upsertJob(jobId, { letterTone: tone, analyses: { coverLetter: record } });
   const saved = await changeDocument(jobId, 'letter', (doc) => writeVersion(doc, units, `${tone} tone`), ctx);
   return { ok: true, record: saved.record };
 }

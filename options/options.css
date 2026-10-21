@@ -629,3 +629,10 @@ label.settings-toggle {
 @media (max-width: 640px) {
   .settings-support { flex-direction: column; align-items: stretch; }
 }
+
+/* Profile strength (lib/profileStrength.js) at the top of About me. */
+.profile-strength { display: flex; flex-direction: column; gap: 4px; margin: 0 0 var(--jc-4); padding: var(--jc-3);
+  border: 1px solid var(--jc-border); border-radius: var(--jc-radius-sm); background: var(--jc-surface-1); }
+.profile-strength__head { display: flex; justify-content: space-between; font-size: var(--jc-text-sm); color: var(--jc-text); }
+.profile-strength meter { width: 100%; height: 10px; }
+.profile-strength .jc-footnote { margin: 0; }

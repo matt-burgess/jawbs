@@ -70,6 +70,12 @@
               <h3 class="settings-group__title">About me</h3>
               <span class="settings-group__hint">Who you are, in your own words. Every analysis prompt reads this.</span>
             </div>
+            <!-- Profile strength (lib/profileStrength.js), live as you type. -->
+            <div class="profile-strength" id="profileStrength">
+              <div class="profile-strength__head"><strong>Profile strength</strong> <span id="profileStrengthPct">0%</span></div>
+              <meter id="profileStrengthMeter" min="0" max="100" low="50" high="80" optimum="100" value="0" aria-labelledby="profileStrength"></meter>
+              <p id="profileStrengthHint" class="jc-footnote"></p>
+            </div>
 
             <section class="options-section">
               <div class="section-head">
@@ -191,7 +197,7 @@
           <div class="settings-group" id="you-documents" data-group="documents">
             <div class="settings-group__head">
               <h3 class="settings-group__title">Documents</h3>
-              <span class="settings-group__hint">How tailored resumes are laid out when printed.</span>
+              <span class="settings-group__hint">How tailored resumes print, and the tone cover letters start in.</span>
             </div>
 
             <section class="options-section">
@@ -215,6 +221,13 @@
                   <select id="docPaper" class="jc-select" data-size="sm">
                     <option value="letter">US Letter</option>
                     <option value="a4">A4</option>
+                  </select>
+                </label>
+                <label>Cover letter tone
+                  <select id="docLetterTone" class="jc-select" data-size="sm" title="The tone new cover letters start in. Each jawb can still pick its own.">
+                    <option value="warm">Warm</option>
+                    <option value="direct">Direct</option>
+                    <option value="formal">Formal</option>
                   </select>
                 </label>
                 <button id="saveDocSettings" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>

@@ -55,6 +55,7 @@ import { DEFAULT_PROFILE, DEFAULT_PREP_QUESTIONS } from '../lib/defaults.js';
 import { DEFAULT_MODELS, MODEL_IDS } from '../lib/models.js';
 import { estimateCostUsd, formatUsd, MODEL_PRICING } from '../lib/pricing.js';
 import { initPromptModal } from '../lib/onboardingPrompts.js';
+import { profileStrength } from '../lib/profileStrength.js';
 
 const flash = (el, text, ms = 2000) => { el.textContent = text; setTimeout(() => (el.textContent = ''), ms); };
 
@@ -720,14 +721,28 @@ els.savePreferences.addEventListener('click', async () => {
 
 // ---------- Auto-analyze toggle ----------
 
+// ---------- Profile strength ----------
+
+function renderProfileStrength() {
+  const { percent, hint } = profileStrength({
+    profile: els.profile.value, masterResume: els.resume.value, knowledgeBase: els.knowledgeBase.value,
+    writingSamples: els.samples.value, prepQuestions: parsePrepQuestions(els.prepQuestions.value),
+  });
+  els.profileStrengthPct.textContent = `${percent}%`;
+  els.profileStrengthMeter.value = percent;
+  els.profileStrengthHint.textContent = hint || 'Complete. Every analysis has the full picture.';
+}
+for (const id of ['profile', 'resume', 'knowledgeBase', 'samples', 'prepQuestions']) els[id].addEventListener('input', renderProfileStrength);
+
 async function loadDocSettings() {
   const d = await getDocumentSettings();
   els.docPageLimit.value = String(d.pageLimit);
   els.docPaper.value = d.paper;
+  els.docLetterTone.value = d.letterTone;
 }
 els.saveDocSettings.addEventListener('click', async () => {
   const v = els.docPageLimit.value;
-  await setDocumentSettings({ pageLimit: v === 'none' ? 'none' : Number(v), paper: els.docPaper.value });
+  await setDocumentSettings({ pageLimit: v === 'none' ? 'none' : Number(v), paper: els.docPaper.value, letterTone: els.docLetterTone.value });
   flash(els.docSettingsStatus, 'Saved.');
 });
 
@@ -1048,6 +1063,7 @@ function refreshSetupHelper() {
 
 (async () => {
   await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadCompanySiteLookup(), loadStrictFacts(), loadDocSettings(), loadShortcuts(), loadApplicationProfile(), loadModels(), loadUsage(), loadActivity()]);
+  renderProfileStrength();
   refreshOllamaStatus();
   refreshSetupHelper();
 })();

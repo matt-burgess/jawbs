@@ -154,6 +154,9 @@ Then load the `jawbs` folder as an unpacked extension using **Step 3** above. Se
 | **Editable documents with history** | The tailored resume and cover letter are stored as parts (a bullet, a skill, a paragraph). Hover a part to Edit, Regenerate (one AI call, with an optional instruction) or Remove it; removed parts stay, struck through, with Put back. In Chat, switch to *Edit the cover letter* or *Edit the resume* to describe a change in words. Every change is a version: Undo the last one, or open History and Restore any of the last 25. |
 | **Page limit** | Settings → You → Documents: hold tailored resumes to 1 or 2 pages (US Letter or A4). Jawbs measures the resume as it will print and removes parts until it fits: the oldest role's last bullets, then that role, then skills the posting doesn't mention, then the summary's last sentence. Your latest role and anything that speaks to a must-have requirement stay. Restore puts trimmed parts back. No AI call. |
 | **Paste an email** | A recruiter or employer emailed? Paste it (Jawbar, or Recall's Timeline). Jawbs finds the jawb it is about with no AI call (the sender's domain, then the company name, then the job title) and shows why, with a picker to override. One AI call then says what it means (interview, rejection, question, offer, acknowledgement), lists its questions, and offers the next step: move the status (forward only; a jawb you closed by hand stays closed), add the interview round with its date, or draft a reply in your voice with the questions your material can't answer listed for you to fill in. The email goes on the Timeline and restarts the follow-up clock. No mailbox access. |
+| **Named progress steps** | Analyses that make more than one AI call show their steps under the progress bar (scoring the fit, listing the requirements, comparing each with your material; writing, checking facts). Close and reopen the Jawbar mid-run and the checklist picks up where it was. |
+| **Letter tone presets** | Warm, Direct or Formal, picked on the Letter tab and kept per jawb, each with its own voice and sign-off. Set the default in Settings → You → Documents. |
+| **Profile strength** | Settings → You → About me shows how complete your material is, weighted by section, and names the one section to work on next. |
 | **Compensation Analysis** | Reads the posted range first, then research, then a title-benchmark fallback. Always shows the source. Flags postings below your floor. |
 | **Connection Analysis** | Surfaces 1st-degree contacts at the company plus anyone on the hiring team (recruiter, hiring manager, poster, interviewer). Rolled into the composite Strength score so an in-network role reads visibly stronger. Also fixes LinkedIn's "who to follow" gap with concrete outreach suggestions. |
 | **Interview Question Prep** | Configure a list of interview questions in Settings. One "Bait" click generates answers for the specific role in your voice. |
@@ -218,6 +221,9 @@ lib/
   emailMatch.js        Which jawb a pasted email is about (pure)
   emailView.js         Paste an email: match, classify, act, draft reply
   rounds.js            Defaults for a new interview round
+  progressSteps.js     Named steps for multi-call analyses (pure)
+  tones.js             Cover letter tone presets and sign-offs
+  profileStrength.js   How complete your material is, and what to add (pure)
   freshness.js         Posting age and applicant counts (pure)
   followups.js         Quiet-application rules (pure)
   calibration.js       Fit track record from your own outcomes (pure)

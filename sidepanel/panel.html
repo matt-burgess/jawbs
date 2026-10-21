@@ -58,6 +58,8 @@
         <div class="jc-progress__bar" aria-hidden="true"></div>
         <div class="jc-progress__msg" id="progressMessage"></div>
       </div>
+      <!-- Named steps of a multi-call analysis (lib/progressSteps.js). -->
+      <ol class="jc-steps" id="progressSteps" aria-live="polite" hidden></ol>
 
       <!-- Tip / share nudge — pinned at the top of the sidebar, right
            below the header/progress row. Two modes:
@@ -541,6 +543,11 @@
               </button>
               <div class="jc-card__body">
                 <div class="jc-btn-row">
+                  <select id="letterTone" class="jc-select" data-size="sm" aria-label="Cover letter tone" title="Tone for the next letter. Each preset has its own voice and sign-off.">
+                    <option value="warm">Warm</option>
+                    <option value="direct">Direct</option>
+                    <option value="formal">Formal</option>
+                  </select>
                   <button id="generateLetter" class="jc-btn" data-variant="primary" data-size="sm" type="button">Generate</button>
                   <button id="letterCopy" class="jc-btn" data-size="sm" type="button" hidden>Copy</button>
                   <button id="letterPdf" class="jc-btn" data-size="sm" type="button" hidden>PDF</button>

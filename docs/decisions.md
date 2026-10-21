@@ -68,3 +68,25 @@ company, then the company name in the sender or subject, then the title in
 the opening. Freemail and shared ATS domains (Greenhouse, Lever, Workday and
 the like) never match by domain. This replaced the unused `inbound-match`
 handler and `lib/search.js#matchInbound`.
+
+## 2026-10-21 · Opt-in usage ping: deferred
+
+**Decided:** not built. The Dossier-inspired batch proposed an opt-in,
+anonymous usage ping; Jawbs has no server to receive one, and every byte it
+sends today goes to a provider the user chose or to freehire.me.
+
+**Follow-up:** revisit alongside `sync-architecture.md`. If a sync backend is
+built, a ping can ride the same endpoint, opt-in and off by default, with the
+exact payload shown in Settings before it is turned on.
+
+## 2026-10-21 · Letter tone presets and the sign-off
+
+**Decided:** Warm, Direct and Formal are named presets (`lib/tones.js`), each
+a voice note in the prompt and a sign-off line. The sign-off is added by code
+as the letter's last unit, with the name from Settings → Resume header, not
+written by the model. The tone is kept per jawb (`job.letterTone`, set when
+picked or generated) with a default in Settings → You → Documents.
+
+**Why code, not model, for the sign-off:** it is fixed text per preset, so a
+model call could only get it wrong, and the user's name is the one fact that
+must never vary.

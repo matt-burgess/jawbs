@@ -1116,3 +1116,13 @@ mark.jc-flagged { background: none; color: inherit; cursor: help;
 .jc-email__match > span { display: flex; flex-direction: column; gap: 2px; }
 .jc-email__unanswered { padding: 6px 8px; border-left: 3px solid var(--jc-caution); background: var(--jc-caution-weak); color: var(--jc-text); }
 .jc-email__reply { white-space: pre-wrap; }
+
+/* Named progress steps under the progress bar (lib/progressSteps.js). */
+.jc-steps { list-style: none; margin: 0; padding: 6px var(--jc-4); display: flex; flex-wrap: wrap; gap: 4px 14px;
+  background: var(--jc-surface-1); border-bottom: 1px solid var(--jc-border); font-size: var(--jc-text-xs); color: var(--jc-text-3); }
+.jc-steps[hidden] { display: none; }
+.jc-steps li::before { content: '○'; margin-right: 5px; }
+.jc-steps li[data-state='done'] { color: var(--jc-text-2); }
+.jc-steps li[data-state='done']::before { content: '✓'; color: var(--jc-pos); }
+.jc-steps li[data-state='active'] { color: var(--jc-text); font-weight: 600; }
+.jc-steps li[data-state='active']::before { content: '●'; color: var(--jc-accent); }
