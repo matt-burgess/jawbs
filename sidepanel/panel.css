@@ -570,48 +570,6 @@ body { background: var(--jc-bg); }
   display: flex; flex-direction: column; gap: var(--jc-2);
   margin-bottom: var(--jc-3);
 }
-/* Quick-actions row under the title — three text links styled as
-   subtle affordances, not competing buttons. Mockup shows them as
-   plain colored text so the score below is where the eye lands. */
-.jc-jobcard__actions {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--jc-3);
-  font: 600 var(--jc-text-xs)/1 var(--jc-font);
-}
-/* The four job-header actions (Details / Corp Site / Job Tracker /
-   Delete) are grouped in a .jc-btn-row and use the design-system
-   .jc-btn styling directly. Override the ghost variant's transparent
-   border for this group so the buttons read as tappable at rest. */
-.jc-jobcard__actions .jc-btn-row .jc-btn[data-variant="ghost"] {
-  --_bd: var(--jc-border);
-}
-.jc-jobcard__actions .jc-btn-row .jc-btn[data-variant="ghost"]:hover {
-  --_bd: var(--jc-accent-line);
-}
-/* Keep the row on a single line — the delete icon can no longer wrap
-   to its own row when the sidebar narrows. Buttons stay flex:none so
-   labels never truncate. */
-.jc-jobcard__actions .jc-btn-row {
-  flex-wrap: nowrap;
-  gap: 4px;
-}
-.jc-jobcard__actions .jc-btn-row > * { flex: none; }
-/* Tighten icon-to-label spacing inside each nav button so the leading
-   glyph reads as part of the same word, not a floating decoration. */
-.jc-jobcard__actions .jc-btn { gap: 3px; }
-.jc-jobcard__actions .jc-details-arrow { margin-right: 0; }
-.jc-jobcard__actions .jc-li-icon { margin-left: 0; }
-/* Delete button gets pushed to the right side of the row so the
-   destructive action is separated from the navigation actions. */
-.jc-jobcard__delete { margin-left: auto; }
-
-/* Secondary button row — holds the wide "Confirm on LinkedIn" CTA on
-   its own line so it can't overflow into the primary nav row. Hidden
-   when its only child is hidden so we don't leave a phantom gap. */
-.jc-jobcard__actions .jc-btn-row--secondary {
-  margin-top: 6px;
-}
-.jc-jobcard__actions .jc-btn-row--secondary:not(:has(.jc-btn:not([hidden]))) { display: none; }
-
 /* Header row — company on the left, mini hunt strip + delete icon on
    the right. Matches the mockup's "top-right chrome" layout. */
 .jc-jobcard__header {
@@ -619,100 +577,6 @@ body { background: var(--jc-bg); }
   gap: var(--jc-2);
 }
 
-/* Mini hunt — 3-stage window on the Captured → Offer journey. Lives
-   on its own full-width row at the top of the job card. Marker
-   vocabulary matches the recall voyage log: chum barrel = past, red
-   fin = now, dashed circle = next; connecting bar goes gold between
-   past stages and grey elsewhere. */
-.mini-hunt {
-  list-style: none; padding: 8px 4px 12px; margin: 0 0 var(--jc-2);
-  display: flex; align-items: flex-start;
-  border-bottom: 1px solid var(--jc-border);
-}
-.mini-hunt[hidden] { display: none; }
-.mini-hunt__step {
-  flex: 1; min-width: 0;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  /* Anchor for the connector line drawn to the next step. */
-  position: relative;
-}
-/* Clickable stages get a pointer cursor + subtle label lift on hover so
-   users discover they're actionable. Non-clickable stages (Offer, which
-   has no matching internal status) stay static. */
-.mini-hunt__step[data-status] { cursor: pointer; }
-/* Scar pill — replaces the 3-stage window when the jawb has hit a
-   terminal state (archived on LinkedIn or notMovingForward, both of
-   which read as "Scar" to the user). Full-width so it visually says
-   "this pursuit is closed" rather than "we're on step N".
-   Red-tinted per the Jaws / scarring theme — this is a battle-scar
-   record, not a neutral bookkeeping state. */
-.mini-hunt__terminal {
-  flex: 1; min-width: 0;
-  display: flex; align-items: center; justify-content: center;
-  padding: 6px 12px;
-  border-radius: var(--jc-radius-sm);
-  background: var(--jc-neg-weak, #F9E4DE);
-  color: var(--jc-neg, #B54528);
-  font: 700 var(--jc-text-xs)/1 var(--jc-font-mono);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  border: 1px solid var(--jc-neg-line, #E9BFAF);
-}
-.mini-hunt__step[data-status]:hover .mini-hunt__label {
-  color: var(--jc-accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.mini-hunt__mark {
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  position: relative;
-}
-/* Connector line spanning the horizontal gap between this step's mark
-   and the next step's mark. Positioned on the step (not the mark) so
-   its width is driven by the step's flex sizing, not the mark's fixed
-   28px width. Sits vertically centered on the 28px base mark; the
-   32px "now" mark stays visually centered because the step is centered
-   too. */
-.mini-hunt__step::after {
-  content: "";
-  position: absolute;
-  top: 14px;
-  left: calc(50% + 18px);
-  right: calc(-50% + 18px);
-  height: 2px;
-  background: var(--jc-border);
-  pointer-events: none;
-}
-.mini-hunt__step:last-child::after { display: none; }
-.mini-hunt__label {
-  font: 700 var(--jc-text-label)/1 var(--jc-font-display);
-  letter-spacing: .1em; text-transform: uppercase;
-  color: var(--jc-text-3);
-  text-align: center;
-  white-space: nowrap;
-}
-/* Past stage — chum barrel dropped */
-.mini-hunt__step[data-state="past"] .mini-hunt__mark {
-  background: url('../assets/chum-barrel.png') center / 24px 24px no-repeat;
-}
-.mini-hunt__step[data-state="past"]::after { background: var(--jaw-highlight); }
-.mini-hunt__step[data-state="past"] .mini-hunt__label { color: var(--jc-text-2); }
-/* Current stage — red shark fin, breaking the surface */
-.mini-hunt__step[data-state="now"] .mini-hunt__mark {
-  width: 32px; height: 32px;
-  background: url('../assets/shark-fin-red.png') center / 28px 28px no-repeat;
-}
-.mini-hunt__step[data-state="now"] .mini-hunt__label { color: var(--jaw-red-text); }
-/* Future stage — dashed circle, open water */
-.mini-hunt__step[data-state="next"] .mini-hunt__mark::before {
-  content: "";
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  border: 2px dashed var(--jc-text-3);
-  box-sizing: border-box;
-  display: block;
-}
 .jc-jobcard__header-actions {
   display: flex; align-items: center; gap: 6px;
   flex: none;
@@ -802,24 +666,6 @@ body { background: var(--jc-bg); }
   object-fit: contain;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6));
 }
-
-.jc-gauge {
-  display: block;
-}
-.jc-gauge__text {
-  font: 700 10.5px/1 var(--jc-font-mono);
-}
-/* Gauge bands on the cabinet: lit stroke, dim track of the same hue,
-   light numeral (≥8:1 on the strip). */
-.jc-gauge[data-band="weak"]   { --_stroke: var(--jc-neg);     --_track: rgba(255,115,115,.2); --_text: #FF9A9A; }
-.jc-gauge[data-band="fair"]   { --_stroke: var(--jc-caution); --_track: rgba(255,181,71,.2);  --_text: #FFC874; }
-.jc-gauge[data-band="strong"] { --_stroke: var(--jc-pos);     --_track: rgba(94,219,138,.2);  --_text: #8AE8AB; }
-.jc-gauge__track { stroke: var(--_track); }
-.jc-gauge__fill  {
-  stroke: var(--_stroke);
-  transition: stroke-dasharray var(--jc-dur) var(--jc-ease);
-}
-.jc-gauge__text  { fill: var(--_text); }
 
 /* Source note under the meta strip — tells the user where the comp
    number came from (posted range / company research / benchmark).
@@ -1012,77 +858,6 @@ body { background: var(--jc-bg); }
 @media (prefers-reduced-motion: reduce) { .remote-mismatch-badge { animation: none; } }
 
 /* ------------------------------------------------------------
-   ACTION BAR — Cast/Bait control-panel rows.
-   Lives inside .jc-jobcard now (below the Details/Corp Site/Job
-   Tracker/Delete row) so we strip the standalone card chrome —
-   border, background, radius, side padding — and only keep vertical
-   rhythm plus a hairline top rule to separate from the nav actions.
-   ------------------------------------------------------------ */
-.jc-action-bar {
-  display: flex; flex-direction: column;
-  gap: 8px;
-  padding: var(--jc-2) 0 0;
-  margin-top: var(--jc-2);
-  border-top: 1px solid var(--jc-border);
-}
-
-/* Cast/Bait primary button — static solid color. Earlier iterations tried
-   a left→right gradient scan to draw the eye, but users read the motion as
-   "click accepted, work in progress" and mistrusted it. Solid it is. */
-.action-row {
-  display: flex; align-items: center; gap: 6px;
-}
-/* Outputs sub-row — hosts the "Copy cover letter" / "Download resume"
-   quick actions below Bait. Collapses entirely when every jc-btn child
-   is hidden so an unbaited jawb has no phantom row taking up space. */
-.action-row--outputs { margin-top: 4px; }
-.action-row--outputs:not(:has(.jc-btn:not([hidden]))) { display: none; }
-.action-row__label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 78px;
-  flex: none;
-}
-.action-row__title {
-  font: 700 17px/1 var(--jc-font-display);
-  color: var(--jc-text);
-  letter-spacing: .08em; text-transform: uppercase;
-}
-.action-row__sub {
-  font: 600 11px/1 var(--jc-font-display);
-  color: var(--jc-text-3);
-  text-transform: uppercase;
-  letter-spacing: .1em;
-}
-.jc-action-bar .jc-btn {
-  min-height: 30px;
-  padding: 0 10px;
-  font-size: 13px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-/* Cast / Bait buttons are the panel's real actions — cyan outline
-   until they've run, then they settle to a green "caught" state. */
-.jc-action-bar .jc-btn[data-action] {
-  --_bg: transparent; --_fg: var(--jc-accent); --_bd: var(--jc-accent-line);
-}
-.jc-action-bar .jc-btn[data-action]:hover {
-  --_bg: var(--jc-accent-weak); --_fg: var(--jc-accent-hover); --_bd: var(--jc-accent);
-}
-.jc-action-bar .jc-btn[data-cached='true'] {
-  border-color: var(--jc-pos-line);
-  color: var(--jc-pos);
-  background: var(--jc-pos-weak);
-}
-.jc-action-bar .jc-btn[data-cached='true']::before {
-  content: '✓ '; opacity: 0.8;
-}
-.jc-action-bar .jc-btn[data-running='true'] {
-  opacity: 0.6; pointer-events: none;
-}
-
-/* ------------------------------------------------------------
    GROUPS — logical section wrappers with clear headers
    ------------------------------------------------------------ */
 .jc-group {
@@ -1153,24 +928,7 @@ body { background: var(--jc-bg); }
   background-image: none;
 }
 
-/* Analysis tabs (#analysisTabs) — same look as the top-level strip, one
-   step quieter. A tab shows every card in its pane; the rest are removed
-   from the flow, so nothing has to be scrolled past. Card heads stay as
-   static title + glance rows. Pinned directly under .jc-tabs (JS sets
-   --jc-tabs-h on #body); the job header above is NOT pinned in the sidebar — at
-   ~450px it left too little room to read an analysis. */
 .jc__verdict { position: static; }
-.jc-subtabs {
-  display: flex; gap: 0;
-  position: sticky; top: calc(var(--jc-tabs-h, 47px) - var(--jc-4)); z-index: 2;
-  margin: 0 calc(-1 * var(--jc-4)) var(--jc-1);
-  background: var(--jc-surface-sunk);
-  border-block: 1px solid var(--jc-border);
-}
-.jc-subtabs .jc-tab { padding: 10px 4px; font-size: 13px; letter-spacing: .06em; border-radius: 0; }
-.jc-subtabs .jc-tab[data-status='done']::before {
-  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--jc-pos);
-}
 #analysisSection .jc-card[data-open='false'] { display: none; }
 #analysisSection .jc-card__head { cursor: default; }
 #analysisSection .jc-card__chev { display: none; }
@@ -1536,23 +1294,165 @@ mark.jc-flagged, li.jc-flagged {
   white-space: nowrap;
 }
 
-/* Narrow Jawbar (≤ 400px) — condensed caps run wider than the old
-   mixed-case labels, so tighten tracking and padding so every control
-   row still fits on one line at the 320–360px side-panel widths. */
+/* ============================================================
+   JAWB TAB: job head, Cast, Apply, Bait, utility row.
+   Rows are .jb-row; detail opens in the flyout (lib/flyoutView.js).
+   ============================================================ */
+.jc__verdict { flex: 1 0 auto; display: flex; flex-direction: column; gap: var(--jc-2); padding: 0; background: none; border-bottom: 0; }
+.jc__verdict[hidden], .jc__verdict [hidden] { display: none !important; }
+#body[data-active-tab="current"] { padding-bottom: 0; }
+#body[data-active-tab="current"]:has(#verdictBlock:not([hidden])) #statusText { display: none; }
+
+.jb-head { padding: 10px 12px; gap: 2px; margin: 0; box-shadow: none; }
+.jb-status { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.jb-head .jc-job-title {
+  margin: 6px 0 0; font-size: 17px; line-height: 1.2;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.jb-head .jc-job-eyebrow { margin: 0 0 2px; }
+.jb-head .jc-job-eyebrow:empty { display: none; }
+
+/* Status row: Captured, Saved, Applied around the current stage. */
+.mini-hunt { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; flex: 1; min-width: 0; }
+.mini-hunt__step {
+  display: inline-flex; align-items: center; white-space: nowrap;
+  font: 700 12px/1 var(--jc-font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--jc-text-3);
+}
+.mini-hunt__step:not(:last-child)::after { content: ""; width: 16px; height: 1px; margin: 0 6px; background: var(--jc-border-strong); }
+.mini-hunt__mark { display: none; }
+.mini-hunt__step[data-status] { cursor: pointer; }
+.mini-hunt__step[data-status]:hover .mini-hunt__label { color: var(--jc-accent); }
+.mini-hunt__label { padding: 4px 0; }
+.mini-hunt__step[data-state="past"] .mini-hunt__label { color: var(--jc-text-2); }
+.mini-hunt__step[data-state="now"] .mini-hunt__label {
+  padding: 4px 10px; border-radius: 999px; color: var(--jc-accent);
+  background: var(--jc-accent-weak); border: 1px solid var(--jc-accent-line);
+}
+.mini-hunt__terminal {
+  padding: 4px 10px; border-radius: 999px; background: var(--jc-neg-weak); color: var(--jc-neg);
+  border: 1px solid var(--jc-neg-line); font: 700 12px/1 var(--jc-font-mono); letter-spacing: .08em; text-transform: uppercase;
+}
+
+/* The "..." menu and the More menu. */
+.jb-menu { position: relative; margin-left: auto; flex: none; }
+.jb-pop {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 210px; padding: 4px;
+  display: flex; flex-direction: column;
+  background: var(--jc-surface-2); border: 1px solid var(--jc-border-strong); border-radius: var(--jc-radius); box-shadow: var(--jc-shadow-xl);
+}
+.jb-pop--up { top: auto; bottom: calc(100% + 4px); }
+.jb-pop__item {
+  appearance: none; background: none; border: 0; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: var(--jc-radius-sm);
+  color: var(--jc-text); font: 600 var(--jc-text-sm)/1.2 var(--jc-font);
+}
+.jb-pop__item small { color: var(--jc-text-3); font-weight: 400; font-size: var(--jc-text-xs); }
+.jb-pop__item:hover, .jb-pop__item:focus-visible { background: var(--jc-surface-3); }
+.jb-pop__item[data-danger] { color: var(--jc-neg); }
+
+/* Strength strip: composite, shark, then Fit / Comp / Network. */
+.jb-strip {
+  display: flex; align-items: center; gap: var(--jc-3); margin-top: 6px; padding: 8px 10px;
+  background: var(--jc-surface-2); border: 1px solid var(--jc-border); border-radius: var(--jc-radius);
+}
+.jb-head .jc-meta-strip__strength { min-width: 56px; padding: 6px; }
+.jb-head .jc-meta-strip__strength-num { font-size: 28px; }
+.jb-head .jc-meta-strip__shark-icon, .jb-head .jc-meta-strip__shark-icon img { width: 36px; height: 24px; }
+.jb-strip__shark { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.jb-strip__tier {
+  font: 600 13px/1 var(--jc-font-display); letter-spacing: .05em; text-transform: uppercase; color: var(--jc-text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.jb-strip__parts { display: flex; gap: 10px; flex: none; }
+.jb-part { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; cursor: help; }
+.jb-part i { font: normal 600 11px/1 var(--jc-font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--jc-text-3); }
+.jb-part b { font: 700 14px/1 var(--jc-font-mono); font-variant-numeric: tabular-nums; color: var(--jc-text); }
+
+/* Sections. */
+.jb-sec { display: flex; flex-direction: column; gap: 6px; }
+.jb-sec__h {
+  margin: 0; display: flex; align-items: baseline; gap: 8px;
+  font: 700 15px/1 var(--jc-font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--jc-text);
+}
+.jb-sec__h em { font: normal 500 12px/1 var(--jc-font); letter-spacing: 0; text-transform: none; color: var(--jc-text-3); }
+.jb-later { display: flex; flex-direction: column; gap: 6px; }
+.jc__verdict[data-weak="true"] .jb-later { opacity: .5; } /* a weak fit dims what follows; nothing is disabled */
+.jb-weak {
+  margin: 0; padding: 6px 10px; border-radius: var(--jc-radius-sm);
+  font: 600 12px/1.3 var(--jc-font); color: var(--jc-neg); background: var(--jc-neg-weak); border: 1px solid var(--jc-neg-line);
+}
+
+/* Rows: badge, summary, end (run button, spinner, or result). */
+.jb-row {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  min-height: 48px; padding: 8px 10px;
+  background: var(--jc-surface-1); border: 1px solid var(--jc-border); border-radius: var(--jc-radius);
+}
+.jb-row[data-state="done"] { cursor: pointer; }
+.jb-row[data-state="done"]:hover { background: var(--jc-surface-2); border-color: var(--jc-border-strong); }
+.jb-row[data-open="true"], .jb-row[data-open="true"]:hover { border-color: var(--jc-accent); }
+.jb-row:focus-visible { outline: none; box-shadow: var(--jc-focus-ring); }
+.jb-badge {
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font: 700 12px/1 var(--jc-font-mono); color: var(--jc-text-3); border: 1.5px solid var(--jc-border-strong);
+}
+.jb-row[data-state="next"] .jb-badge, .jb-row[data-state="running"] .jb-badge { background: var(--jc-accent); border-color: var(--jc-accent); color: var(--jc-accent-ink); }
+.jb-row[data-state="done"] .jb-badge { background: var(--jc-pos-weak); border-color: var(--jc-pos); color: var(--jc-pos); }
+.jb-row__main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.jb-row__titleline { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.jb-row__title { font: 700 14px/1 var(--jc-font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--jc-text); }
+.jb-row__sub { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; font: 400 12px/1.3 var(--jc-font); color: var(--jc-text-2); }
+.jb-row__sub.jb-trunc { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jb-row__end { display: flex; align-items: center; gap: 8px; flex: none; }
+.jb-row .jc-btn { min-height: 28px; padding: 0 10px; font-size: 13px; }
+.jb-score { font: 400 26px/1 var(--jc-font-brand); }
+.jb-score__lbl { font: 700 12px/1 var(--jc-font-display); letter-spacing: .1em; text-transform: uppercase; }
+.tone-pos { color: var(--jc-pos); } .tone-caution { color: var(--jc-caution); } .tone-neg { color: var(--jc-neg); }
+.jb-chip { margin-left: auto; padding: 3px 6px; border-radius: 4px; border: 1px solid; font: 700 11px/1 var(--jc-font-mono); white-space: nowrap; }
+.jb-chip.tone-pos { background: var(--jc-pos-weak); border-color: var(--jc-pos-line); }
+.jb-chip.tone-caution { background: var(--jc-caution-weak); border-color: var(--jc-caution-line); }
+.jb-chip.tone-neg { background: var(--jc-neg-weak); border-color: var(--jc-neg-line); }
+.jb-mono { font-family: var(--jc-font-mono); font-weight: 700; color: var(--jc-text); }
+.jb-range { font-size: 14px; }
+.jb-opt { padding: 2px 5px; border: 1px solid var(--jc-border); border-radius: 4px; font: 600 11px/1 var(--jc-font-mono); color: var(--jc-text-3); }
+.jb-chev { color: var(--jc-text-3); font-size: 22px; line-height: 1; transition: transform var(--jc-dur-fast) var(--jc-ease); } /* points at the flyout */
+.jb-row[data-open="true"] .jb-chev { transform: rotate(180deg); color: var(--jc-accent); }
+.jb-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--jc-border-strong); border-top-color: var(--jc-accent); animation: jb-spin .8s linear infinite; }
+.jb-busy { font: 600 12px/1 var(--jc-font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--jc-accent); }
+@keyframes jb-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .jb-spin { animation-duration: 2.4s; } }
+
+/* Apply on the employer's site. */
+.jb-apply { gap: 4px; }
+.jb-apply__btn { width: 100%; min-height: 34px; }
+.jb-caption { margin: 0; text-align: center; font: 400 12px/1.3 var(--jc-font); color: var(--jc-text-3); }
+
+/* Utility row, pinned to the bottom of the scroll area. */
+.jb-spacer { flex: 1 1 0; min-height: 4px; }
+.jb-bar {
+  position: sticky; bottom: 0; z-index: 4; display: flex; gap: 6px; padding: 8px 0 var(--jc-3);
+  background: var(--jc-bg); border-top: 1px solid var(--jc-border);
+}
+.jb-bar > .jc-btn, .jb-bar .jb-menu .jc-btn { flex: 1 1 auto; min-height: 30px; padding: 0 8px; font-size: 13px; letter-spacing: .03em; }
+.jb-bar .jb-menu { margin-left: 0; flex: 1 1 auto; display: flex; }
+.jb-bar .jb-menu .jc-btn { width: 100%; }
+.jb-bar .jc-li-icon { margin: 0; }
+
+/* The sheet: one analysis card over the Jawb tab (prep, chat, offer, editors). */
+#body:not([data-sheet]) .jb-sheet { display: none; }
+#body[data-sheet] #verdictBlock, #body[data-sheet] #noJob { display: none; }
+.jb-sheet { display: flex; flex-direction: column; gap: var(--jc-2); padding-bottom: var(--jc-4); }
+.jb-sheet__bar { display: flex; align-items: center; gap: 10px; }
+.jb-sheet__bar strong { font: 700 15px/1 var(--jc-font-display); letter-spacing: .1em; text-transform: uppercase; }
+#body[data-pane="offer"] #compOutput, #body[data-pane="offer"] #compCard .jc-card__foot, #body[data-pane="offer"] #compCard .jc-card__head { display: none; }
+
 @media (max-width: 400px) {
-  .jc__verdict { padding-inline: 0; }
-  .jc-jobcard { padding: var(--jc-3); }
-  .jc-jobcard__actions .jc-btn { padding: 0 6px; letter-spacing: .02em; font-size: 12.5px; }
-  .jc-action-bar .jc-btn { padding: 0 4px; letter-spacing: .01em; font-size: 12.5px; }
-  .action-row__label { min-width: 60px; }
-  .action-row__title { font-size: 15px; }
-  .jc-meta-strip { gap: 6px; padding: 8px; }
-  .jc-meta-strip__strength { min-width: 52px; padding: 6px 6px 4px; }
-  .jc-meta-strip__strength-num { font-size: 30px; }
-  .jc-meta-strip__label { font-size: 11.5px; letter-spacing: .01em; }
-  .jc-meta-strip__shark-icon, .jc-meta-strip__shark-icon img { width: 36px; }
+  .jb-head { padding: 8px 10px; }
+  .jb-strip { gap: 8px; padding: 6px 8px; }
+  .jb-strip__parts { gap: 8px; }
+  .jb-row { gap: 8px; padding: 8px; }
+  .jb-bar .jc-btn { padding: 0 5px; letter-spacing: .01em; font-size: 12.5px; }
 }
 @media (max-width: 340px) {
   .jc-tab { padding-inline: 4px; font-size: 13px; letter-spacing: .02em; }
-  .jc-jobcard__actions .jc-btn { padding: 0 4px; }
 }

@@ -13,7 +13,9 @@ import { orderRequirements } from '../lib/requirementMatch.js';
 import { refineSuggestions } from '../lib/refineSuggestions.js';
 import { flagReason } from '../lib/flagMarks.js';
 import { renderDocUnits, renderDocHistory, flaggedCount } from '../lib/unitView.js';
-import { docFromJob } from '../lib/documentHistory.js';
+import { docFromJob, undoTarget } from '../lib/documentHistory.js';
+import { STEPS, scoreBand, fmtMoneyK, isFitSkeleton, stepStates, fitView, compView } from '../lib/jawbSteps.js';
+import { createFlyout } from '../lib/flyoutView.js';
 import { resumeFromUnits } from '../lib/documentUnits.js';
 import { nextTrim, trimNote } from '../lib/pageLimit.js';
 import { measurePages } from '../lib/pageMeasure.js';
@@ -69,110 +71,24 @@ function scoreTier(score) {
   return 'neg';
 }
 
-// Weak / fair / strong band label for the meta-strip circular gauges.
-// Mirrors the score bands the mockup calls out: 0-39 weak, 40-69 fair,
-// 70+ strong. Distinct from scoreTier() so the two labeling schemes
-// stay independent — anything that reads scoreTier() (verdictBadges,
-// fit-glance chips) keeps its own vocabulary.
-function scoreBand(score) {
-  const n = Number.isFinite(score) ? score : 0;
-  if (n >= 70) return 'strong';
-  if (n >= 40) return 'fair';
-  return 'weak';
-}
-
-// Circular-gauge circumference for r=12 (mockup dimensions): 2·π·12 ≈ 75.4.
-const GAUGE_CIRC = 75.4;
-
-// Fills a mockup-style circular gauge (SVG). `svg` is the outer element
-// used for the [data-band] color palette; `fillCircle` is the arc
-// stroke whose dasharray we animate to represent the percentage;
-// `text` is the numeric label in the middle. Score clamps 0-100.
-function renderGauge(svg, fillCircle, text, score) {
-  if (!svg || !fillCircle || !text) return;
-  const n = Math.max(0, Math.min(100, Number(score) || 0));
-  const dash = (n / 100) * GAUGE_CIRC;
-  fillCircle.setAttribute('stroke-dasharray', `${dash.toFixed(2)} ${GAUGE_CIRC}`);
-  text.textContent = String(Math.round(n));
-  svg.setAttribute('data-band', scoreBand(n));
-}
-
-// Format a dollar amount as "$XXK" / "$X.XM" — matches the compact
-// notation used elsewhere in the sidepanel.
-function fmtMoneyK(n) {
-  if (n == null || Number.isNaN(n)) return null;
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1000) return `$${Math.round(n / 1000)}K`;
-  return `$${Math.round(n)}`;
-}
-
-// Populates the Comp gauge and the source note under the meta strip.
-// The gauge measures the TOP of the posting's base range against the
-// user's Settings → target salary — a "how close does the ceiling get
-// to what I want" signal. Hides when we lack both a range and a
-// target (nothing meaningful to plot). Source note pulls from the
-// comp analysis's `salary.sourceLabel` (already human-readable) and
-// falls back to a source-key mapping when the label is absent.
-function renderCompGauge(job) {
-  const gaugeWrap = els.compGaugeGroup;
-  const note = els.compSourceNote;
-  if (!gaugeWrap && !note) return;
-
+// The Comp number in the strength strip: how close the TOP of the base
+// range gets to your target (or, failing that, the model's vsTarget read
+// or your floor). null when there is no range and no read to plot.
+function compStripScore(job) {
   const comp = job?.analyses?.comp?.result;
   const salary = comp?.salary;
   const low  = salary?.base?.low  ?? comp?.marketEstimate?.baseLow  ?? null;
   const high = salary?.base?.high ?? comp?.marketEstimate?.baseHigh ?? null;
   const target = Number(compTargets?.target) || null;
   const floor  = Number(compTargets?.floor)  || null;
-
-  // Nothing to plot if we have neither a range nor a vsTarget verdict.
-  const hasRange = high != null || low != null;
   const vsTarget = salary?.vsTargets?.vsTarget || comp?.vsTargets?.vsTarget;
-  if (!hasRange && !vsTarget) {
-    if (gaugeWrap) gaugeWrap.hidden = true;
-    if (note) { note.hidden = true; note.textContent = ''; }
-    return;
-  }
-
-  // Score: prefer the numeric ratio when we have both a target and a
-  // top-of-range. Fall back to the LLM's vsTarget verdict when we
-  // only have the qualitative signal. Fall back to a floor comparison
-  // when even the target is missing.
-  let score = null;
-  const ratioAnchor = high ?? low;
-  if (target && ratioAnchor) {
-    score = Math.min(100, Math.round((ratioAnchor / target) * 100));
-  } else if (vsTarget) {
-    score = vsTarget === 'above' ? 100
-          : vsTarget === 'at'    ? 80
-          : vsTarget === 'below' ? 30
-          : 50;
-  } else if (floor && ratioAnchor) {
-    // Anchor at 60 when the ceiling matches the floor exactly — floor
-    // is the "acceptable but not aspirational" mark.
-    score = Math.min(100, Math.round((ratioAnchor / floor) * 60));
-  } else {
-    score = 50;
-  }
-
-  if (gaugeWrap) {
-    renderGauge(els.compGauge, els.compGaugeFill, els.compGaugeText, score);
-    // Tooltip: full compare so the user can inspect without clicking.
-    const rangeText = (low != null && high != null) ? `${fmtMoneyK(low)}-${fmtMoneyK(high)}`
-                    : (high != null) ? `up to ${fmtMoneyK(high)}`
-                    : (low != null) ? `from ${fmtMoneyK(low)}` : 'unknown range';
-    const targetText = target ? fmtMoneyK(target) : 'not set';
-    gaugeWrap.title = `Comp ${rangeText} vs your target ${targetText}. Score ${score}/100, `
-      + (score >= 70 ? 'strong.' : score >= 40 ? 'fair.' : 'weak.');
-    gaugeWrap.hidden = false;
-  }
-
-  if (note) {
-    // Comp-source paragraph retired from the header; the comp analysis
-    // card carries the same source label + confidence lower down.
-    note.hidden = true;
-    note.textContent = '';
-  }
+  if (high == null && low == null && !vsTarget) return null;
+  const anchor = high ?? low;
+  if (target && anchor) return Math.min(100, Math.round((anchor / target) * 100));
+  if (vsTarget) return vsTarget === 'above' ? 100 : vsTarget === 'at' ? 80 : vsTarget === 'below' ? 30 : 50;
+  // Floor met exactly reads as 60: acceptable, not aspirational.
+  if (floor && anchor) return Math.min(100, Math.round((anchor / floor) * 60));
+  return 50;
 }
 
 function replaceGlance(glanceEl, node) {
@@ -522,7 +438,7 @@ function renderJawboardStatusCounts(byStatus) {
 // The footer strips (Recent Jawbs, usage bar) are outside #body and
 // stay pinned regardless.
 const CURRENT_TAB_ELS = () => [
-  els.verdictBlock, els.noticeSlot, els.noJob, els.analysisSection,
+  els.verdictBlock, els.noticeSlot, els.noJob, els.jbSheet,
 ];
 function switchTab(name) {
   const body = els.body;
@@ -901,38 +817,48 @@ const CARD_PANE = {
   fitCard: 'fit', requirementsCard: 'fit', levelCard: 'fit', flagsCard: 'fit',
   compCard: 'comp', prepCard: 'prep', resumeCard: 'resume', letterCard: 'letter', askCard: 'ask',
 };
-let activePane = 'fit'; // kept across jobs so comparing comp job-to-job stays on Comp
+let activePane = 'fit'; // the card the sheet shows
+
+// The sheet: one analysis card (prep, chat, offer, or a document's full
+// editor) shown over the Jawb tab. Everything the rows and the flyout
+// summarise stays reachable here.
+const SHEET_TITLES = { prep: 'Prep brief', ask: 'Chat with AI', offer: 'Record an offer', resume: 'Resume editor', letter: 'Cover letter editor', comp: 'Comp', fit: 'Fit' };
 
 function selectPane(pane) {
   activePane = pane;
-  for (const [cardId, p] of Object.entries(CARD_PANE)) $(cardId).dataset.open = String(p === pane);
-  for (const tab of els.analysisTabs.children) {
-    const active = tab.dataset.pane === pane;
-    tab.dataset.active = String(active);
-    tab.setAttribute('aria-selected', String(active));
-  }
+  const card = pane === 'offer' ? 'comp' : pane;
+  for (const [cardId, p] of Object.entries(CARD_PANE)) $(cardId).dataset.open = String(p === card);
+  els.body.dataset.pane = pane; // CSS narrows the comp card to the offer form
 }
 
-els.body.style.setProperty('--jc-tabs-h', `${els.jcTabs.offsetHeight}px`);
-els.analysisTabs.addEventListener('click', (e) => {
-  const tab = e.target.closest('[data-pane]');
-  if (!tab) return;
-  selectPane(tab.dataset.pane);
-  // Bring the strip up to its pinned position so the pane gets the full
-  // panel height; the job header is one scroll-up away.
-  const pinLine = els.body.getBoundingClientRect().top + els.jcTabs.offsetHeight;
-  els.body.scrollTop += els.analysisSection.getBoundingClientRect().top - pinLine;
-});
+function openSheet(pane) {
+  closeFlyout();
+  selectPane(pane);
+  els.body.dataset.sheet = pane;
+  if (pane === 'offer') els.offerForm.open = true;
+  els.jbSheetTitle.textContent = SHEET_TITLES[pane] || '';
+  els.body.scrollTop = 0;
+}
+function closeSheet() { delete els.body.dataset.sheet; }
+els.jbSheetBack?.addEventListener('click', closeSheet);
 
-// ---------- Action bar (quick-access buttons above the job title) ----------
-
-document.querySelectorAll('.jc-btn[data-action]').forEach((btn) => {
-  btn.addEventListener('click', () => runAction(btn.dataset.action));
+// Menus: the job's "..." (Delete) and the bottom row's "More".
+function wireMenu(btn, menu) {
+  const set = (open) => { menu.hidden = !open; btn.setAttribute('aria-expanded', String(open)); };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); set(menu.hidden); });
+  menu.addEventListener('click', () => set(false));
+  document.addEventListener('click', () => set(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { set(false); btn.focus(); } });
+}
+wireMenu(els.jobMenuBtn, els.jobMenu);
+wireMenu(els.moreBtn, els.moreMenu);
+els.moreMenu.addEventListener('click', (e) => {
+  const item = e.target.closest('[data-sheet]');
+  if (item) openSheet(item.dataset.sheet);
 });
 
 async function runAction(action) {
   if (!currentJob) return;
-  if (Object.values(CARD_PANE).includes(action)) selectPane(action); // show where the result will land
   switch (action) {
     case 'fit': return els.analyzeFit.click();
     case 'comp': return els.analyzeComp.click();
@@ -968,37 +894,6 @@ async function reprocessCurrentJob() {
   }
 }
 
-function updateActionBarState(job) {
-  const a = job?.analyses || {};
-  const map = { fit: !!a.fit, comp: !!a.comp, prep: !!a.brief, letter: !!a.coverLetter, resume: !!a.resume };
-  document.querySelectorAll('.jc-btn[data-action]').forEach((btn) => {
-    const action = btn.dataset.action;
-    if (action === 'reprocess') return;
-    if (map[action]) btn.dataset.cached = 'true';
-    else delete btn.dataset.cached;
-  });
-
-  // Dynamic primary in the Cast row: Fit is the recommended next click
-  // until it's been run, then Comp becomes the recommended next click.
-  // Only one of the two carries data-variant="primary" at a time.
-  const actionBar = $('actionBar');
-  if (actionBar) {
-    const fitBtn = actionBar.querySelector('.jc-btn[data-action="fit"]');
-    const compBtn = actionBar.querySelector('.jc-btn[data-action="comp"]');
-    if (fitBtn && compBtn) {
-      if (map.fit) {
-        // Fit done → point at Comp next.
-        fitBtn.removeAttribute('data-variant');
-        compBtn.setAttribute('data-variant', 'primary');
-      } else {
-        // No fit yet → primary the Fit button.
-        fitBtn.setAttribute('data-variant', 'primary');
-        compBtn.removeAttribute('data-variant');
-      }
-    }
-  }
-}
-
 // ---------- Letter tone (lib/tones.js) ----------
 
 // The picker shows this job's tone, else the default in Settings →
@@ -1016,6 +911,7 @@ els.letterTone?.addEventListener('change', () => {
 
 async function renderJob(job) {
   // A pasted email belongs to the job it was opened on.
+  if (currentJob?.jobId !== job?.jobId) { closeFlyout(); closeSheet(); }
   if (els.emailPanel && currentJob?.jobId !== job?.jobId) { els.emailPanel.hidden = true; els.emailPanel.replaceChildren(); els.pasteEmail?.setAttribute('aria-expanded', 'false'); }
   currentJob = job;
   // Publish the currently-viewed jawb id to storage so the external
@@ -1089,6 +985,7 @@ function renderVerdict(job) {
   // Delete button is only meaningful when the job is actually in the Jawboard.
   // status presence is the same signal used for the badge above.
   if (els.deleteJob) els.deleteJob.hidden = !job.status;
+  if (els.jobMenuBtn) els.jobMenuBtn.hidden = !job.status; // Delete is the menu's only item
   // Find on LinkedIn Tracker — only for LinkedIn-sourced jobs with a
   // tracker-eligible status (anything other than 'analyzed', which is
   // the internal-only "we looked at it" state). Google Jobs captures
@@ -1167,68 +1064,14 @@ function renderVerdict(job) {
   });
   const fit = job.analyses?.fit?.result;
 
+  // Strength strip: always there. Before a fit result it reads
+  // "-" and "Unscored"; the composite needs the fit.
+  renderStrip(job, fit);
+
   if (!fit) {
-    if (els.metaStrip) els.metaStrip.hidden = true;
-    // Comp source note is a sibling of the meta strip, hide it too so
-    // it doesn't linger under an empty area on jobs without analysis.
-    if (els.compSourceNote) { els.compSourceNote.hidden = true; els.compSourceNote.textContent = ''; }
     els.verdictBadges.innerHTML = '';
     renderFreshnessBadges(p);
-    if (els.jobFitSummary) { els.jobFitSummary.textContent = ''; els.jobFitSummary.hidden = true; }
     return;
-  }
-
-  // Meta strip: shark tier + Fit / Strength / Comp gauges. Populated
-  // whenever a fit result exists — that's what unlocks the strength
-  // composite too. The comp gauge and source note are further gated
-  // on the comp analysis existing (renderCompGauge decides).
-  if (els.metaStrip) {
-    const fitScore = roundFitToTens(fit.fitScore ?? 0);
-    const strength = computeStrengthScore(job, { compTargets, followMap });
-    // Connections gauge — scale the 0–20 connections component up to a
-    // 0–100 percentage so it reads on the same scale as fit/comp.
-    const conn = strength.breakdown?.connections;
-    const connectionsPct = conn && conn.max
-      ? Math.round((conn.score / conn.max) * 100)
-      : 0;
-    renderGauge(els.fitGauge, els.fitGaugeFill, els.fitGaugeText, fitScore);
-    // Requirement counts in the Fit gauge's tooltip, when mapped.
-    const rs = job.analyses?.requirements?.summary;
-    els.fitGauge.closest('.jc-meta-strip__item').title = `Fit score: the model's overall match against your profile.${rs
-      ? ` Requirements: ${rs.covered} covered, ${rs.partial} partial, ${rs.gap} gaps of ${rs.total}${rs.mustGaps ? ` (${rs.mustGaps} must-have gap${rs.mustGaps === 1 ? '' : 's'})` : ''}.` : ''}`;
-    renderGauge(els.connectionsGauge, els.connectionsGaugeFill, els.connectionsGaugeText, connectionsPct);
-    // Big strength score on the left of the shark icon.
-    if (els.metaStrengthNum) els.metaStrengthNum.textContent = String(strength.score);
-    if (els.metaStrength) {
-      els.metaStrength.dataset.band = strength.score >= 75 ? 'strong'
-        : strength.score >= 50 ? 'fair' : 'weak';
-    }
-    if (els.metaSharkImg && strength.tierImage) {
-      els.metaSharkImg.src = chrome.runtime.getURL(strength.tierImage);
-      els.metaSharkImg.alt = `${strength.tierLabel} shark`;
-    }
-    // Tint the shark's halo to reflect its tier — dark red (weakest)
-    // through deep green (strongest). CSS holds the color per tier via
-    // [data-tier].
-    if (els.metaSharkIcon) els.metaSharkIcon.setAttribute('data-tier', strength.tier);
-    if (els.metaSharkLabel) els.metaSharkLabel.textContent = strength.tierLabel;
-    if (els.metaShark) {
-      els.metaShark.title = `${strength.tierLabel} shark: ${strength.tierDescription || 'strength tier'}. `
-        + `Strength ${strength.score}/100 = fit ${strength.breakdown.fit.note} · `
-        + `comp ${strength.breakdown.comp.note} · connections ${strength.breakdown.connections.note}. `
-        + `Weights: fit 50% · comp 30% · connections 20%.`;
-    }
-    renderCompGauge(job);
-    els.metaStrip.hidden = false;
-  }
-  // One-line summary — surface the first alignment as the headline
-  // takeaway. Falls back to the first gap when there's no alignment,
-  // and hides the row entirely when neither exists.
-  if (els.jobFitSummary) {
-    // Fit-summary sentence retired from the header; the Career Fit card
-    // already surfaces alignments and gaps below.
-    els.jobFitSummary.textContent = '';
-    els.jobFitSummary.hidden = true;
   }
 
   els.verdictBadges.innerHTML = '';
@@ -1245,6 +1088,43 @@ function renderVerdict(job) {
 
 
   renderFreshnessBadges(p);
+}
+
+function renderStrip(job, fit) {
+  const hasFit = !!fit && !isFitSkeleton(fit);
+  const set = (id, v) => { const n = $(id); if (n) n.textContent = v; };
+  if (!hasFit) {
+    set('metaStrengthNum', '-'); set('stripFit', '-'); set('stripComp', '-'); set('stripNet', '-');
+    els.metaStrength.removeAttribute('data-band');
+    els.metaSharkImg.hidden = true;
+    els.metaSharkIcon.removeAttribute('data-tier');
+    set('metaSharkLabel', 'Unscored');
+    els.metaShark.title = 'Run Fit to score this role.';
+    return;
+  }
+  const strength = computeStrengthScore(job, { compTargets, followMap });
+  // Connections: scale the 0-20 component to 0-100 so it reads like fit and comp.
+  const conn = strength.breakdown?.connections;
+  const rs = job.analyses?.requirements?.summary;
+  const comp = compStripScore(job);
+  set('metaStrengthNum', String(strength.score));
+  set('stripFit', String(roundFitToTens(fit.fitScore ?? 0)));
+  set('stripComp', comp == null ? '-' : String(comp));
+  set('stripNet', String(conn && conn.max ? Math.round((conn.score / conn.max) * 100) : 0));
+  $('partFit').title = `Fit score: the model's overall match against your profile.${rs
+    ? ` Requirements: ${rs.covered} covered, ${rs.partial} partial, ${rs.gap} gaps of ${rs.total}${rs.mustGaps ? ` (${rs.mustGaps} must-have gap${rs.mustGaps === 1 ? '' : 's'})` : ''}.` : ''}`;
+  els.metaStrength.dataset.band = strength.score >= 75 ? 'strong' : strength.score >= 50 ? 'fair' : 'weak';
+  if (strength.tierImage) {
+    els.metaSharkImg.src = chrome.runtime.getURL(strength.tierImage);
+    els.metaSharkImg.alt = `${strength.tierLabel} shark`;
+    els.metaSharkImg.hidden = false;
+  }
+  els.metaSharkIcon.setAttribute('data-tier', strength.tier);
+  set('metaSharkLabel', strength.tierLabel);
+  els.metaShark.title = `${strength.tierLabel} shark: ${strength.tierDescription || 'strength tier'}. `
+    + `Strength ${strength.score}/100 = fit ${strength.breakdown.fit.note} · `
+    + `comp ${strength.breakdown.comp.note} · connections ${strength.breakdown.connections.note}. `
+    + `Weights: fit 50% · comp 30% · connections 20%.`;
 }
 
 // Freshness and applicant badges — free facts, so they show before any
@@ -1431,9 +1311,10 @@ function renderAnalysisSection(job) {
   renderResumeCard(a.resume);
   renderAskCard(a.chats);
 
-  updateActionBarState(job);
   updateCardStatuses(a);
   selectPane(activePane);
+  renderSteps();
+  pushFlyout();
 }
 
 // Map each collapsible card to a boolean "done" test against the analyses
@@ -1456,7 +1337,6 @@ function updateCardStatuses(analyses) {
     if (!card) continue;
     card.dataset.status = test(analyses) ? 'done' : 'undone';
   }
-  for (const tab of els.analysisTabs.children) tab.dataset.status = $(`${tab.dataset.pane}Card`).dataset.status;
 }
 
 // ---------- Ask (freeform LLM prompt for this job) ----------
@@ -1631,10 +1511,7 @@ function renderFitCard(record) {
   // listing rather than a single posting. Short-circuit the normal
   // card render and show a loud banner instead so the user isn't
   // misled by an unusable analysis.
-  const isRecoverySkeleton = r.fitScore === 0
-    && Array.isArray(r.gaps)
-    && r.gaps.length === 1
-    && /^No job description was captured/i.test(r.gaps[0] || '');
+  const isRecoverySkeleton = isFitSkeleton(r);
   if (isRecoverySkeleton) {
     replaceGlance(els.fitGlance, h('span', { class: 'jc-badge', dataset: { tone: 'neg' } }, 'Not captured'));
     const singleJobUrl = currentJob?.jobId
@@ -2033,7 +1910,6 @@ function renderPrepCard(analyses) {
 
 function renderLetterCard(record) {
   els.letterOutput.innerHTML = '';
-  if (!record) setTabCount('letter', 0);
   if (!record) {
     els.letterMeta.innerHTML = '';
     els.letterMeta.append(h('span', { class: 'jc-footnote' }, 'Not generated'));
@@ -2054,7 +1930,6 @@ function renderLetterCard(record) {
 
   const flags = record.factGuard?.flags || [];
   const doc = docFromJob(currentJob, 'letter');
-  setTabCount('letter', flaggedCount(doc));
   els.letterOutput.append(...docView(doc, 'letter', els.letterError));
 
   // Inline copy link — sits at the bottom of the letter body so it's obvious
@@ -2107,7 +1982,6 @@ function renderLetterCard(record) {
 
 function renderResumeCard(record) {
   els.resumeOutput.innerHTML = '';
-  if (!record) setTabCount('resume', 0);
   if (!record) {
     els.resumeMeta.innerHTML = '';
     els.resumeMeta.append(h('span', { class: 'jc-footnote' }, 'Not generated'));
@@ -2130,7 +2004,6 @@ function renderResumeCard(record) {
   const out = els.resumeOutput;
 
   const doc = docFromJob(currentJob, 'resume');
-  setTabCount('resume', flaggedCount(doc));
   out.append(...renderAtsCheck(r, record.keywordCheck));
   if (doc) out.append(renderPageFit(doc));
   out.append(...docView(doc, 'resume', els.resumeError));
@@ -2312,7 +2185,7 @@ async function refineDocument(kind, request) {
       try { docChanged(kind, await send('document-undo', { jobId, kind })); undo.textContent = 'Undone'; }
       catch (e) { undo.disabled = false; els.askError.hidden = false; els.askError.textContent = e.message; }
     } }, 'Undo');
-    const see = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: () => selectPane(kind) }, `See the ${label}`);
+    const see = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: () => openSheet(kind) }, `See the ${label}`);
     els.askOutput.prepend(h('div', { class: 'jc-notice', dataset: { tone: res.changed ? 'pos' : 'caution' } },
       h('div', { class: 'jc-notice__body' },
         h('span', { class: 'jc-notice__title' }, res.changed ? `Changed ${res.changed} part${res.changed === 1 ? '' : 's'} of the ${label}` : `The ${label} is unchanged`),
@@ -2344,6 +2217,8 @@ function docChanged(kind, res) {
   if (res.record?.result) currentJob.analyses = { ...currentJob.analyses, [key]: res.record };
   if (kind === 'letter') renderLetterCard(currentJob.analyses.coverLetter);
   else renderResumeCard(currentJob.analyses.resume);
+  renderSteps();
+  pushFlyout();
 }
 
 // ---------- Paste an email (lib/emailView.js) ----------
@@ -2458,15 +2333,6 @@ function restoreControl(removed) {
 }
 
 // ---------- Fact-guard marks (lib/flagMarks.js) ----------
-
-// "Letter (2)" on the analysis tab when the fact guard flagged two units.
-function setTabCount(pane, n) {
-  const tab = els.analysisTabs?.querySelector(`[data-pane="${pane}"]`);
-  if (!tab) return;
-  tab.dataset.label ||= tab.textContent;
-  tab.textContent = n ? `${tab.dataset.label} (${n})` : tab.dataset.label;
-  tab.title = n ? `${n} sentence${n === 1 ? '' : 's'} with facts not found in your material or the posting` : '';
-}
 
 // The checks that stand between a generated document and an employer:
 // numbers and roles the source never states (found by text search, so
@@ -2668,11 +2534,9 @@ function applyProgressForCurrentJob() {
   const activeSet = new Set(active);
   for (const [msgType, primary] of Object.entries(ACTION_BUTTONS_BY_MSGTYPE)) {
     const btn = els[primary];
-    const twin = actionBarTwin(btn);
     const working = activeSet.has(msgType);
     const label = WORKING_LABEL[msgType] || 'Working…';
     setButtonWorkingState(btn, working, label);
-    setButtonWorkingState(twin, working, label);
     // Card processing shimmer follows the same activeSet.
     const cards = PROCESSING_CARDS[msgType] || [];
     for (const id of cards) {
@@ -2682,7 +2546,8 @@ function applyProgressForCurrentJob() {
       else delete card.dataset.processing;
     }
   }
-
+  renderSteps();
+  pushFlyout(); // a Re-run or Regenerate in the flyout shows its busy state
 }
 
 // Analysis-button el-id lookup, keyed by the msgType the button triggers.
@@ -2744,21 +2609,6 @@ const PROCESSING_CARDS = {
   'refine-document': ['askCard'],
   'review-letter':   ['letterCard'],
 };
-// Map card-button IDs to action-bar action names so we can mirror state.
-const ACTION_MIRROR = {
-  analyzeFit: 'fit',
-  analyzeComp: 'comp',
-  buildBrief: 'prep',
-  generateLetter: 'letter',
-  generateResume: 'resume',
-};
-
-function actionBarTwin(button) {
-  const action = ACTION_MIRROR[button?.id];
-  if (!action) return null;
-  return document.querySelector(`#actionBar .jc-btn[data-action="${action}"]`);
-}
-
 async function runAnalysis(button, errorEl, msgType, payload, onSuccess) {
   if (!currentJob) return;
   const jobId = payload.jobId || currentJob.jobId;
@@ -2785,6 +2635,9 @@ async function runAnalysis(button, errorEl, msgType, payload, onSuccess) {
         currentJob = { ...currentJob, analyses: refreshed.data.analyses, documents: refreshed.data.documents, warmth: refreshed.data.warmth ?? currentJob.warmth };
         renderVerdict(currentJob);
         renderAnalysisSection(currentJob);
+        // A finished step opens its detail, unless a sheet is covering the tab.
+        const step = MSG_STEP[msgType];
+        if (step && !els.body.dataset.sheet && stepStates(currentJob.analyses).done[step]) showFlyout(step);
       }
     }
   } catch (e) {
@@ -2847,6 +2700,228 @@ els.askSend?.addEventListener('click', async () => {
 // to save the current scraped job on demand (e.g., before running an
 // analysis on a job that isn't yet archived), runAnalysis handles that inline.
 
+// ---------- Steps (Cast and Bait rows) and the flyout ----------
+//
+// The four rows are views of the analyses: Run when not done, a summary
+// when done. Clicking a done row opens its flyout (lib/flyoutView.js) on
+// the LinkedIn page, left of this panel; on any other page the same view
+// opens over this panel instead.
+
+const STEP_MSG = { fit: 'analyze-fit', comp: 'analyze-comp', resume: 'generate-resume', letter: 'generate-letter' };
+const MSG_STEP = Object.fromEntries(Object.entries(STEP_MSG).map(([step, msg]) => [msg, step]));
+const STEP_ROW = { fit: 'rowFit', comp: 'rowComp', resume: 'rowResume', letter: 'rowLetter' };
+const STEP_LABEL = { fit: 'Fit', comp: 'Comp', resume: 'Resume', letter: 'Cover letter' };
+const RUN_LABEL = { fit: 'Run fit', comp: 'Run comp', resume: 'Generate', letter: 'Generate' };
+const BAND_TONE = { strong: 'pos', fair: 'caution', weak: 'neg' };
+
+let flyoutStep = null;   // step whose detail is open
+let flyoutTabId = null;  // page tab showing it; null when it is the in-panel overlay
+let panelFlyout = null;
+let currentTabUrl = '';
+
+const spinner = (label) => [h('span', { class: 'jb-spin', 'aria-hidden': 'true' }), h('span', { class: 'jb-busy' }, label)];
+const runBtn = (step, primary) => h('button', {
+  class: 'jc-btn', 'data-size': 'sm', type: 'button', ...(primary ? { 'data-variant': 'primary' } : {}),
+  onClick: (e) => { e.stopPropagation(); runAction(step); },
+}, RUN_LABEL[step]);
+// A small button in a row. It must not also open the flyout.
+const quickBtn = (label, done, doneLabel = 'Copied') => {
+  const b = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: async (e) => {
+    e.stopPropagation();
+    await done();
+    b.textContent = doneLabel;
+    setTimeout(() => { if (b.isConnected) b.textContent = label; }, 1200);
+  } }, label);
+  return b;
+};
+const docLine = (kind, record, extra) => {
+  const doc = docFromJob(currentJob, kind);
+  const flagged = doc ? flaggedCount(doc) : 0;
+  return [`${doc?.current || 'v1'} ready`, fmtShortDate(record.generatedAt), extra, flagged ? `${flagged} to check` : null].filter(Boolean).join(' · ');
+};
+const chev = () => h('span', { class: 'jb-chev', 'aria-hidden': 'true' }, '‹');
+
+const ROW_PARTS = {
+  fit: ({ a, done, busy, next }) => {
+    const title = h('span', { class: 'jb-row__title' }, 'Fit');
+    if (busy) return { main: [title, h('span', { class: 'jb-row__sub' }, 'Reading the posting against your profile')], end: spinner('Casting…') };
+    if (done) {
+      const v = fitView(a.fit.result);
+      const tone = BAND_TONE[v.band];
+      return {
+        main: [title, h('span', { class: 'jb-row__sub jb-trunc', title: v.topGap || '' }, v.topGap ? `Top gap: ${v.topGap}` : 'No gaps found')],
+        end: [h('span', { class: `jb-score tone-${tone}` }, String(v.score)), h('span', { class: `jb-score__lbl tone-${tone}` }, v.label), chev()],
+      };
+    }
+    return {
+      main: [title, h('span', { class: 'jb-row__sub' }, a.fit ? 'The description was not captured. Open the single job view and run again.' : 'How well you match this role')],
+      end: [runBtn('fit', next)],
+    };
+  },
+  comp: ({ a, done, busy, next }) => {
+    const title = h('span', { class: 'jb-row__title' }, 'Comp');
+    if (busy) return { main: [title, h('span', { class: 'jb-row__sub' }, 'Finding the pay range')], end: spinner('Casting…') };
+    const v = done && compView(a.comp, compTargets || {});
+    if (v) {
+      const answer = v.answer?.number != null ? h('span', { class: 'jb-row__sub' }, 'Pay answer ',
+        h('b', { class: 'jb-mono' }, v.answer.numberText),
+        quickBtn('Copy', () => navigator.clipboard.writeText(String(v.answer.number)))) : null;
+      return {
+        main: [
+          h('span', { class: 'jb-row__titleline' }, title,
+            h('span', { class: `jb-chip tone-${v.badge.tone}`, title: v.estimate ? 'The model\'s own estimate, not a pay database.' : 'Stated in the posting.' }, v.badge.label)),
+          h('span', { class: 'jb-row__sub' }, h('b', { class: 'jb-mono jb-range' }, `${v.estimate && v.range ? '~' : ''}${v.range || 'No range'}`),
+            v.verdict ? h('span', { class: `tone-${v.verdict.tone}` }, v.verdict.label) : null),
+          answer,
+        ],
+        end: [chev()],
+      };
+    }
+    return { main: [title, h('span', { class: 'jb-row__sub' }, done ? 'No pay found. Run again.' : 'Pay range and what to say if asked')], end: [runBtn('comp', next || done)] };
+  },
+  resume: ({ a, done, busy, next }) => {
+    const title = h('span', { class: 'jb-row__title' }, 'Resume');
+    if (busy) return { main: [title, h('span', { class: 'jb-row__sub' }, 'Tailoring to this posting')], end: spinner('Baiting…') };
+    if (done) return { main: [title, h('span', { class: 'jb-row__sub' }, docLine('resume', a.resume))], end: [quickBtn('↓ PDF', () => els.resumeDownload.click(), '✓ Opened')] };
+    return { main: [title, h('span', { class: 'jb-row__sub' }, 'Tailored to this posting')], end: [runBtn('resume', next)] };
+  },
+  letter: ({ a, done, busy, next }) => {
+    const title = h('span', { class: 'jb-row__titleline' }, h('span', { class: 'jb-row__title' }, 'Cover letter'), h('span', { class: 'jb-opt' }, 'optional'));
+    if (busy) return { main: [title, h('span', { class: 'jb-row__sub' }, 'Writing in your voice')], end: spinner('Baiting…') };
+    if (done) return { main: [title, h('span', { class: 'jb-row__sub' }, docLine('letter', a.coverLetter, TONES[toneKey(a.coverLetter.tone)].label))], end: [quickBtn('Copy', () => els.letterCopy.click())] };
+    return { main: [title, h('span', { class: 'jb-row__sub' }, 'Only if the application asks for one')], end: [runBtn('letter', next)] };
+  },
+};
+
+function paintRow(step, st, busy, a) {
+  const row = $(STEP_ROW[step]);
+  const done = st.done[step];
+  const open = flyoutStep === step;
+  row.dataset.state = busy ? 'running' : done ? 'done' : st.next === step ? 'next' : 'todo';
+  row.dataset.open = String(open && done);
+  if (done) {
+    row.setAttribute('role', 'button'); row.tabIndex = 0;
+    row.setAttribute('aria-expanded', String(open));
+    row.title = `${open ? 'Close' : 'Show'} ${STEP_LABEL[step]} detail`;
+  } else {
+    for (const attr of ['role', 'tabindex', 'aria-expanded', 'title']) row.removeAttribute(attr);
+  }
+  const { main, end } = ROW_PARTS[step]({ a, done, busy, next: st.next === step });
+  row.replaceChildren(
+    h('span', { class: 'jb-badge', 'aria-hidden': 'true' }, done ? '✓' : String(STEPS.indexOf(step) + 1)),
+    h('div', { class: 'jb-row__main' }, ...main),
+    h('div', { class: 'jb-row__end' }, ...end));
+}
+
+function renderSteps() {
+  const job = currentJob;
+  if (!job || !els.rowFit) return;
+  const a = job.analyses || {};
+  const st = stepStates(a);
+  const active = new Set(inFlightByJob.get(job.jobId) || []);
+  for (const step of STEPS) paintRow(step, st, active.has(STEP_MSG[step]), a);
+  // A weak fit dims what comes after it (CSS) and says why. Nothing is disabled.
+  els.verdictBlock.dataset.weak = String(st.weak);
+  els.weakNote.hidden = !st.weak;
+  if (st.weak) els.weakNote.textContent = `Weak fit (${a.fit.result.fitScore}). Read the gaps before you spend more time on this one.`;
+  if (st.applyPrimary) els.companyCareersSearch.dataset.variant = 'primary';
+  else els.companyCareersSearch.removeAttribute('data-variant');
+}
+
+for (const step of STEPS) {
+  const row = $(STEP_ROW[step]);
+  const toggle = () => (flyoutStep === step ? closeFlyout() : showFlyout(step));
+  row.addEventListener('click', (e) => { if (row.dataset.state === 'done' && !e.target.closest('button, a')) toggle(); });
+  row.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target === row && row.dataset.state === 'done') { e.preventDefault(); toggle(); }
+  });
+}
+
+// What the flyout shows, as plain data (it runs in the page, not here).
+function flyoutPayload(step) {
+  const job = currentJob;
+  const a = job?.analyses || {};
+  if (!job || !stepStates(a).done[step]) return null;
+  const p = job.posting || {};
+  const base = {
+    job: [p.title, p.company].filter(Boolean).join(' at '),
+    busy: (inFlightByJob.get(job.jobId) || []).includes(STEP_MSG[step]),
+  };
+  if (step === 'fit') return { ...base, fit: fitView(a.fit.result) };
+  if (step === 'comp') {
+    const comp = compView(a.comp, compTargets || {});
+    return comp ? { ...base, comp } : null;
+  }
+  const isLetter = step === 'letter';
+  const record = isLetter ? a.coverLetter : a.resume;
+  const doc = docFromJob(job, step);
+  const r = record.result || {};
+  const text = isLetter ? (r.letter || '') : resumeToPlainText(r);
+  return {
+    ...base, kind: step, preview: text, copyText: text,
+    meta: `${doc?.current || 'v1'} · ${fmtShortDate(record.generatedAt)}${isLetter ? ` · ${TONES[toneKey(record.tone)].label}` : ''}`,
+    tone: els.letterTone.value, tones: Object.entries(TONES).map(([key, t]) => ({ key, label: t.label })),
+    canUndo: !!(doc && undoTarget(doc)), flagged: doc ? flaggedCount(doc) : 0,
+  };
+}
+
+async function showFlyout(step) {
+  const payload = flyoutPayload(step);
+  if (!payload) return closeFlyout();
+  if (flyoutStep !== step) { flyoutStep = step; renderSteps(); }
+  const onLinkedIn = currentTabId != null && /^https:\/\/www\.linkedin\.com\//.test(currentTabUrl);
+  let delivered = false;
+  if (onLinkedIn) {
+    try { delivered = !!(await chrome.tabs.sendMessage(currentTabId, { type: 'jawbar:flyout', step, payload }))?.ok; }
+    catch { /* content script not on this page (e.g. the extension was just reloaded) */ }
+  }
+  if (flyoutStep !== step) return; // closed or swapped while waiting
+  if (delivered) {
+    flyoutTabId = currentTabId;
+    panelFlyout?.close({ silent: true });
+  } else {
+    flyoutTabId = null;
+    panelFlyout ||= createFlyout({ mode: 'panel', onAction: flyoutAction, onClose: flyoutClosed });
+    panelFlyout.show(step, payload);
+  }
+}
+
+function closeFlyout() {
+  const tab = flyoutTabId;
+  const had = flyoutStep;
+  flyoutStep = null; flyoutTabId = null;
+  panelFlyout?.close({ silent: true });
+  if (tab != null) chrome.tabs.sendMessage(tab, { type: 'jawbar:flyout-close' }).catch(() => {});
+  if (had) renderSteps();
+}
+
+function flyoutClosed() { flyoutStep = null; flyoutTabId = null; renderSteps(); }
+
+// Fresh data for an open flyout; closes it if its step is no longer done.
+function pushFlyout() {
+  if (flyoutStep && currentJob) showFlyout(flyoutStep);
+}
+
+function flyoutAction(action, { step, tone } = {}) {
+  if (!currentJob) return;
+  switch (action) {
+    case 'rerun': case 'regenerate': return runAction(step);
+    case 'details': return els.openFullView.click();
+    case 'pdf': return (step === 'resume' ? els.resumeDownload : els.letterPdf).click();
+    case 'compare': case 'history': return openSheet(step);
+    case 'tone':
+      els.letterTone.value = tone;
+      els.letterTone.dispatchEvent(new Event('change'));
+      return;
+    case 'undo':
+      return send('document-undo', { jobId: currentJob.jobId, kind: step })
+        .then((res) => docChanged(step, res))
+        .catch((e) => { els.letterError.hidden = false; els.letterError.textContent = e.message; });
+  }
+}
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && flyoutStep) closeFlyout(); });
+
 // ---------- Print / PDF ----------
 
 async function openPrintTab({ kind, company, body, resume, header, candidateName }) {
@@ -2868,8 +2943,14 @@ async function openPrintTab({ kind, company, body, resume, header, candidateName
 
 // ---------- Init + listeners ----------
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg?.type === 'PROGRESS') { onProgress(msg); return; }
+  // The page flyout talking back. Only the tab it is showing in counts.
+  if (msg?.type === 'jawbar:flyout-action' || msg?.type === 'jawbar:flyout-closed') {
+    if (sender?.id !== chrome.runtime.id || sender.tab?.id !== flyoutTabId) return;
+    if (msg.type === 'jawbar:flyout-closed') flyoutClosed(); else flyoutAction(msg.action, msg);
+    return;
+  }
   if (msg?.type === 'current-job-updated') {
     // Only apply if this update belongs to the tab this panel is currently
     // watching. A LinkedIn tab in another window shouldn't repaint this
@@ -2949,6 +3030,7 @@ async function loadForActiveTab() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, windowId: panelWindowId });
     currentTabId = tab?.id ?? null;
+    currentTabUrl = tab?.url || '';
     renderSearchContext(tab?.url || null);
     if (currentTabId == null) { await renderJob(null); return; }
     const { data: job } = await send('get-current-job', { tabId: currentTabId });

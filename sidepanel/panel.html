@@ -29,6 +29,10 @@
             <img src="../assets/jawbridge.png" alt="" class="jc-header-linkbtn__icon" width="16" height="16">
             <span class="jc-brand">Jawbridge</span>
           </button>
+          <a class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" href="https://www.linkedin.com/jobs-tracker/" target="_blank" rel="noopener noreferrer" title="Open your Job Tracker on LinkedIn">
+            <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true">
+            <span>Job Tracker</span>
+          </a>
           <button id="openOptions" class="jc-btn" data-size="sm" data-icon-only type="button" aria-label="Settings" title="Settings">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <circle cx="12" cy="12" r="3"></circle>
@@ -144,175 +148,100 @@
 
         <!-- Save this search — moved above #body so it stays visible on
              any tab. See #searchContext higher up in this file. -->
-        <!-- Sticky verdict (rendered when analyzed) -->
+        <!-- Jawb tab. Top to bottom: the job, Cast (is it worth it), the
+             corp-site apply link, Bait (what to send), then the utility row.
+             Detail for a finished step opens in the flyout (lib/flyoutView.js). -->
         <div class="jc__verdict" id="verdictBlock" hidden>
-          <!-- Cast/Bait action bar moved into the jobcard control-panel
-               row below so all buttons live in one region. -->
-          <!-- Job header card — mockup 1a's report-first layout.
-               Order (top → bottom): mini hunt, strength strip, title,
-               company, control-panel button rows. Grouped into one
-               bordered card so it reads as a single object. -->
-          <div class="jc-jobcard">
-            <!-- Mini hunt strip — 3 canonical stages centered on the
-                 current status. Lives on its own row at the top of
-                 the card so the barrel/fin/dashed markers and their
-                 labels have full card width to breathe. -->
-            <ol id="miniHunt" class="mini-hunt" hidden></ol>
-            <!-- Strength strip: sits directly under the hunt so the
-                 big number + shark tier + gauges land as the second
-                 read after the hunt progress. Hidden until a fit
-                 result exists (that's what unlocks the composite). -->
-            <div class="jc-meta-strip" id="metaStrip" hidden>
-              <!-- Big strength score — the composite fit/comp/network
-                   number, promoted from the meta gauge trio to a hero
-                   moment on the left. Shark tier icon sits next to it
-                   as the visual anchor. -->
+          <div class="jc-jobcard jb-head">
+            <!-- Captured, Saved, Applied: the three stages around the
+                 current one. Click a stage to set it by hand. -->
+            <div class="jb-status">
+              <ol id="miniHunt" class="mini-hunt" hidden></ol>
+              <div class="jb-menu">
+                <button id="jobMenuBtn" class="jc-btn" data-variant="ghost" data-size="sm" data-icon-only type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="jobMenu" aria-label="More for this jawb" title="More" hidden>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+                </button>
+                <div id="jobMenu" class="jb-pop" role="menu" hidden>
+                  <button id="deleteJob" class="jb-pop__item" data-danger role="menuitem" type="button" title="Delete all stored information about this position from the Jawboard (analyses, chats, timeline, notes). This cannot be undone." hidden>Delete this jawb</button>
+                </div>
+              </div>
+            </div>
+            <h2 class="jc-job-title" id="jobTitle"></h2>
+            <div class="jc-job-eyebrow"><span id="jobCompany"></span><span id="jobMetaRest" class="jc-job-meta__rest"></span></div>
+            <!-- Strength: the composite, its shark, then the three parts. -->
+            <div class="jb-strip" id="metaStrip">
               <span class="jc-meta-strip__strength" id="metaStrength" title="Strength = fit 50% · comp 30% · connections 20%">
                 <span class="jc-meta-strip__strength-num" id="metaStrengthNum">-</span>
               </span>
-              <span class="jc-meta-strip__item" id="metaShark" title="">
-                <span class="jc-meta-strip__shark-icon" id="metaSharkIcon">
-                  <img id="metaSharkImg" src="" alt="" width="20" height="20" />
-                </span>
-                <span class="jc-meta-strip__label" id="metaSharkLabel">-</span>
+              <span class="jb-strip__shark" id="metaShark" title="">
+                <span class="jc-meta-strip__shark-icon" id="metaSharkIcon"><img id="metaSharkImg" src="" alt="" width="20" height="20" hidden /></span>
+                <span class="jb-strip__tier" id="metaSharkLabel">Unscored</span>
               </span>
-              <span class="jc-meta-strip__item" title="Fit score: LLM's holistic match against your profile">
-                <svg class="jc-gauge" id="fitGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Fit score">
-                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
-                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="fitGaugeFill" stroke-dasharray="0 75.4"></circle>
-                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="fitGaugeText">-</text>
-                </svg>
-                <span class="jc-meta-strip__label">Fit</span>
-              </span>
-              <span class="jc-meta-strip__item" title="Connections: actionable people in your network for this role">
-                <svg class="jc-gauge" id="connectionsGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Connections score">
-                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
-                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="connectionsGaugeFill" stroke-dasharray="0 75.4"></circle>
-                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="connectionsGaugeText">-</text>
-                </svg>
-                <span class="jc-meta-strip__label">Connections</span>
-              </span>
-              <span class="jc-meta-strip__item" id="compGaugeGroup" title="Posted / analyzed comp range vs your target salary" hidden>
-                <svg class="jc-gauge" id="compGauge" data-band="fair" width="30" height="30" viewBox="0 0 30 30" role="img" aria-label="Comp vs target">
-                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" class="jc-gauge__track"></circle>
-                  <circle cx="15" cy="15" r="12" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 15 15)" class="jc-gauge__fill" id="compGaugeFill" stroke-dasharray="0 75.4"></circle>
-                  <text x="15" y="19" text-anchor="middle" class="jc-gauge__text" id="compGaugeText">-</text>
-                </svg>
-                <span class="jc-meta-strip__label">Comp</span>
+              <span class="jb-strip__parts">
+                <span class="jb-part" id="partFit" title="Fit score: the model's overall match against your profile."><i>Fit</i><b id="stripFit">-</b></span>
+                <span class="jb-part" id="partComp" title="Posted / analyzed comp range vs your target salary"><i>Comp</i><b id="stripComp">-</b></span>
+                <span class="jb-part" id="partNet" title="Connections: actionable people in your network for this role"><i>Network</i><b id="stripNet">-</b></span>
               </span>
             </div>
-            <!-- Title reads first; company drops below as the eyebrow
-                 so the role name is the dominant scan target. -->
-            <h2 class="jc-job-title" id="jobTitle"></h2>
-            <span id="jobCompany" class="jc-job-eyebrow"></span>
-            <!-- Control panel — every button lives in one region.
-                 Row 1: Details / Corp Site / Job Tracker / Delete
-                 Row 2: Cast (Fit, Comp)
-                 Row 3: Bait (Cover letter, Resume, Prep brief) -->
-            <div class="jc-jobcard__actions">
-              <div class="jc-btn-row">
-                <button id="openFullView" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" type="button" aria-label="Open full page view for this jawb" title="Open the full page view for this jawb: interview rounds, timeline, comp, offer form, and everything else that doesn't fit in the Jawbar."><span class="jc-details-arrow" aria-hidden="true">←</span>Details</button>
-                <a id="companyCareersSearch" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" title="Google search for '[Company] Careers - [Jawb Title]'. It often lands directly on the same role on the company's own careers site.">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path>
-                  </svg>
-                  <span>Corp Site</span>
-                </a>
-                <!-- Find on LinkedIn's own job tracker — opens the
-                     tracker at the stage matching this job's status,
-                     walks the pages to find the row, and flashes a
-                     highlight around it. Disabled until a job with a
-                     tracker-eligible status is loaded. -->
-                <button id="findOnTracker" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" type="button" aria-label="Update this job's status in LinkedIn's Job Tracker" title="Opens LinkedIn's Job Tracker at this job so you can change its status there. Jawbs picks up the change." hidden>
-                  <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
-                  <span>Update status</span>
-                </button>
-                <!-- Delete lives at the tail of the action row now,
-                     rendered as an icon-only danger button — the red
-                     trash glyph carries the destructive intent on its
-                     own. -->
-                <button id="deleteJob" class="jc-btn jc-jobcard__delete" data-variant="danger" data-size="sm" data-icon-only type="button" aria-label="Delete this jawb" title="Delete all stored information about this position from the Jawboard (analyses, chats, timeline, notes). This cannot be undone." hidden>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 6h18"/><path d="M19 6l-1.2 13.2A2 2 0 0 1 15.8 21H8.2a2 2 0 0 1-2-1.8L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
-                  </svg>
-                </button>
-              </div>
-              <!-- Confirm on LinkedIn — dedicated row so the wide CTA
-                   doesn't overflow the primary Details / Corp Site /
-                   Job Tracker row. Shown only while the jawb is in the
-                   Applied mini-hunt band AND the user hasn't already
-                   dismissed it by clicking through once (state is
-                   persisted at ui.confirmedLinkedIn). -->
-              <div class="jc-btn-row jc-btn-row--secondary">
-                <a id="confirmOnLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="highlight" data-size="sm" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" aria-label="Confirm applied on LinkedIn tracker" title="Open LinkedIn's tracker at the Clicked Apply stage, find this jawb, and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>
-                  <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
-                  <span>Transition to 'Applied' on LinkedIn</span>
-                </a>
-                <!-- Network at company — opens LinkedIn People search
-                     filtered to 1st + 2nd degree connections whose
-                     keywords match the company name. Shown only for
-                     saved (or later-stage) jawbs so the primary
-                     Analyzed-only path isn't cluttered with
-                     already-you-should-be-networking affordances. -->
-                <a id="networkAtCompany" class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" aria-label="Find 1st and 2nd degree connections at this company on LinkedIn" title="Find your 1st and 2nd degree LinkedIn connections at this company." hidden>
-                  <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
-                  <span>Network</span>
-                </a>
-                <!-- A recruiter emailed: match it to a jawb, read what it
-                     means, move the status, add the round, draft a reply. -->
-                <button id="pasteEmail" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-expanded="false" aria-controls="emailPanel" title="Paste an email from a recruiter or employer: Jawbs finds the jawb it's about, reads what it means and drafts a reply.">Paste an email</button>
-              </div>
-              <span id="jobMetaRest" class="jc-job-meta__rest"></span>
-            </div>
-            <!-- Cast + Bait action bar — analysis and generation
-                 shortcuts, immediately below the navigation row so
-                 every button reads as part of one control panel. -->
-            <div class="jc-action-bar" id="actionBar">
-              <div class="action-row">
-                <span class="action-row__label">
-                  <span class="action-row__title">Cast</span>
-                  <span class="action-row__sub">Analysis</span>
-                </span>
-                <button class="jc-btn" data-size="sm" data-action="fit" type="button">Fit</button>
-                <button class="jc-btn" data-size="sm" data-action="comp" type="button">Comp</button>
-              </div>
-              <div class="action-row">
-                <span class="action-row__label">
-                  <span class="action-row__title">Bait</span>
-                  <span class="action-row__sub">Generation</span>
-                </span>
-                <button class="jc-btn" data-size="sm" data-action="letter" type="button" title="Warm tone">Cover letter</button>
-                <button class="jc-btn" data-size="sm" data-action="resume" type="button">Resume/CV</button>
-                <button class="jc-btn" data-size="sm" data-action="prep" type="button">Prep brief</button>
-              </div>
-              <!-- Bait outputs — quick actions on already-generated
-                   artifacts. Split off from the Bait row so the wide
-                   "Copy" / "Download" labels stop squeezing the three
-                   generation buttons above. The whole row collapses
-                   (see .action-row--outputs CSS) when no children are
-                   visible, so a fresh jawb with nothing generated
-                   still renders cleanly. -->
-              <div class="action-row action-row--outputs">
-                <span class="action-row__label" aria-hidden="true"></span>
-                <button id="letterCopyTop" class="jc-btn" data-size="sm" type="button" title="Copy the generated cover letter" hidden>📋 Copy cover letter</button>
-                <button id="resumeDownloadTop" class="jc-btn" data-size="sm" type="button" title="Open the tailored resume as a formatted PDF; the browser's print dialog opens automatically with 'Save as PDF' preselected." hidden>↓ Download resume</button>
-              </div>
-            </div>
-            <!-- Comp source note + one-line fit summary retired — the
-                 comp analysis card carries the source label, and the
-                 fit card carries the same alignment/gap sentence. The
-                 sidebar header stayed clogged with two paragraphs of
-                 body-copy that repeated what's already below. Kept the
-                 hidden placeholders so the render code can no-op on
-                 them without null guards. -->
-            <p class="jc-meta-strip__source" id="compSourceNote" hidden aria-hidden="true"></p>
-            <p id="jobFitSummary" class="jc-jobcard__summary" hidden aria-hidden="true"></p>
           </div>
           <div class="jc-verdict-badges" id="verdictBadges"></div>
-          <!-- Same job on the employer's own careers site, via freehire.me
-               (Settings → Shortcuts → Company-site lookup). -->
-          <div id="companySite" class="jc-company-site" hidden></div>
+
+          <!-- CAST: Is this worth pursuing? -->
+          <section class="jb-sec" aria-labelledby="castH">
+            <h3 class="jb-sec__h" id="castH"><span>Cast</span><em>Is this worth pursuing?</em></h3>
+            <div class="jb-row" id="rowFit" data-step="fit"></div>
+            <p class="jb-weak" id="weakNote" hidden></p>
+            <div class="jb-later">
+              <div class="jb-row" id="rowComp" data-step="comp"></div>
+            </div>
+          </section>
+
+          <!-- Apply on the employer's own site -->
+          <section class="jb-sec jb-later jb-apply" id="applySec">
+            <a id="companyCareersSearch" class="jc-btn jb-apply__btn" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" title="Google search for '[Company] Careers - [Jawb Title]'. It often lands directly on the same role on the company's own careers site.">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+              <span>Apply on corp site</span>
+            </a>
+            <p class="jb-caption">So your application isn't tracked as coming from LinkedIn.</p>
+            <!-- Same job on the employer's own careers site, via freehire.me
+                 (Settings → Shortcuts → Company-site lookup). -->
+            <div id="companySite" class="jc-company-site" hidden></div>
+            <!-- Applied on the corp site: tell LinkedIn too. Shown only in the Applied band. -->
+            <a id="confirmOnLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="highlight" data-size="sm" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" aria-label="Confirm applied on LinkedIn tracker" title="Open LinkedIn's tracker at the Clicked Apply stage, find this jawb, and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>
+              <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
+              <span>Transition to 'Applied' on LinkedIn</span>
+            </a>
+          </section>
+
+          <!-- BAIT: Tailor what you send -->
+          <section class="jb-sec jb-later" aria-labelledby="baitH">
+            <h3 class="jb-sec__h" id="baitH"><span>Bait</span><em>Tailor what you send</em></h3>
+            <div class="jb-row" id="rowResume" data-step="resume"></div>
+            <div class="jb-row" id="rowLetter" data-step="letter"></div>
+          </section>
+
           <div id="emailPanel" class="jc-email-panel" hidden></div>
+          <div class="jb-spacer"></div>
+
+          <!-- Utility row, pinned to the bottom of the scroll area. -->
+          <div class="jb-bar" id="jbBar">
+            <button id="openFullView" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-label="Open full page view for this jawb" title="Open the full page view for this jawb: interview rounds, timeline, comp, offer form, and everything else that doesn't fit in the Jawbar."><span class="jc-details-arrow" aria-hidden="true">←</span> Details</button>
+            <!-- Opens LinkedIn's Job Tracker at this job so its status can be changed there. -->
+            <button id="findOnTracker" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-label="Update this job's status in LinkedIn's Job Tracker" title="Opens LinkedIn's Job Tracker at this job so you can change its status there. Jawbs picks up the change." hidden>
+              <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
+              <span>Status</span>
+            </button>
+            <a id="networkAtCompany" class="jc-btn" data-variant="ghost" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" aria-label="Find 1st and 2nd degree connections at this company on LinkedIn" title="Find your 1st and 2nd degree LinkedIn connections at this company." hidden>Network</a>
+            <button id="pasteEmail" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-expanded="false" aria-controls="emailPanel" title="Paste an email from a recruiter or employer: Jawbs finds the jawb it's about, reads what it means and drafts a reply.">Paste email</button>
+            <div class="jb-menu jb-menu--up">
+              <button id="moreBtn" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu">More ▴</button>
+              <div id="moreMenu" class="jb-pop jb-pop--up" role="menu" hidden>
+                <button class="jb-pop__item" role="menuitem" type="button" data-sheet="prep"><span>Prep brief</span><small>For scheduled interviews</small></button>
+                <button class="jb-pop__item" role="menuitem" type="button" data-sheet="ask"><span>Chat with AI</span></button>
+                <button class="jb-pop__item" role="menuitem" type="button" data-sheet="offer"><span>Record an offer</span></button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Notices (degraded, missing key, error) -->
@@ -378,19 +307,16 @@
           </div>
         </div>
 
-        <!-- Analysis cards -->
+        <!-- Analysis cards. Not shown on the Jawb tab: they still render the
+             editors (resume/letter units and history, chat, prep, offer form)
+             and run the analyses. "More" and the flyout's links open one of
+             them here as a sheet over the tab. -->
+        <div id="jbSheet" class="jb-sheet">
+          <div class="jb-sheet__bar">
+            <button id="jbSheetBack" class="jc-btn" data-variant="ghost" data-size="sm" type="button">← Back</button>
+            <strong id="jbSheetTitle"></strong>
+          </div>
         <div id="analysisSection" class="jc-group" hidden>
-          <!-- Analysis tabs — one pane shows at a time. The strip pins
-               under the top-level tabs while the pane scrolls, so every
-               analysis stays one click away. -->
-          <nav class="jc-subtabs" id="analysisTabs" role="tablist" aria-label="Analysis">
-            <button type="button" class="jc-tab" data-pane="fit" role="tab">Fit</button>
-            <button type="button" class="jc-tab" data-pane="comp" role="tab">Comp</button>
-            <button type="button" class="jc-tab" data-pane="prep" role="tab">Prep</button>
-            <button type="button" class="jc-tab" data-pane="resume" role="tab">Resume</button>
-            <button type="button" class="jc-tab" data-pane="letter" role="tab">Letter</button>
-            <button type="button" class="jc-tab" data-pane="ask" role="tab">Chat</button>
-          </nav>
 
           <!-- Career fit -->
           <div class="jc-card jc-card--tone" data-category="fit" id="fitCard" data-open="false">
@@ -595,6 +521,7 @@
             </div>
           </div>
 
+        </div>
         </div>
 
         <p class="jc-footnote" id="statusText"></p>

@@ -47,6 +47,7 @@ import {
 import { MODEL_IDS } from './lib/models.js';
 import { FIT_SYSTEM, FIT_PROMPT_VERSION, buildFitUserMessage } from './lib/prompts/fit.js';
 import { COMP_SYSTEM, COMP_PROMPT_VERSION, buildCompUserMessage } from './lib/prompts/comp.js';
+import { normalizeComp } from './lib/jawbSteps.js';
 import {
   BRIEF_SYSTEM, QUESTION_PROMPT_VERSION, buildBriefUserMessage,
 } from './lib/prompts/questionPrep.js';
@@ -1892,7 +1893,7 @@ async function runComp(jobId) {
   const modelLabel = r.provider === 'local' ? `local:${r.model}` : r.model;
   await addUsage({ model: modelLabel, usage: r.usage });
   const record = {
-    result: r.result, model: modelLabel, usage: r.usage, retried: r.retried,
+    result: normalizeComp(r.result, { target: ctx.comp?.target }), model: modelLabel, usage: r.usage, retried: r.retried,
     provider: r.provider, fellback: r.fellback,
     generatedAt: new Date().toISOString(),
     promptVersion: COMP_PROMPT_VERSION,
