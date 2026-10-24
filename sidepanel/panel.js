@@ -976,7 +976,6 @@ function renderVerdict(job) {
 
   const p = job.posting || {};
   els.jobTitle.textContent = p.title || '(no title extracted)';
-  renderCompanySite(job);
 
   // Mini hunt strip — 3-stage window on the 5-stage Captured → Saved →
   // Applied → Interviewing → Offer journey. Replaces the old single
@@ -1148,16 +1147,6 @@ function renderFreshnessBadges(p) {
     const tone = count && count > 100 ? 'neg' : count && count > 50 ? 'caution' : undefined;
     els.verdictBadges.append(h('span', { class: 'jc-badge', dataset: tone ? { tone } : {} }, p.applicantCount));
   }
-}
-
-// ---------- Company-site lookup ----------
-//
-// The same job on the employer's own careers page (freehire.me). Nothing
-// is shown; the lookup runs so the service worker keeps the match, and Comp
-// reads pay from it when LinkedIn shows none.
-function renderCompanySite(job) {
-  send('company-site-lookup', { jobId: job.jobId, title: job.posting?.title, company: job.posting?.company, location: job.posting?.location })
-    .catch(() => {});
 }
 
 function fmtShortDate(iso) {
