@@ -1321,7 +1321,7 @@ mark.jc-flagged, li.jc-flagged {
 .jc__footer { padding: 6px var(--jc-4); }
 .usage-strip { font: 400 11px/1.2 var(--jc-font-mono); color: var(--jc-text-3); }
 
-.jc__verdict { flex: 1 0 auto; display: flex; flex-direction: column; gap: 0; padding: 0; background: none; border-bottom: 0; font-family: var(--jc-font); }
+.jc__verdict { z-index: auto; /* the base sheet gives it z 5, which flex items honor and which put it over the sticky tabs */ flex: 1 0 auto; display: flex; flex-direction: column; gap: 0; padding: 0; background: none; border-bottom: 0; font-family: var(--jc-font); }
 .jc__verdict[hidden], .jc__verdict [hidden] { display: none !important; }
 #body[data-active-tab="current"] { padding-bottom: 0; }
 #body[data-active-tab="current"]:has(#verdictBlock:not([hidden])) #statusText { display: none; }
