@@ -1461,3 +1461,6 @@ mark.jc-flagged, li.jc-flagged {
 .jb-row[data-cta] { grid-template-columns: 22px 100px minmax(0, 1fr); }
 .jb-row[data-cta] .jb-row__end { justify-content: flex-start; }
 .jb-row[data-cta] .jb-row__end .jc-btn { width: 100%; }
+.jb-row[data-merged] { grid-template-columns: 118px minmax(0, 1fr); }
+.jb-row .jc-btn .jb-badge { width: 18px; height: 18px; font-size: 11px; flex: none; }
+.jb-row .jc-btn[data-variant="primary"] .jb-badge { background: var(--jc-accent-ink); border-color: var(--jc-accent-ink); color: var(--jc-accent); }

@@ -2723,7 +2723,7 @@ const spinner = (label) => [h('span', { class: 'jb-spin', 'aria-hidden': 'true' 
 const runBtn = (step, primary) => h('button', {
   class: 'jc-btn', 'data-size': 'sm', type: 'button', ...(primary ? { 'data-variant': 'primary' } : {}),
   onClick: (e) => { e.stopPropagation(); runAction(step); },
-}, RUN_LABEL[step]);
+}, h('span', { class: 'jb-badge', 'aria-hidden': 'true' }, String(STEPS.indexOf(step) + 1)), RUN_LABEL[step]);
 // A small button in a row. It must not also open the flyout.
 const quickBtn = (label, done, doneLabel = 'Copied') => {
   const b = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: async (e) => {
@@ -2814,7 +2814,10 @@ function paintRow(step, st, busy, a) {
   const badge = h('span', { class: 'jb-badge', 'aria-hidden': 'true' }, done ? '✓' : String(STEPS.indexOf(step) + 1));
   const mainEl = h('div', { class: 'jb-row__main' }, ...main);
   const endEl = h('div', { class: 'jb-row__end' }, ...end);
-  row.replaceChildren(...(cta ? [badge, endEl, mainEl] : [badge, mainEl, endEl]));
+  // A Run/Generate button carries its own step number, so no separate badge.
+  const merged = !done && !busy;
+  if (merged) row.dataset.merged = ''; else delete row.dataset.merged;
+  row.replaceChildren(...(merged ? [endEl, mainEl] : cta ? [badge, endEl, mainEl] : [badge, mainEl, endEl]));
 }
 
 function renderSteps() {
