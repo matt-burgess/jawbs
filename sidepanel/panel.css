@@ -1456,3 +1456,8 @@ mark.jc-flagged, li.jc-flagged {
 @media (max-width: 340px) {
   .jc-tab { padding-inline: 4px; font-size: 13px; letter-spacing: .02em; }
 }
+
+/* Row CTAs: one width, on the left. */
+.jb-row[data-cta] { grid-template-columns: 22px 100px minmax(0, 1fr); }
+.jb-row[data-cta] .jb-row__end { justify-content: flex-start; }
+.jb-row[data-cta] .jb-row__end .jc-btn { width: 100%; }

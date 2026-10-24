@@ -2807,10 +2807,14 @@ function paintRow(step, st, busy, a) {
     for (const attr of ['role', 'tabindex', 'aria-expanded', 'title']) row.removeAttribute(attr);
   }
   const { main, end } = ROW_PARTS[step]({ a, done, busy, next: st.next === step });
-  row.replaceChildren(
-    h('span', { class: 'jb-badge', 'aria-hidden': 'true' }, done ? '✓' : String(STEPS.indexOf(step) + 1)),
-    h('div', { class: 'jb-row__main' }, ...main),
-    h('div', { class: 'jb-row__end' }, ...end));
+  // Buttons (Run, Generate, PDF, Copy) and the spinner sit left, one fixed
+  // width, right after the badge. Fit and Comp results stay on the right.
+  const cta = busy || !done || step === 'resume' || step === 'letter';
+  if (cta) row.dataset.cta = ''; else delete row.dataset.cta;
+  const badge = h('span', { class: 'jb-badge', 'aria-hidden': 'true' }, done ? '✓' : String(STEPS.indexOf(step) + 1));
+  const mainEl = h('div', { class: 'jb-row__main' }, ...main);
+  const endEl = h('div', { class: 'jb-row__end' }, ...end);
+  row.replaceChildren(...(cta ? [badge, endEl, mainEl] : [badge, mainEl, endEl]));
 }
 
 function renderSteps() {
