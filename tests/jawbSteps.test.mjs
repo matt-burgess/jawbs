@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stepStates, scoreBand, compView, compBadge, normalizeComp, fitView } from '../lib/jawbSteps.js';
+import { accentStep, stepStates, scoreBand, compView, compBadge, normalizeComp, fitView } from '../lib/jawbSteps.js';
 
 const fit = (fitScore, extra = {}) => ({ fit: { result: { fitScore, gaps: ['No Kubernetes'], alignments: ['a', 'b'], ...extra } } });
 
@@ -30,7 +30,7 @@ test('fitView puts the top gap first and says how many of each', () => {
 const salary = (source, low, high, confidence = 'medium') => ({ source, confidence, sourceLabel: 'Model estimate: x', base: { low, high } });
 
 test('compBadge: estimates say so; only a posting is plain', () => {
-  assert.deepEqual(compBadge(salary('posting', 1, 2, 'high')), { label: 'Job posting · high', tone: 'pos' });
+  assert.deepEqual(compBadge(salary('posting', 1, 2, 'high')), { label: 'Job posting · high', name: 'Job posting', tone: 'pos' });
   assert.equal(compBadge(salary('company-research', 1, 2)).label, 'Company est. · medium');
   assert.equal(compBadge(salary('title-benchmark', 1, 2, 'low')).tone, 'neg');
 });
@@ -55,4 +55,13 @@ test('normalizeComp: no posting in others, pay answer at/above target, $5K steps
   assert.equal(normalizeComp(base(), {}).applicationAnswer.number, 260000);              // no target: model's figure, rounded
   const none = normalizeComp({ salary: { source: 'unknown', base: {} } }, {});
   assert.equal(none.applicationAnswer, null);
+});
+
+test('exactly one accent step; none when the fit is weak', () => {
+  assert.equal(accentStep(stepStates({}), false), 'fit');
+  assert.equal(accentStep(stepStates(fit(80)), false), 'comp');
+  assert.equal(accentStep(stepStates({ ...fit(80), comp: {} }), false), 'apply');
+  assert.equal(accentStep(stepStates({ ...fit(80), comp: {} }), true), 'resume');
+  assert.equal(accentStep(stepStates({ ...fit(80), comp: {}, resume: {} }), true), null);
+  assert.equal(accentStep(stepStates(fit(30)), false), null);
 });

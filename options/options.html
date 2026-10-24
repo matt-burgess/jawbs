@@ -655,6 +655,25 @@ sudo systemctl restart ollama
 
             <section class="options-section">
               <div class="section-head">
+                <h2>Jawbar display</h2>
+                <p class="jc-footnote">Two lines the Jawbar keeps out of the way unless you want them.</p>
+              </div>
+              <label class="toggle-row">
+                <input id="showSearchBar" type="checkbox" />
+                <span>Show a "Save this search" line on LinkedIn and Google Jobs search pages</span>
+              </label>
+              <label class="toggle-row">
+                <input id="showCosts" type="checkbox" />
+                <span>Show the cost line at the bottom (today, 30 days, total)</span>
+              </label>
+              <div class="jc-btn-row">
+                <button id="saveJawbarDisplay" class="jc-btn" data-variant="primary" data-size="sm" type="button">Save</button>
+                <span id="jawbarDisplayStatus" class="jc-footnote"></span>
+              </div>
+            </section>
+
+            <section class="options-section">
+              <div class="section-head">
                 <h2>Company-site lookup</h2>
                 <p class="jc-footnote">When you open a job, Jawbs checks freehire.me, a free public catalogue of
                   company career sites, for the same job on the employer's own site: a direct link, its real age and

@@ -1,4 +1,4 @@
-import { getDocumentSettings, getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getContactEmail, getContactPhone, getContactLocation, getCompTargets, getApplicationProfile, getCandidateName, getCandidateTagline, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
+import { getDocumentSettings, getApiKey, getOpenAIKey, getGeminiKey, getCloudProvider, getContactEmail, getContactPhone, getContactLocation, getCompTargets, getApplicationProfile, getCandidateName, getCandidateTagline, getShowSearchBar, getShowCosts, safeExternalUrl, defaultSearchName, condenseKeywords } from '../lib/store.js';
 import { initQuickFill } from '../lib/contactFill.js';
 import { estimateCostUsd, formatUsd } from '../lib/pricing.js';
 import { normalizeStatus, statusLabel, STATUS_ORDER } from '../lib/statuses.js';
@@ -14,7 +14,7 @@ import { refineSuggestions } from '../lib/refineSuggestions.js';
 import { flagReason } from '../lib/flagMarks.js';
 import { renderDocUnits, renderDocHistory, flaggedCount } from '../lib/unitView.js';
 import { docFromJob, undoTarget } from '../lib/documentHistory.js';
-import { STEPS, scoreBand, fmtMoneyK, isFitSkeleton, stepStates, fitView, compView } from '../lib/jawbSteps.js';
+import { STEPS, accentStep, scoreBand, fmtMoneyK, isFitSkeleton, stepStates, fitView, compView } from '../lib/jawbSteps.js';
 import { createFlyout } from '../lib/flyoutView.js';
 import { resumeFromUnits } from '../lib/documentUnits.js';
 import { nextTrim, trimNote } from '../lib/pageLimit.js';
@@ -69,26 +69,6 @@ function scoreTier(score) {
   if (score >= 70) return 'pos';
   if (score >= 40) return 'caution';
   return 'neg';
-}
-
-// The Comp number in the strength strip: how close the TOP of the base
-// range gets to your target (or, failing that, the model's vsTarget read
-// or your floor). null when there is no range and no read to plot.
-function compStripScore(job) {
-  const comp = job?.analyses?.comp?.result;
-  const salary = comp?.salary;
-  const low  = salary?.base?.low  ?? comp?.marketEstimate?.baseLow  ?? null;
-  const high = salary?.base?.high ?? comp?.marketEstimate?.baseHigh ?? null;
-  const target = Number(compTargets?.target) || null;
-  const floor  = Number(compTargets?.floor)  || null;
-  const vsTarget = salary?.vsTargets?.vsTarget || comp?.vsTargets?.vsTarget;
-  if (high == null && low == null && !vsTarget) return null;
-  const anchor = high ?? low;
-  if (target && anchor) return Math.min(100, Math.round((anchor / target) * 100));
-  if (vsTarget) return vsTarget === 'above' ? 100 : vsTarget === 'at' ? 80 : vsTarget === 'below' ? 30 : 50;
-  // Floor met exactly reads as 60: acceptable, not aspirational.
-  if (floor && anchor) return Math.min(100, Math.round((anchor / floor) * 60));
-  return 50;
 }
 
 function replaceGlance(glanceEl, node) {
@@ -256,33 +236,21 @@ async function markConfirmedLinkedIn(jobId) {
   } catch { /* in-memory set already updated; persist is best-effort */ }
 }
 
-// Mini-hunt click → force-set status. Escape hatch for when LinkedIn's
-// Save/Apply UI didn't fire our detection (their DOM has A/B tested
-// away from aria-label on some rollouts). Delegated on the <ol> since
-// the <li> children are re-rendered on every renderMiniHunt call.
-// Force-set semantics: whatever cell the user clicks becomes the exact
-// status — no upgradeStatus() gating. The user knows what they want.
-els.miniHunt?.addEventListener('click', async (e) => {
-  const li = e.target.closest('.mini-hunt__step');
-  if (!li) return;
-  const newStatus = li.dataset.status;
-  if (!newStatus || !currentJob?.jobId) return;
+// Status pill: set the status by hand (for when LinkedIn's UI detection
+// missed a Save or Apply). Force-set: the pick becomes the exact status.
+async function setJobStatus(status, note) {
+  if (!status || !currentJob?.jobId) return;
   try {
-    const r = await send('update-job-status', {
-      jobId: currentJob.jobId,
-      status: newStatus,
-      note: `Status set from mini-hunt (${newStatus})`,
-    });
-    if (r?.ok) {
-      // Re-render from fresh storage so every gated affordance (Confirm
-      // on LinkedIn, Delete, etc.) re-evaluates against the new status.
-      await renderJob(currentJob);
-    }
+    const r = await send('update-job-status', { jobId: currentJob.jobId, status, note });
+    if (r?.ok) await renderJob(currentJob); // every gated affordance re-evaluates
   } catch (err) {
-    console.warn('[Jawbs] mini-hunt status update failed:', err);
+    console.warn('[Jawbs] status update failed:', err);
   }
+}
+els.statusMenu?.addEventListener('click', (e) => {
+  const item = e.target.closest('[data-status]');
+  if (item) setJobStatus(item.dataset.status, `Status set from the status pill (${item.dataset.status})`);
 });
-
 // Anchor's default target="_blank" opens the tracker in a new tab; we
 // intercept only to persist state, hand off an auto-confirm signal to
 // the tracker's content script, and hide the button. Not preventing
@@ -336,28 +304,12 @@ async function refreshUsageStrip() {
     els.usageMonth.textContent = formatUsd(monthCost);
     els.usageLifetime.textContent = formatUsd(lifetimeCost);
 
-    renderUsageSparkline(costs.slice(-14));
   } catch (e) {
     console.warn('[Jawbs] usage strip refresh failed:', e);
   }
 }
 
-function renderUsageSparkline(costs) {
-  if (!costs.length) { els.usageChart.innerHTML = ''; return; }
-  const W = 180, H = 34, pad = 2;
-  const max = Math.max(...costs, 0.001);
-  const barW = (W - pad * 2) / costs.length - 1;
-  const bars = costs.map((c, i) => {
-    const x = pad + i * ((W - pad * 2) / costs.length);
-    const h = max > 0 ? Math.max(1, (c / max) * (H - pad * 2)) : 1;
-    const y = H - pad - h;
-    const tone = c > 0 ? 'var(--jc-accent)' : 'var(--jc-border)';
-    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" style="fill:${tone};opacity:${c > 0 ? 0.85 : 0.3}" rx="1">
-      <title>${costs.length - i} day${costs.length - i === 1 ? '' : 's'} ago: ${formatUsd(c)}</title>
-    </rect>`;
-  }).join('');
-  els.usageChart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none">${bars}</svg>`;
-}
+
 
 async function refreshArchiveCount() {
   try {
@@ -851,6 +803,7 @@ function wireMenu(btn, menu) {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { set(false); btn.focus(); } });
 }
 wireMenu(els.jobMenuBtn, els.jobMenu);
+wireMenu(els.statusPill, els.statusMenu);
 wireMenu(els.moreBtn, els.moreMenu);
 els.moreMenu.addEventListener('click', (e) => {
   const item = e.target.closest('[data-sheet]');
@@ -980,7 +933,7 @@ function renderVerdict(job) {
   // Mini hunt strip — 3-stage window on the 5-stage Captured → Saved →
   // Applied → Interviewing → Offer journey. Replaces the old single
   // status badge so users see where they are in context.
-  renderMiniHunt(job);
+  renderStatusPill(job);
   // Delete button is only meaningful when the job is actually in the Jawboard.
   // status presence is the same signal used for the badge above.
   if (els.deleteJob) els.deleteJob.hidden = !job.status;
@@ -1033,17 +986,6 @@ function renderVerdict(job) {
   // can sit inline with it. Location / workplace live in a separate span
   // that follows the buttons.
   els.jobCompany.textContent = p.company || '';
-  // Google-search shortcut: '[Company] Careers - [Job Title]'. Hidden when
-  // we don't have a company to search for. Opens in a new tab.
-  if (els.companyCareersSearch) {
-    if (p.company) {
-      const q = `${p.company} Careers${p.title ? ' - ' + p.title : ''}`;
-      els.companyCareersSearch.href = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-      els.companyCareersSearch.hidden = false;
-    } else {
-      els.companyCareersSearch.hidden = true;
-    }
-  }
   els.jobMetaRest.innerHTML = '';
   const rest = [p.location, p.workplaceType].filter(Boolean);
   rest.forEach((part, i) => {
@@ -1092,38 +1034,32 @@ function renderVerdict(job) {
 function renderStrip(job, fit) {
   const hasFit = !!fit && !isFitSkeleton(fit);
   const set = (id, v) => { const n = $(id); if (n) n.textContent = v; };
+  const net = els.networkAtCompany;
   if (!hasFit) {
-    set('metaStrengthNum', '-'); set('stripFit', '-'); set('stripComp', '-'); set('stripNet', '-');
-    els.metaStrength.removeAttribute('data-band');
+    set('metaStrengthNum', ''); set('metaSharkLabel', 'Not scored yet. Start with Fit.');
+    els.metaStrength.hidden = true;
     els.metaSharkImg.hidden = true;
-    els.metaSharkIcon.removeAttribute('data-tier');
-    set('metaSharkLabel', 'Unscored');
     els.metaShark.title = 'Run Fit to score this role.';
+    if (net) net.textContent = 'Network';
     return;
   }
   const strength = computeStrengthScore(job, { compTargets, followMap });
   // Connections: scale the 0-20 component to 0-100 so it reads like fit and comp.
   const conn = strength.breakdown?.connections;
-  const rs = job.analyses?.requirements?.summary;
-  const comp = compStripScore(job);
   set('metaStrengthNum', String(strength.score));
-  set('stripFit', String(roundFitToTens(fit.fitScore ?? 0)));
-  set('stripComp', comp == null ? '-' : String(comp));
-  set('stripNet', String(conn && conn.max ? Math.round((conn.score / conn.max) * 100) : 0));
-  $('partFit').title = `Fit score: the model's overall match against your profile.${rs
-    ? ` Requirements: ${rs.covered} covered, ${rs.partial} partial, ${rs.gap} gaps of ${rs.total}${rs.mustGaps ? ` (${rs.mustGaps} must-have gap${rs.mustGaps === 1 ? '' : 's'})` : ''}.` : ''}`;
+  els.metaStrength.hidden = false;
   els.metaStrength.dataset.band = strength.score >= 75 ? 'strong' : strength.score >= 50 ? 'fair' : 'weak';
   if (strength.tierImage) {
     els.metaSharkImg.src = chrome.runtime.getURL(strength.tierImage);
-    els.metaSharkImg.alt = `${strength.tierLabel} shark`;
+    els.metaSharkImg.alt = '';
     els.metaSharkImg.hidden = false;
   }
-  els.metaSharkIcon.setAttribute('data-tier', strength.tier);
-  set('metaSharkLabel', strength.tierLabel);
+  set('metaSharkLabel', `${strength.tierLabel} · overall strength`);
   els.metaShark.title = `${strength.tierLabel} shark: ${strength.tierDescription || 'strength tier'}. `
     + `Strength ${strength.score}/100 = fit ${strength.breakdown.fit.note} · `
     + `comp ${strength.breakdown.comp.note} · connections ${strength.breakdown.connections.note}. `
     + `Weights: fit 50% · comp 30% · connections 20%.`;
+  if (net) net.textContent = `Network · ${conn && conn.max ? Math.round((conn.score / conn.max) * 100) : 0}`;
 }
 
 // Freshness and applicant badges — free facts, so they show before any
@@ -1179,54 +1115,17 @@ function huntStageIndex(status) {
 // everywhere by editing STATUS.notMovingForward.label).
 const TERMINAL_STATES = new Set(['archived', 'notMovingForward']);
 
-function renderMiniHunt(job) {
-  const el = $('miniHunt');
-  if (!el) return;
-  if (!job || !job.status) { el.hidden = true; el.innerHTML = ''; el.removeAttribute('data-terminal'); return; }
+// The pill next to the title: where the job stands. Hidden until the job
+// is in the archive (a status exists). Terminal states show their own name.
+function renderStatusPill(job) {
+  const pill = els.statusPill;
+  if (!pill) return;
+  pill.hidden = !job?.status;
+  if (!job?.status) return;
   const norm = normalizeStatus(job.status);
-  const terminalLabel = TERMINAL_STATES.has(norm) ? statusLabel(norm) : null;
-  // Terminal states — the pursuit is closed. Instead of showing the
-  // 3-stage linear window (which would misleadingly render "Captured"
-  // as the current band since terminal states have no place in that
-  // progression), show a single terminal pill spanning the strip. The
-  // clickable-stage escape hatch is intentionally removed here — a
-  // click that force-sets 'analyzed' or 'saved' would silently undo
-  // the terminal decision. Users who want to un-archive can do so
-  // from Details.
-  if (terminalLabel) {
-    el.innerHTML = `<li class="mini-hunt__terminal" data-status="${norm}">${terminalLabel}</li>`;
-    el.dataset.terminal = norm;
-    el.hidden = false;
-    return;
-  }
-  el.removeAttribute('data-terminal');
-  const cur = huntStageIndex(job.status);
-  // Slide the 3-stage window so it always covers the current stage.
-  // First stage → 0..2; last stage → last-2..last; anything in between
-  // centers on cur.
-  const last = HUNT_STAGES.length - 1;
-  let start;
-  if (cur <= 0) start = 0;
-  else if (cur >= last) start = last - 2;
-  else start = cur - 1;
-  const items = [];
-  for (let i = start; i < start + 3 && i <= last; i++) {
-    const state = i < cur ? 'past' : i === cur ? 'now' : 'next';
-    const status = HUNT_STAGE_STATUS[i];
-    // Cells are clickable escape hatches for when LinkedIn UI detection
-    // misses a Save/Apply — user force-sets the status to what they want.
-    // Offer stage has no matching internal status; render it non-clickable.
-    const statusAttr = status ? ` data-status="${status}"` : '';
-    const title = status
-      ? `Click to mark this jawb as ${HUNT_STAGES[i]}`
-      : '';
-    items.push(`<li class="mini-hunt__step" data-state="${state}"${statusAttr}${title ? ` title="${title}"` : ''}>
-      <span class="mini-hunt__mark" aria-hidden="true"></span>
-      <span class="mini-hunt__label">${HUNT_STAGES[i]}</span>
-    </li>`);
-  }
-  el.innerHTML = items.join('');
-  el.hidden = false;
+  const stage = HUNT_STAGES[huntStageIndex(job.status)];
+  pill.textContent = `${TERMINAL_STATES.has(norm) ? statusLabel(norm) : stage} ▾`;
+  pill.dataset.status = norm;
 }
 
 
@@ -2652,13 +2551,16 @@ let flyoutStep = null;   // step whose detail is open
 let flyoutTabId = null;  // page tab showing it; null when it is the in-panel overlay
 let panelFlyout = null;
 let currentTabUrl = '';
+let showSearchBar = false; // Settings → System → Jawbar display
 
 const spinner = (label) => [h('span', { class: 'jb-spin', 'aria-hidden': 'true' }), h('span', { class: 'jb-busy' }, label)];
-const runBtn = (step, primary) => h('button', {
-  class: 'jc-btn', 'data-size': 'sm', type: 'button', ...(primary ? { 'data-variant': 'primary' } : {}),
+const doneMark = () => h('span', { class: 'jb-done', 'aria-label': 'Done' }, '✓');
+// Only the next step's button is accent-filled; every other one is outlined.
+const runBtn = (step, accent) => h('button', {
+  class: 'jc-btn', 'data-size': 'sm', type: 'button', ...(accent ? { 'data-variant': 'primary' } : {}),
   onClick: (e) => { e.stopPropagation(); runAction(step); },
-}, h('span', { class: 'jb-badge', 'aria-hidden': 'true' }, String(STEPS.indexOf(step) + 1)), RUN_LABEL[step]);
-// A small button in a row. It must not also open the flyout.
+}, RUN_LABEL[step]);
+// A small outlined button on a done row. It must not also open the flyout.
 const quickBtn = (label, done, doneLabel = 'Copied') => {
   const b = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: async (e) => {
     e.stopPropagation();
@@ -2671,68 +2573,73 @@ const quickBtn = (label, done, doneLabel = 'Copied') => {
 const docLine = (kind, record, extra) => {
   const doc = docFromJob(currentJob, kind);
   const flagged = doc ? flaggedCount(doc) : 0;
-  return [`${doc?.current || 'v1'} ready`, fmtShortDate(record.generatedAt), extra, flagged ? `${flagged} to check` : null].filter(Boolean).join(' · ');
+  return [`Version ${String(doc?.current || 'v1').replace(/^v/, '')}`, fmtShortDate(record.generatedAt), extra, flagged ? `${flagged} to check` : null].filter(Boolean).join(' · ');
 };
-const chev = () => h('span', { class: 'jb-chev', 'aria-hidden': 'true' }, '‹');
+const chev = () => h('span', { class: 'jb-chev', 'aria-hidden': 'true' }, '‹'); // points at the flyout
+const label = (text, suffix) => h('span', { class: 'jb-label' }, text, suffix ? h('span', { class: 'jb-opt' }, ` · ${suffix}`) : null);
+const sub = (...kids) => h('span', { class: 'jb-sub' }, ...kids);
 
+// Each row: slot (button, spinner or ✓), label with a line once it has run,
+// and the result on the right.
 const ROW_PARTS = {
-  fit: ({ a, done, busy, next }) => {
-    const title = h('span', { class: 'jb-row__title' }, 'Fit');
-    if (busy) return { main: [title, h('span', { class: 'jb-row__sub' }, 'Reading the posting against your profile')], end: spinner('Casting…') };
+  fit: ({ a, done, busy, accent }) => {
+    if (busy) return { slot: spinner('Casting…'), main: [label('Fit')], res: [] };
     if (done) {
       const v = fitView(a.fit.result);
       const tone = BAND_TONE[v.band];
       return {
-        main: [title, h('span', { class: 'jb-row__sub jb-trunc', title: v.topGap || '' }, v.topGap ? `Top gap: ${v.topGap}` : 'No gaps found')],
-        end: [h('span', { class: `jb-score tone-${tone}` }, String(v.score)), h('span', { class: `jb-score__lbl tone-${tone}` }, v.label), chev()],
+        slot: [doneMark()],
+        main: [label('Fit'), h('span', { class: 'jb-sub jb-trunc', title: v.topGap || '' }, v.topGap ? `Top gap: ${v.topGap}` : 'No gaps found')],
+        res: [h('span', { class: `jb-score tone-${tone}` }, String(v.score)), h('span', { class: `jb-score__lbl tone-${tone}` }, v.label), chev()],
       };
     }
-    return {
-      main: [title, h('span', { class: 'jb-row__sub' }, a.fit ? 'The description was not captured. Open the single job view and run again.' : 'How well you match this role')],
-      end: [runBtn('fit', next)],
-    };
+    return { slot: [runBtn('fit', accent)], main: [label('Fit'), a.fit ? sub('The description was not captured. Open the single job view and run again.') : null], res: [] };
   },
-  comp: ({ a, done, busy, next }) => {
-    const title = h('span', { class: 'jb-row__title' }, 'Comp');
-    if (busy) return { main: [title, h('span', { class: 'jb-row__sub' }, 'Finding the pay range')], end: spinner('Casting…') };
+  comp: ({ a, done, busy, accent }) => {
+    if (busy) return { slot: spinner('Casting…'), main: [label('Comp')], res: [] };
     const v = done && compView(a.comp, compTargets || {});
     if (v) {
-      const answer = v.answer?.number != null ? h('span', { class: 'jb-row__sub' }, 'Pay answer ',
-        h('b', { class: 'jb-mono' }, v.answer.numberText),
-        quickBtn('Copy', () => navigator.clipboard.writeText(String(v.answer.number)))) : null;
       return {
-        main: [
-          h('span', { class: 'jb-row__titleline' }, title,
-            h('span', { class: `jb-chip tone-${v.badge.tone}`, title: v.estimate ? 'The model\'s own estimate, not a pay database.' : 'Stated in the posting.' }, v.badge.label)),
-          h('span', { class: 'jb-row__sub' }, h('b', { class: 'jb-mono jb-range' }, `${v.estimate && v.range ? '~' : ''}${v.range || 'No range'}`),
-            v.verdict ? h('span', { class: `tone-${v.verdict.tone}` }, v.verdict.label) : null),
-          answer,
-        ],
-        end: [chev()],
+        slot: [doneMark()],
+        main: [label('Comp'), sub(
+          h('span', { class: `tone-${v.badge.tone}`, title: v.estimate ? "The model's own estimate, not a pay database." : 'Stated in the posting.' }, v.badge.name),
+          v.verdict ? ` · ${v.verdict.label}` : '')],
+        res: [h('span', { class: 'jb-mono jb-range' }, `${v.estimate && v.range ? '~' : ''}${v.range || 'No range'}`), chev()],
       };
     }
-    return { main: [title, h('span', { class: 'jb-row__sub' }, done ? 'No pay found. Run again.' : 'Pay range and what to say if asked')], end: [runBtn('comp', next || done)] };
+    return { slot: [runBtn('comp', accent)], main: [label('Comp'), done ? sub('No pay found. Run again.') : null], res: [] };
   },
-  resume: ({ a, done, busy, next }) => {
-    const title = h('span', { class: 'jb-row__title' }, 'Resume');
-    if (busy) return { main: [title, h('span', { class: 'jb-row__sub' }, 'Tailoring to this posting')], end: spinner('Baiting…') };
-    if (done) return { main: [title, h('span', { class: 'jb-row__sub' }, docLine('resume', a.resume))], end: [quickBtn('↓ PDF', () => els.resumeDownload.click(), '✓ Opened')] };
-    return { main: [title, h('span', { class: 'jb-row__sub' }, 'Tailored to this posting')], end: [runBtn('resume', next)] };
+  resume: ({ a, done, busy, accent }) => {
+    if (busy) return { slot: spinner('Baiting…'), main: [label('Resume')], res: [] };
+    if (done) return {
+      slot: [doneMark()], main: [label('Resume'), sub(docLine('resume', a.resume))],
+      res: [quickBtn('PDF', () => els.resumeDownload.click(), 'Opened'), chev()],
+    };
+    return { slot: [runBtn('resume', accent)], main: [label('Resume')], res: [] };
   },
-  letter: ({ a, done, busy, next }) => {
-    const title = h('span', { class: 'jb-row__titleline' }, h('span', { class: 'jb-row__title' }, 'Cover letter'), h('span', { class: 'jb-opt' }, 'optional'));
-    if (busy) return { main: [title, h('span', { class: 'jb-row__sub' }, 'Writing in your voice')], end: spinner('Baiting…') };
-    if (done) return { main: [title, h('span', { class: 'jb-row__sub' }, docLine('letter', a.coverLetter, TONES[toneKey(a.coverLetter.tone)].label))], end: [quickBtn('Copy', () => els.letterCopy.click())] };
-    return { main: [title, h('span', { class: 'jb-row__sub' }, 'Only if the application asks for one')], end: [runBtn('letter', next)] };
+  letter: ({ a, done, busy }) => {
+    if (busy) return { slot: spinner('Baiting…'), main: [label('Cover letter', 'optional')], res: [] };
+    if (done) return {
+      slot: [doneMark()], main: [label('Cover letter', 'optional'), sub(`${TONES[toneKey(a.coverLetter.tone)].label} tone · ready`)],
+      res: [quickBtn('Copy', () => els.letterCopy.click()), chev()],
+    };
+    return { slot: [runBtn('letter', false)], main: [label('Cover letter', 'optional')], res: [] };
   },
 };
 
-function paintRow(step, st, busy, a) {
+function fillRow(row, { slot, main, res }) {
+  row.replaceChildren(...[
+    h('div', { class: 'jb-slot' }, ...slot),
+    h('div', { class: 'jb-main' }, ...main),
+    res.length ? h('div', { class: 'jb-res' }, ...res) : null,
+  ].filter(Boolean));
+}
+
+function paintRow(step, st, busy, a, accent) {
   const row = $(STEP_ROW[step]);
   const done = st.done[step];
   const open = flyoutStep === step;
-  row.dataset.state = busy ? 'running' : done ? 'done' : st.next === step ? 'next' : 'todo';
-  row.dataset.open = String(open && done);
+  row.dataset.state = busy ? 'running' : done ? 'done' : 'idle';
   if (done) {
     row.setAttribute('role', 'button'); row.tabIndex = 0;
     row.setAttribute('aria-expanded', String(open));
@@ -2740,18 +2647,37 @@ function paintRow(step, st, busy, a) {
   } else {
     for (const attr of ['role', 'tabindex', 'aria-expanded', 'title']) row.removeAttribute(attr);
   }
-  const { main, end } = ROW_PARTS[step]({ a, done, busy, next: st.next === step });
-  // Buttons (Run, Generate, PDF, Copy) and the spinner sit left, one fixed
-  // width, right after the badge. Fit and Comp results stay on the right.
-  const cta = busy || !done || step === 'resume' || step === 'letter';
-  if (cta) row.dataset.cta = ''; else delete row.dataset.cta;
-  const badge = h('span', { class: 'jb-badge', 'aria-hidden': 'true' }, done ? '✓' : String(STEPS.indexOf(step) + 1));
-  const mainEl = h('div', { class: 'jb-row__main' }, ...main);
-  const endEl = h('div', { class: 'jb-row__end' }, ...end);
-  // A Run/Generate button carries its own step number, so no separate badge.
-  const merged = !done && !busy;
-  if (merged) row.dataset.merged = ''; else delete row.dataset.merged;
-  row.replaceChildren(...(merged ? [endEl, mainEl] : cta ? [badge, endEl, mainEl] : [badge, mainEl, endEl]));
+  fillRow(row, ROW_PARTS[step]({ a, done, busy, accent }));
+}
+
+// Apply on the corp site. Opening it also marks the jawb Applied (a status
+// kept here; nothing is done on LinkedIn). Not clickable as a row.
+function paintApply(job, st, accent) {
+  const row = $('rowApply');
+  const p = job.posting || {};
+  row.hidden = !p.company;
+  if (!p.company) return;
+  const q = `${p.company} Careers${p.title ? ' - ' + p.title : ''}`;
+  const status = normalizeStatus(job.status || '');
+  const open = h('a', {
+    class: 'jc-btn', 'data-size': 'sm', ...(accent ? { 'data-variant': 'primary' } : {}),
+    href: `https://www.google.com/search?q=${encodeURIComponent(q)}`, target: '_blank', rel: 'noopener noreferrer',
+    title: "Google search for '[Company] Careers - [Jawb Title]'. It often lands directly on the same role on the company's own careers site.",
+    onClick: () => { if (job.status && huntStageIndex(job.status) < 2 && !TERMINAL_STATES.has(status)) setJobStatus('applied', 'Opened the corp site'); },
+  }, 'Open ↗');
+  const answer = st.done.comp ? compView(job.analyses.comp, compTargets || {})?.answer : null;
+  let line;
+  if (answer?.number != null) {
+    const copy = h('button', { class: 'jb-textbtn', type: 'button', onClick: async () => {
+      await navigator.clipboard.writeText(String(answer.number));
+      copy.textContent = 'Copied';
+      setTimeout(() => { if (copy.isConnected) copy.textContent = 'Copy'; }, 1500);
+    } }, 'Copy');
+    line = sub('If asked about pay: ', h('b', { class: 'jb-mono' }, answer.numberText), ' ', copy);
+  } else {
+    line = sub('Keeps LinkedIn out of the applicant tracking record');
+  }
+  fillRow(row, { slot: [open], main: [label('Apply on corp site'), line], res: [] });
 }
 
 function renderSteps() {
@@ -2760,13 +2686,13 @@ function renderSteps() {
   const a = job.analyses || {};
   const st = stepStates(a);
   const active = new Set(inFlightByJob.get(job.jobId) || []);
-  for (const step of STEPS) paintRow(step, st, active.has(STEP_MSG[step]), a);
+  const accent = accentStep(st, huntStageIndex(job.status) >= 2);
+  for (const step of STEPS) paintRow(step, st, active.has(STEP_MSG[step]), a, accent === step);
+  paintApply(job, st, accent === 'apply');
   // A weak fit dims what comes after it (CSS) and says why. Nothing is disabled.
   els.verdictBlock.dataset.weak = String(st.weak);
   els.weakNote.hidden = !st.weak;
-  if (st.weak) els.weakNote.textContent = `Weak fit (${a.fit.result.fitScore}). Read the gaps before you spend more time on this one.`;
-  if (st.applyPrimary) els.companyCareersSearch.dataset.variant = 'primary';
-  else els.companyCareersSearch.removeAttribute('data-variant');
+  if (st.weak) els.weakNote.textContent = 'Weak fit. Read the gaps before spending credits on the rest.';
 }
 
 for (const step of STEPS) {
@@ -2959,6 +2885,8 @@ chrome.storage.onChanged.addListener((changes) => {
     compTargets = changes['settings.compTargets'].newValue || null;
     if (currentJob) { renderVerdict(currentJob); renderCompCard(currentJob.analyses?.comp); }
   }
+  if (changes['settings.showSearchBar']) { showSearchBar = changes['settings.showSearchBar'].newValue === true; renderSearchContext(currentTabUrl); }
+  if (changes['settings.showCosts']) document.querySelector('.jc__footer').hidden = changes['settings.showCosts'].newValue === false;
   if (changes['settings.applicationProfile']) {
     applicationProfile = changes['settings.applicationProfile'].newValue || {};
     if (currentJob) renderFitCard(currentJob.analyses?.fit);
@@ -2990,7 +2918,7 @@ function renderSearchContext(url) {
   const el = els.searchContext;
   if (!el) return;
   const info = parseAnySearch(url);
-  if (!info) { el.hidden = true; return; }
+  if (!info || !showSearchBar) { el.hidden = true; return; }
   el.hidden = false;
   els.searchContextSummary.textContent = info.name;
   els.searchContextSummary.title = info.name;
@@ -3101,6 +3029,7 @@ async function init() {
   // whenever the user edits comp floor/target/walk-away.
   try { compTargets = await getCompTargets(); } catch { compTargets = null; }
   try { applicationProfile = await getApplicationProfile(); } catch { applicationProfile = {}; }
+  try { showSearchBar = await getShowSearchBar(); document.querySelector('.jc__footer').hidden = !(await getShowCosts()); } catch { /* defaults */ }
 
   // Check whichever provider is currently active. Nothing leaves the
   // browser until the user provides a key for their chosen cloud AI.

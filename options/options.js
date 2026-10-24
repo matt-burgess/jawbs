@@ -25,6 +25,7 @@ import {
   setContactEmail,
   getApplicationProfile, setApplicationProfile,
   getCompanySiteLookupEnabled, setCompanySiteLookupEnabled,
+  getShowSearchBar, getShowCosts, setJawbarDisplay,
   getStrictFacts, setStrictFacts, getDocumentSettings, setDocumentSettings,
   getContactPhone,
   setContactPhone,
@@ -754,6 +755,15 @@ els.saveStrictFacts.addEventListener('click', async () => {
   flash(els.strictFactsStatus, 'Saved.');
 });
 
+async function loadJawbarDisplay() {
+  els.showSearchBar.checked = await getShowSearchBar();
+  els.showCosts.checked = await getShowCosts();
+}
+els.saveJawbarDisplay.addEventListener('click', async () => {
+  await setJawbarDisplay({ searchBar: els.showSearchBar.checked, costs: els.showCosts.checked });
+  flash(els.jawbarDisplayStatus, 'Saved.');
+});
+
 async function loadCompanySiteLookup() {
   els.companySiteLookup.checked = await getCompanySiteLookupEnabled();
 }
@@ -1062,7 +1072,7 @@ function refreshSetupHelper() {
 // ---------- Init ----------
 
 (async () => {
-  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadCompanySiteLookup(), loadStrictFacts(), loadDocSettings(), loadShortcuts(), loadApplicationProfile(), loadModels(), loadUsage(), loadActivity()]);
+  await Promise.all([loadKey(), loadProfile(), loadResume(), loadCandidateHeader(), loadComp(), loadSamples(), loadPrepQuestions(), loadNegativeKeywords(), loadWorkLocations(), loadKnowledge(), loadAutoAnalyze(), loadCompanySiteLookup(), loadJawbarDisplay(), loadStrictFacts(), loadDocSettings(), loadShortcuts(), loadApplicationProfile(), loadModels(), loadUsage(), loadActivity()]);
   renderProfileStrength();
   refreshOllamaStatus();
   refreshSetupHelper();

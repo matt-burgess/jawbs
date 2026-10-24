@@ -29,9 +29,8 @@
             <img src="../assets/jawbridge.png" alt="" class="jc-header-linkbtn__icon" width="16" height="16">
             <span class="jc-brand">Jawbridge</span>
           </button>
-          <a class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" href="https://www.linkedin.com/jobs-tracker/" target="_blank" rel="noopener noreferrer" title="Open your Job Tracker on LinkedIn">
+          <a class="jc-btn jc-btn--icon-lead" data-variant="ghost" data-size="sm" data-icon-only href="https://www.linkedin.com/jobs-tracker/" target="_blank" rel="noopener noreferrer" aria-label="Job tracker" title="Open your Job Tracker on LinkedIn">
             <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true">
-            <span>Job Tracker</span>
           </a>
           <button id="openOptions" class="jc-btn" data-size="sm" data-icon-only type="button" aria-label="Settings" title="Settings">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -41,22 +40,6 @@
           </button>
         </div>
       </header>
-
-      <!-- Save this search — one-line bar under the header, visible on
-           any tab. Auto-shows when the active tab is a LinkedIn or
-           Google Jobs search results URL with meaningful filters. -->
-      <div id="searchContext" class="jc-search-bar" hidden>
-        <span class="jc-search-bar__label">Save this search:</span>
-        <span id="searchContextSummary" class="jc-search-bar__title"></span>
-        <button id="saveThisSearch" type="button"
-                class="jc-icon-btn jc-search-bar__save"
-                aria-label="Save this search" title="Save this search">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-            <path d="M12 5v14"/><path d="M5 12h14"/>
-          </svg>
-        </button>
-        <span id="saveThisSearchStatus" class="jc-search-bar__status jc-footnote"></span>
-      </div>
 
       <div class="jc-progress" id="progressBar" hidden>
         <div class="jc-progress__bar" aria-hidden="true"></div>
@@ -91,6 +74,15 @@
         </nav>
 
         <!-- Interviews tab — populated on activation. -->
+        <!-- Save this search: one 12px line under the tabs, only when
+             Settings → System → Jawbar display turns it on. -->
+        <div id="searchContext" class="jc-search-bar" hidden>
+          <span class="jc-search-bar__label">Search:</span>
+          <span id="searchContextSummary" class="jc-search-bar__title"></span>
+          <button id="saveThisSearch" type="button" class="jb-textbtn" title="Save this search">Save</button>
+          <span id="saveThisSearchStatus" class="jc-search-bar__status"></span>
+        </div>
+
         <section id="tabInterviews" class="jc-tab-pane" data-tab-only="interviews" hidden>
           <div class="jc-tab-pane__group">
             <h3 class="jc-tab-pane__h">Upcoming</h3>
@@ -148,17 +140,27 @@
 
         <!-- Save this search — moved above #body so it stays visible on
              any tab. See #searchContext higher up in this file. -->
-        <!-- Jawb tab. Top to bottom: the job, Cast (is it worth it), the
-             corp-site apply link, Bait (what to send), then the utility row.
+        <!-- Jawb tab. Top to bottom: the job, the five steps (Fit, Comp,
+             corp site, Resume, Cover letter), then the utility row.
              Detail for a finished step opens in the flyout (lib/flyoutView.js). -->
         <div class="jc__verdict" id="verdictBlock" hidden>
-          <div class="jc-jobcard jb-head">
-            <!-- Captured, Saved, Applied: the three stages around the
-                 current one. Click a stage to set it by hand. -->
-            <div class="jb-status">
-              <ol id="miniHunt" class="mini-hunt" hidden></ol>
+          <div class="jb-head">
+            <div class="jb-titlerow">
+              <h2 class="jc-job-title" id="jobTitle"></h2>
               <div class="jb-menu">
-                <button id="jobMenuBtn" class="jc-btn" data-variant="ghost" data-size="sm" data-icon-only type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="jobMenu" aria-label="More for this jawb" title="More" hidden>
+                <button id="statusPill" class="jb-pill" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="statusMenu" title="Where this job stands. Click to change it." hidden>Saved ▾</button>
+                <div id="statusMenu" class="jb-pop" role="menu" hidden>
+                  <button class="jb-pop__item" role="menuitem" type="button" data-status="analyzed">Captured</button>
+                  <button class="jb-pop__item" role="menuitem" type="button" data-status="saved">Saved</button>
+                  <button class="jb-pop__item" role="menuitem" type="button" data-status="applied">Applied</button>
+                  <!-- Change it on LinkedIn's own tracker instead. -->
+                  <button id="findOnTracker" class="jb-pop__item" role="menuitem" type="button" title="Opens LinkedIn's Job Tracker at this job so you can change its status there. Jawbs picks up the change." hidden>Update on LinkedIn</button>
+                  <!-- Applied on the corp site: tell LinkedIn too. Shown only in the Applied band. -->
+                  <a id="confirmOnLinkedIn" class="jb-pop__item" role="menuitem" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" title="Open LinkedIn's tracker at the Clicked Apply stage, find this jawb, and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>Mark applied on LinkedIn</a>
+                </div>
+              </div>
+              <div class="jb-menu">
+                <button id="jobMenuBtn" class="jb-iconbtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="jobMenu" aria-label="More for this jawb" title="More" hidden>
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
                 </button>
                 <div id="jobMenu" class="jb-pop" role="menu" hidden>
@@ -166,72 +168,37 @@
                 </div>
               </div>
             </div>
-            <h2 class="jc-job-title" id="jobTitle"></h2>
             <div class="jc-job-eyebrow"><span id="jobCompany"></span><span id="jobMetaRest" class="jc-job-meta__rest"></span></div>
-            <!-- Strength: the composite, its shark, then the three parts. -->
+            <!-- Strength, one line: composite, shark, tier. -->
             <div class="jb-strip" id="metaStrip">
-              <span class="jc-meta-strip__strength" id="metaStrength" title="Strength = fit 50% · comp 30% · connections 20%">
-                <span class="jc-meta-strip__strength-num" id="metaStrengthNum">-</span>
-              </span>
-              <span class="jb-strip__shark" id="metaShark" title="">
-                <span class="jc-meta-strip__shark-icon" id="metaSharkIcon"><img id="metaSharkImg" src="" alt="" width="20" height="20" hidden /></span>
-                <span class="jb-strip__tier" id="metaSharkLabel">Unscored</span>
-              </span>
-              <span class="jb-strip__parts">
-                <span class="jb-part" id="partFit" title="Fit score: the model's overall match against your profile."><i>Fit</i><b id="stripFit">-</b></span>
-                <span class="jb-part" id="partComp" title="Posted / analyzed comp range vs your target salary"><i>Comp</i><b id="stripComp">-</b></span>
-                <span class="jb-part" id="partNet" title="Connections: actionable people in your network for this role"><i>Network</i><b id="stripNet">-</b></span>
-              </span>
+              <span class="jb-strip__num" id="metaStrength"><span id="metaStrengthNum">-</span></span>
+              <img id="metaSharkImg" class="jb-strip__shark" src="" alt="" width="18" height="18" hidden />
+              <span class="jb-strip__txt" id="metaShark" title=""><span id="metaSharkLabel">Not scored yet. Start with Fit.</span></span>
             </div>
           </div>
           <div class="jc-verdict-badges" id="verdictBadges"></div>
 
-          <!-- CAST: Is this worth pursuing? -->
-          <section class="jb-sec" aria-labelledby="castH">
-            <h3 class="jb-sec__h" id="castH"><span>Cast</span><em>Is this worth pursuing?</em></h3>
+          <!-- The five steps, flat. Detail for a finished one opens in the
+               flyout (lib/flyoutView.js). -->
+          <div class="jb-rows">
             <div class="jb-row" id="rowFit" data-step="fit"></div>
             <p class="jb-weak" id="weakNote" hidden></p>
-            <div class="jb-later">
-              <div class="jb-row" id="rowComp" data-step="comp"></div>
-            </div>
-          </section>
-
-          <!-- Apply on the employer's own site -->
-          <section class="jb-sec jb-later jb-apply" id="applySec">
-            <a id="companyCareersSearch" class="jc-btn jb-apply__btn" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" title="Google search for '[Company] Careers - [Jawb Title]'. It often lands directly on the same role on the company's own careers site.">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path></svg>
-              <span>Apply on corp site</span>
-            </a>
-            <p class="jb-caption">So your application isn't tracked as coming from LinkedIn.</p>
-            <!-- Applied on the corp site: tell LinkedIn too. Shown only in the Applied band. -->
-            <a id="confirmOnLinkedIn" class="jc-btn jc-btn--icon-lead" data-variant="highlight" data-size="sm" href="https://www.linkedin.com/jobs-tracker/?stage=clicked_apply" target="_blank" rel="noopener noreferrer" aria-label="Confirm applied on LinkedIn tracker" title="Open LinkedIn's tracker at the Clicked Apply stage, find this jawb, and click Yes on 'Did you finish applying?' to mark it applied on LinkedIn too." hidden>
-              <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
-              <span>Transition to 'Applied' on LinkedIn</span>
-            </a>
-          </section>
-
-          <!-- BAIT: Tailor what you send -->
-          <section class="jb-sec jb-later" aria-labelledby="baitH">
-            <h3 class="jb-sec__h" id="baitH"><span>Bait</span><em>Tailor what you send</em></h3>
-            <div class="jb-row" id="rowResume" data-step="resume"></div>
-            <div class="jb-row" id="rowLetter" data-step="letter"></div>
-          </section>
+            <div class="jb-row jb-later" id="rowComp" data-step="comp"></div>
+            <div class="jb-row jb-later" id="rowApply"></div>
+            <div class="jb-row jb-later" id="rowResume" data-step="resume"></div>
+            <div class="jb-row jb-later" id="rowLetter" data-step="letter"></div>
+          </div>
 
           <div id="emailPanel" class="jc-email-panel" hidden></div>
           <div class="jb-spacer"></div>
 
           <!-- Utility row, pinned to the bottom of the scroll area. -->
           <div class="jb-bar" id="jbBar">
-            <button id="openFullView" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-label="Open full page view for this jawb" title="Open the full page view for this jawb: interview rounds, timeline, comp, offer form, and everything else that doesn't fit in the Jawbar."><span class="jc-details-arrow" aria-hidden="true">←</span> Details</button>
-            <!-- Opens LinkedIn's Job Tracker at this job so its status can be changed there. -->
-            <button id="findOnTracker" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-label="Update this job's status in LinkedIn's Job Tracker" title="Opens LinkedIn's Job Tracker at this job so you can change its status there. Jawbs picks up the change." hidden>
-              <img class="jc-li-icon jc-li-icon--inline" src="../assets/linkedin.svg" alt="" aria-hidden="true" />
-              <span>Status</span>
-            </button>
-            <a id="networkAtCompany" class="jc-btn" data-variant="ghost" data-size="sm" href="#" target="_blank" rel="noopener noreferrer" aria-label="Find 1st and 2nd degree connections at this company on LinkedIn" title="Find your 1st and 2nd degree LinkedIn connections at this company." hidden>Network</a>
-            <button id="pasteEmail" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-expanded="false" aria-controls="emailPanel" title="Paste an email from a recruiter or employer: Jawbs finds the jawb it's about, reads what it means and drafts a reply.">Paste email</button>
+            <button id="openFullView" class="jb-ghost" type="button" aria-label="Open full page view for this jawb" title="Open the full page view for this jawb: interview rounds, timeline, comp, offer form, and everything else that doesn't fit in the Jawbar.">Details</button>
+            <a id="networkAtCompany" class="jb-ghost" href="#" target="_blank" rel="noopener noreferrer" aria-label="Find 1st and 2nd degree connections at this company on LinkedIn" title="Find your 1st and 2nd degree LinkedIn connections at this company." hidden>Network</a>
+            <button id="pasteEmail" class="jb-ghost" type="button" aria-expanded="false" aria-controls="emailPanel" title="Paste an email from a recruiter or employer: Jawbs finds the jawb it's about, reads what it means and drafts a reply.">Paste email</button>
             <div class="jb-menu jb-menu--up">
-              <button id="moreBtn" class="jc-btn" data-variant="ghost" data-size="sm" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu">More ▴</button>
+              <button id="moreBtn" class="jb-ghost" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu">More ▴</button>
               <div id="moreMenu" class="jb-pop jb-pop--up" role="menu" hidden>
                 <button class="jb-pop__item" role="menuitem" type="button" data-sheet="prep"><span>Prep brief</span><small>For scheduled interviews</small></button>
                 <button class="jb-pop__item" role="menuitem" type="button" data-sheet="ask"><span>Chat with AI</span></button>
@@ -532,22 +499,8 @@
              Recent and Searches tabs in the tab bar surface those
              lists with more room. -->
 
-        <div class="usage-strip" id="usageStrip">
-          <div class="usage-metrics">
-            <div class="usage-metric" title="Cost accrued today across all analyses">
-              <span class="usage-metric__val" id="usageToday">$0.00</span>
-              <span class="usage-metric__lbl">today</span>
-            </div>
-            <div class="usage-metric" title="Trailing 30 days">
-              <span class="usage-metric__val" id="usageMonth">$0.00</span>
-              <span class="usage-metric__lbl">30d</span>
-            </div>
-            <div class="usage-metric" title="Lifetime spend since install">
-              <span class="usage-metric__val" id="usageLifetime">$0.00</span>
-              <span class="usage-metric__lbl">total</span>
-            </div>
-          </div>
-          <div class="usage-chart" id="usageChart" title="Daily spend for the last 14 days"></div>
+        <div class="usage-strip" id="usageStrip" title="What the AI calls have cost: today, the last 30 days, and since install">
+          <span id="usageToday">$0.00</span> today · <span id="usageMonth">$0.00</span> 30d · <span id="usageLifetime">$0.00</span> total
         </div>
       </footer>
     </div>
