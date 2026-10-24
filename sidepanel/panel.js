@@ -1150,69 +1150,14 @@ function renderFreshnessBadges(p) {
   }
 }
 
-// ---------- On the company site ----------
+// ---------- Company-site lookup ----------
 //
-// The same job on the employer's own careers page (freehire.me, keyless,
-// title + company only). Shows the direct link, its real age and repost
-// history, and pay when the company posting states it. A near match is
-// only offered — the user picks, or says none of them.
-const SOURCE_NAMES = { greenhouse: 'Greenhouse', lever: 'Lever', ashby: 'Ashby', workday: 'Workday', icims: 'iCIMS', smartrecruiters: 'SmartRecruiters', workable: 'Workable', bamboohr: 'BambooHR', jobvite: 'Jobvite', taleo: 'Taleo', successfactors: 'SuccessFactors', oracle: 'Oracle', teamtailor: 'Teamtailor', recruitee: 'Recruitee', personio: 'Personio', rippling: 'Rippling' };
-
+// The same job on the employer's own careers page (freehire.me). Nothing
+// is shown; the lookup runs so the service worker keeps the match, and Comp
+// reads pay from it when LinkedIn shows none.
 function renderCompanySite(job) {
-  const el = els.companySite;
-  if (!el) return;
-  const jobId = job.jobId;
-  send('company-site-lookup', { jobId, title: job.posting?.title, company: job.posting?.company, location: job.posting?.location })
-    .then((res) => { if (currentJob?.jobId === jobId) paintCompanySite(el, job, res?.data); })
-    .catch(() => { el.hidden = true; });
-}
-
-function paintCompanySite(el, job, site) {
-  el.innerHTML = '';
-  el.hidden = !site || (site.status !== 'match' && site.status !== 'possible');
-  if (el.hidden) return;
-  el.title = "From freehire.me's catalogue of company career sites.";
-  const choose = (slug) => send('company-site-choose', { jobId: job.jobId, slug })
-    .then((res) => paintCompanySite(el, job, res?.data)).catch(() => {});
-
-  if (site.status === 'possible') {
-    el.append(h('span', { class: 'jc-eyebrow' }, 'Might be on the company site'));
-    for (const m of site.possible) {
-      el.append(h('div', { class: 'jc-company-site__row' },
-        h('span', {}, [m.title, m.location].filter(Boolean).join(' · ')),
-        h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: () => choose(m.slug) }, 'This one')));
-    }
-    el.append(h('button', { class: 'jc-linkbtn', type: 'button', onClick: () => choose(null) }, 'None of these'));
-    return;
-  }
-
-  const m = site.match;
-  const facts = [SOURCE_NAMES[m.source] || m.source];
-  if (m.ageDays != null) facts.push(m.ageDays === 0 ? 'posted today' : `up ${m.ageDays} day${m.ageDays === 1 ? '' : 's'}`);
-  if (m.repostCount > 1) facts.push(`posted ${m.repostCount} times`);
-  el.append(h('div', { class: 'jc-company-site__head' },
-    h('span', { class: 'jc-eyebrow' }, 'On the company site'),
-    m.closedAt
-      ? h('span', { class: 'jc-badge', dataset: { tone: 'neg' } }, `Closed ${fmtShortDate(m.closedAt)}`)
-      : h('a', {
-          class: 'jc-btn', 'data-variant': 'outline', 'data-size': 'sm', href: m.url, target: '_blank', rel: 'noopener',
-          // Lets the Fill button and the answer drafter on that page know
-          // which job this is — no status change, nothing applied yet.
-          onClick: () => send('company-site-opened', { jobId: job.jobId }).catch(() => {}),
-        }, 'Open ↗')));
-  el.append(h('p', { class: 'jc-company-site__facts' }, facts.join(' · ')));
-  if (m.fakeFreshness) {
-    el.append(h('p', { class: 'jc-company-site__note' }, 'Its posting date has been refreshed; the job is older than it looks.'));
-  }
-  const pay = m.salary && (m.salary.min || m.salary.max);
-  if (pay) {
-    const range = [m.salary.min, m.salary.max].filter(Boolean).map((n) => fmtMoneyK(n)).join(' to ');
-    el.append(h('p', { class: 'jc-company-site__note' },
-      `Pay on the company posting: ${range}${m.salary.currency && m.salary.currency !== 'USD' ? ` ${m.salary.currency}` : ''}${m.salary.period && m.salary.period !== 'year' ? ` per ${m.salary.period}` : ''} (as read by freehire). Comp uses it when you run it.`));
-  }
-  if (!site.chosen) {
-    el.append(h('button', { class: 'jc-linkbtn', type: 'button', title: 'Hide this if it is a different job', onClick: () => choose(null) }, 'Not this job'));
-  }
+  send('company-site-lookup', { jobId: job.jobId, title: job.posting?.title, company: job.posting?.company, location: job.posting?.location })
+    .catch(() => {});
 }
 
 function fmtShortDate(iso) {
