@@ -2553,21 +2553,33 @@ let panelFlyout = null;
 let currentTabUrl = '';
 let showSearchBar = false; // Settings → System → Jawbar display
 
+const ICONS = {
+  download: '<path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>',
+  sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
+};
+const icon = (name) => {
+  const n = document.createElement('span');
+  n.className = 'jb-icon';
+  n.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+  return n;
+};
 const spinner = (label) => [h('span', { class: 'jb-spin', 'aria-hidden': 'true' }), h('span', { class: 'jb-busy' }, label)];
 const doneMark = () => h('span', { class: 'jb-done', 'aria-label': 'Done' }, '✓');
 // Only the next step's button is accent-filled; every other one is outlined.
 const runBtn = (step, accent) => h('button', {
   class: 'jc-btn', 'data-size': 'sm', type: 'button', ...(accent ? { 'data-variant': 'primary' } : {}),
   onClick: (e) => { e.stopPropagation(); runAction(step); },
-}, RUN_LABEL[step]);
+}, RUN_LABEL[step], step === 'resume' || step === 'letter' ? icon('sparkle') : null);
 // A small outlined button on a done row. It must not also open the flyout.
-const quickBtn = (label, done, doneLabel = 'Copied') => {
+const quickBtn = (label, done, doneLabel = 'Copied', iconName = null) => {
+  const set = (text, withIcon) => b.replaceChildren(text, ...(withIcon && iconName ? [icon(iconName)] : []));
   const b = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: async (e) => {
     e.stopPropagation();
     await done();
-    b.textContent = doneLabel;
-    setTimeout(() => { if (b.isConnected) b.textContent = label; }, 1200);
-  } }, label);
+    set(doneLabel, false);
+    setTimeout(() => { if (b.isConnected) set(label, true); }, 1200);
+  } });
+  set(label, true);
   return b;
 };
 const docLine = (kind, record, extra) => {
@@ -2613,7 +2625,7 @@ const ROW_PARTS = {
     if (busy) return { slot: spinner('Baiting…'), main: [label('Resume')], res: [] };
     if (done) return {
       slot: [doneMark()], main: [label('Resume'), sub(docLine('resume', a.resume))],
-      res: [quickBtn('PDF', () => els.resumeDownload.click(), 'Opened'), chev()],
+      res: [quickBtn('PDF', () => els.resumeDownload.click(), 'Opened', 'download'), chev()],
     };
     return { slot: [runBtn('resume', accent)], main: [label('Resume')], res: [] };
   },

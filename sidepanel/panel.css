@@ -1431,3 +1431,4 @@ mark.jc-flagged, li.jc-flagged {
   .jb-ghost { padding: 6px 8px; font-size: 12.5px; }
 }
 @media (max-width: 340px) { .jc-tab { padding-inline: 4px; } }
+.jb-icon { display: inline-flex; margin-left: 6px; }
