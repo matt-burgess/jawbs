@@ -49,3 +49,10 @@ test('pickCompany wants the exact company', () => {
   assert.equal(pickCompany(cs, 'Stripe, Inc.').slug, 'stripe');
   assert.equal(pickCompany([{ slug: 'stripe-atlas', name: 'Stripe Atlas' }], 'Stripe'), null);
 });
+
+test('same title only in other cities is offered, not matched', () => {
+  const r = pickMatch([job('Staff Engineer', 'Globex', { location: 'Austin, TX' }), job('Staff Engineer', 'Globex', { location: 'Denver, CO' })],
+    { title: 'Staff Engineer', company: 'Globex', location: 'Seattle, WA' });
+  assert.equal(r.match, null);
+  assert.equal(r.possible.length, 2);
+});
