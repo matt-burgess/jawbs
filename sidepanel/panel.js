@@ -2647,7 +2647,15 @@ function paintRow(step, st, busy, a, accent) {
   } else {
     for (const attr of ['role', 'tabindex', 'aria-expanded', 'title']) row.removeAttribute(attr);
   }
-  fillRow(row, ROW_PARTS[step]({ a, done, busy, accent }));
+  const parts = ROW_PARTS[step]({ a, done, busy, accent });
+  // On a finished row the result sits beside the ✓, in what would be empty
+  // space; only the chevron stays at the right edge.
+  if (done && !busy) {
+    const chevs = parts.res.filter((n) => n.classList.contains('jb-chev'));
+    parts.slot = [...parts.slot, ...parts.res.filter((n) => !chevs.includes(n))];
+    parts.res = chevs;
+  }
+  fillRow(row, parts);
 }
 
 // Apply on the corp site. Opening it also marks the jawb Applied (a status
