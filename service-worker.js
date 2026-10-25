@@ -1417,6 +1417,7 @@ async function getListingDecorations(jobIds) {
     const fit = job.analyses?.fit?.result;
     const comp = job.analyses?.comp?.result;
     const strength = computeStrengthScore(job, { compTargets, followMap });
+    const hasFit = typeof fit?.fitScore === 'number';
     decorations[id] = {
       status: job.status || null,
       statusLabel: job.status ? statusLabel(job.status) : null,
@@ -1424,10 +1425,12 @@ async function getListingDecorations(jobIds) {
       compLow:  comp?.salary?.base?.low  ?? comp?.marketEstimate?.baseLow  ?? null,
       compHigh: comp?.salary?.base?.high ?? comp?.marketEstimate?.baseHigh ?? null,
       compScore: computeCompGaugeScore(comp, compTargets),
-      strengthScore: strength.score,
-      strengthTier: strength.tier,
-      strengthTierLabel: strength.tierLabel,
-      strengthTierImage: strength.tierImage,
+      // No fit, no strength: the composite's other parts (comp, network)
+      // add up to a number even for a job never analyzed. Null hides it.
+      strengthScore: hasFit ? strength.score : null,
+      strengthTier: hasFit ? strength.tier : null,
+      strengthTierLabel: hasFit ? strength.tierLabel : null,
+      strengthTierImage: hasFit ? strength.tierImage : null,
       // Connections normalized to 0-100 so the on-page mini-gauge in
       // scrape.js can render it with the same weak/fair/strong palette
       // as fit and comp. Raw component tops out at 20 (the network
