@@ -62,3 +62,11 @@ test('pickOption', () => {
   assert.equal(pickOption(opts('Maybe'), 'Yes'), -1);
   assert.equal(pickOption(opts('Yes'), ''), -1);
 });
+
+test('the Comp pay answer beats the saved salary and feeds the short answer', async () => {
+  const { buildValues } = await import('../lib/applicationFill.js');
+  const v = buildValues({ profile: { salaryExpectation: '150000' }, pay: { number: 270000, short: 'I am targeting $260K to $290K.' } });
+  assert.equal(v.salaryExpectation, '270000');
+  assert.equal(v.salaryShort, 'I am targeting $260K to $290K.');
+  assert.equal(buildValues({ profile: { salaryExpectation: '150000' } }).salaryExpectation, '150000');
+});

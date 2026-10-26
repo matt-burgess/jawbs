@@ -136,8 +136,15 @@
   // Empty fields only; a field the user (or the ATS's own resume parser)
   // already filled is theirs.
   async function plan() {
-    const r = await chrome.storage.local.get([...Object.values(KEYS), 'settings.candidateName', 'settings.applicationProfile']);
+    const r = await chrome.storage.local.get([...Object.values(KEYS), 'settings.candidateName', 'settings.applicationProfile', 'ui.payAnswer', 'ui.applyClick', 'ui.activeApplicationJawbId']);
+    // The pay answer from Comp, if it is for the job being applied to:
+    // the one just opened from LinkedIn or the Jawbar, else the one on screen.
+    const pa = r['ui.payAnswer'];
+    const click = r['ui.applyClick'];
+    const recent = click && Date.now() - click.at < 6 * 60 * 60_000 ? String(click.jobId) : null;
+    const pay = pa && [recent, r['ui.activeApplicationJawbId']].filter(Boolean).includes(String(pa.jobId)) ? pa : null;
     const values = buildValues({
+      pay,
       name: r['settings.candidateName'], email: r[KEYS.email], phone: r[KEYS.phone],
       location: r[KEYS.location], linkedInUrl: r[KEYS.linkedInUrl],
       profile: r['settings.applicationProfile'] || {},
@@ -163,6 +170,15 @@
       // The native setter, not `el.value =`: React-controlled inputs ignore
       // the latter and snap back to empty on the next render.
       if (value) todo.push({ el, apply: () => Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, value) });
+    }
+
+    // A pay question asked as a paragraph gets the short answer.
+    for (const el of document.querySelectorAll('textarea')) {
+      if (el.disabled || el.readOnly || el.value || !visible(el) || !values.salaryShort) continue;
+      const label = extractQuestionFor(el) || '';
+      if (fieldKey({ label, hint: hintOf(el) }) === 'salaryExpectation') {
+        todo.push({ el, apply: () => Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(el, values.salaryShort) });
+      }
     }
 
     const groups = new Map();

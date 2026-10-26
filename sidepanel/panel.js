@@ -1129,6 +1129,13 @@ function renderStatusPill(job) {
 }
 
 
+// The pay answer for the jawb on screen, left where the application
+// autofill (content/externalFill.js) can read it on the employer's site.
+function publishPayAnswer(job) {
+  const answer = job && compView(job.analyses?.comp, compTargets || {})?.answer;
+  if (answer) chrome.storage.local.set({ 'ui.payAnswer': { jobId: String(job.jobId), number: answer.number, short: answer.short, at: Date.now() } }).catch(() => {});
+}
+
 function renderAnalysisSection(job) {
   if (!job) { els.analysisSection.hidden = true; return; }
   els.analysisSection.hidden = false;
@@ -1146,6 +1153,7 @@ function renderAnalysisSection(job) {
 
   updateCardStatuses(a);
   selectPane(activePane);
+  publishPayAnswer(job);
   renderSteps();
   pushFlyout();
 }
@@ -2615,7 +2623,11 @@ const ROW_PARTS = {
         slot: [doneMark()],
         main: [label('Comp'), sub(
           h('span', { class: `tone-${v.badge.tone}`, title: v.estimate ? "The model's own estimate, not a pay database." : 'Stated in the posting.' }, v.badge.name),
-          v.verdict ? ` · ${v.verdict.label}` : '')],
+          v.verdict ? ` · ${v.verdict.label}` : ''),
+          // For pasting into an application's pay question.
+          v.answer ? h('span', { class: 'jb-copies' },
+            v.answer.number != null ? quickBtn(`Copy ${v.answer.numberText}`, () => navigator.clipboard.writeText(String(v.answer.number)), 'Copied') : null,
+            v.answer.short ? quickBtn('Copy short answer', () => navigator.clipboard.writeText(v.answer.short), 'Copied') : null) : null],
         res: [h('span', { class: 'jb-mono jb-range' }, `${v.estimate && v.range ? '~' : ''}${v.range || 'No range'}`), chev()],
       };
     }
@@ -2683,20 +2695,13 @@ function paintApply(job, st, accent) {
     class: 'jc-btn', 'data-size': 'sm', ...(accent ? { 'data-variant': 'primary' } : {}),
     href: `https://www.google.com/search?q=${encodeURIComponent(q)}`, target: '_blank', rel: 'noopener noreferrer',
     title: "Google search for '[Company] Careers - [Jawb Title]'. It often lands directly on the same role on the company's own careers site.",
-    onClick: () => { if (job.status && huntStageIndex(job.status) < 2 && !TERMINAL_STATES.has(status)) setJobStatus('applied', 'Opened the corp site'); },
+    onClick: () => {
+      // Tells the application autofill whose application the next tab is.
+      chrome.storage.local.set({ 'ui.applyClick': { jobId: String(job.jobId), title: p.title || '', company: p.company || '', at: Date.now() } }).catch(() => {});
+      if (job.status && huntStageIndex(job.status) < 2 && !TERMINAL_STATES.has(status)) setJobStatus('applied', 'Opened the corp site');
+    },
   }, 'Open ↗');
-  const answer = st.done.comp ? compView(job.analyses.comp, compTargets || {})?.answer : null;
-  let line;
-  if (answer?.number != null) {
-    const copy = h('button', { class: 'jb-textbtn', type: 'button', onClick: async () => {
-      await navigator.clipboard.writeText(String(answer.number));
-      copy.textContent = 'Copied';
-      setTimeout(() => { if (copy.isConnected) copy.textContent = 'Copy'; }, 1500);
-    } }, 'Copy');
-    line = sub('If asked about pay: ', h('b', { class: 'jb-mono' }, answer.numberText), ' ', copy);
-  } else {
-    line = sub('Keeps LinkedIn out of the applicant tracking record');
-  }
+  const line = sub('Keeps LinkedIn out of the applicant tracking record');
   fillRow(row, { slot: [open], main: [label('Apply on corp site'), line], res: [] });
 }
 

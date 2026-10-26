@@ -1434,3 +1434,5 @@ mark.jc-flagged, li.jc-flagged {
 .jb-icon { display: inline-flex; margin-left: 6px; }
 .jb-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 50%; flex: none; font: 700 11px/1 var(--jc-font-mono); border: 1.5px solid currentColor; }
 .jc__verdict .jc-btn[data-variant="primary"] .jb-num { background: var(--jc-accent-ink); border-color: var(--jc-accent-ink); color: var(--jc-accent); }
+.jb-copies { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.jb-copies .jc-btn { min-height: 24px; padding: 0 8px; font-size: 12px; }
