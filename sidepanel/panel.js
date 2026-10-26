@@ -805,7 +805,7 @@ function wireMenu(btn, menu) {
 wireMenu(els.jobMenuBtn, els.jobMenu);
 wireMenu(els.statusPill, els.statusMenu);
 wireMenu(els.moreBtn, els.moreMenu);
-els.moreMenu.addEventListener('click', (e) => {
+els.jbBar.addEventListener('click', (e) => {
   const item = e.target.closest('[data-sheet]');
   if (item) openSheet(item.dataset.sheet);
 });
