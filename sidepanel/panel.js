@@ -1040,7 +1040,7 @@ function renderStrip(job, fit) {
     els.metaStrength.hidden = true;
     els.metaSharkImg.hidden = true;
     els.metaShark.title = 'Run Fit to score this role.';
-    if (net) net.textContent = 'Network';
+    if (net) { net.dataset.score = ''; net.textContent = 'Network'; }
     return;
   }
   const strength = computeStrengthScore(job, { compTargets, followMap });
@@ -1059,7 +1059,7 @@ function renderStrip(job, fit) {
     + `Strength ${strength.score}/100 = fit ${strength.breakdown.fit.note} · `
     + `comp ${strength.breakdown.comp.note} · connections ${strength.breakdown.connections.note}. `
     + `Weights: fit 50% · comp 30% · connections 20%.`;
-  if (net) net.textContent = `Network · ${conn && conn.max ? Math.round((conn.score / conn.max) * 100) : 0}`;
+  if (net) net.dataset.score = String(conn && conn.max ? Math.round((conn.score / conn.max) * 100) : 0);
 }
 
 // Freshness and applicant badges — free facts, so they show before any
@@ -2563,6 +2563,7 @@ let showSearchBar = false; // Settings → System → Jawbar display
 
 const ICONS = {
   download: '<path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
   sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
 };
 const icon = (name) => {
@@ -2579,9 +2580,9 @@ const runBtn = (step, accent) => h('button', {
   onClick: (e) => { e.stopPropagation(); runAction(step); },
 }, h('span', { class: 'jb-num', 'aria-hidden': 'true' }, String(STEPS.indexOf(step) + 1)), RUN_LABEL[step], step === 'resume' || step === 'letter' ? icon('sparkle') : null);
 // A small outlined button on a done row. It must not also open the flyout.
-const quickBtn = (label, done, doneLabel = 'Copied', iconName = null) => {
+const quickBtn = (label, done, doneLabel = 'Copied', iconName = null, title = '') => {
   const set = (text, withIcon) => b.replaceChildren(text, ...(withIcon && iconName ? [icon(iconName)] : []));
-  const b = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', onClick: async (e) => {
+  const b = h('button', { class: 'jc-btn', 'data-size': 'sm', type: 'button', ...(title ? { title } : {}), onClick: async (e) => {
     e.stopPropagation();
     await done();
     set(doneLabel, false);
@@ -2626,8 +2627,8 @@ const ROW_PARTS = {
           v.verdict ? ` · ${v.verdict.label}` : ''),
           // For pasting into an application's pay question.
           v.answer ? h('span', { class: 'jb-copies' },
-            v.answer.number != null ? quickBtn(`Copy ${v.answer.numberText}`, () => navigator.clipboard.writeText(String(v.answer.number)), 'Copied') : null,
-            v.answer.short ? quickBtn('Copy short answer', () => navigator.clipboard.writeText(v.answer.short), 'Copied') : null) : null],
+            v.answer.number != null ? quickBtn(v.answer.numberText, () => navigator.clipboard.writeText(String(v.answer.number)), 'Copied', 'copy', 'Copy the number for a pay field') : null,
+            v.answer.short ? quickBtn('Short answer', () => navigator.clipboard.writeText(v.answer.short), 'Copied', 'copy', 'Copy the short answer for a pay question') : null) : null],
         res: [h('span', { class: 'jb-mono jb-range' }, `${v.estimate && v.range ? '~' : ''}${v.range || 'No range'}`), chev()],
       };
     }
@@ -2705,6 +2706,20 @@ function paintApply(job, st, accent) {
   fillRow(row, { slot: [open], main: [label('Apply on corp site'), line], res: [] });
 }
 
+// Step 5: people to message at the company. The link and the visibility
+// come from the hidden #networkAtCompany (renderVerdict decides both).
+function paintNetwork() {
+  const row = $('rowNetwork');
+  const src = els.networkAtCompany;
+  row.hidden = !src || src.hidden;
+  if (row.hidden) return;
+  const go = h('a', { class: 'jc-btn', 'data-size': 'sm', href: src.href, target: '_blank', rel: 'noopener noreferrer',
+    title: 'Find your 1st and 2nd degree LinkedIn connections at this company.' },
+    h('span', { class: 'jb-num', 'aria-hidden': 'true' }, '5'), 'Find people');
+  const score = src.dataset.score;
+  fillRow(row, { slot: [go], main: [label('Network'), sub(score ? `Score ${score} · ` : '', 'Connections to message about this role')], res: [] });
+}
+
 function renderSteps() {
   const job = currentJob;
   if (!job || !els.rowFit) return;
@@ -2714,6 +2729,7 @@ function renderSteps() {
   const accent = accentStep(st, huntStageIndex(job.status) >= 2);
   for (const step of STEPS) paintRow(step, st, active.has(STEP_MSG[step]), a, accent === step);
   paintApply(job, st, accent === 'apply');
+  paintNetwork();
   // A weak fit dims what comes after it (CSS) and says why. Nothing is disabled.
   els.verdictBlock.dataset.weak = String(st.weak);
   els.weakNote.hidden = !st.weak;
