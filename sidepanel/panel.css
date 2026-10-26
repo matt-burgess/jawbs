@@ -1432,3 +1432,5 @@ mark.jc-flagged, li.jc-flagged {
 }
 @media (max-width: 340px) { .jc-tab { padding-inline: 4px; } }
 .jb-icon { display: inline-flex; margin-left: 6px; }
+.jb-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 50%; flex: none; font: 700 11px/1 var(--jc-font-mono); border: 1.5px solid currentColor; }
+.jc__verdict .jc-btn[data-variant="primary"] .jb-num { background: var(--jc-accent-ink); border-color: var(--jc-accent-ink); color: var(--jc-accent); }

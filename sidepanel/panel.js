@@ -2569,7 +2569,7 @@ const doneMark = () => h('span', { class: 'jb-done', 'aria-label': 'Done' }, 'âœ
 const runBtn = (step, accent) => h('button', {
   class: 'jc-btn', 'data-size': 'sm', type: 'button', ...(accent ? { 'data-variant': 'primary' } : {}),
   onClick: (e) => { e.stopPropagation(); runAction(step); },
-}, RUN_LABEL[step], step === 'resume' || step === 'letter' ? icon('sparkle') : null);
+}, h('span', { class: 'jb-num', 'aria-hidden': 'true' }, String(STEPS.indexOf(step) + 1)), RUN_LABEL[step], step === 'resume' || step === 'letter' ? icon('sparkle') : null);
 // A small outlined button on a done row. It must not also open the flyout.
 const quickBtn = (label, done, doneLabel = 'Copied', iconName = null) => {
   const set = (text, withIcon) => b.replaceChildren(text, ...(withIcon && iconName ? [icon(iconName)] : []));
