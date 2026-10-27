@@ -2414,6 +2414,7 @@ async function runAnalysis(button, errorEl, msgType, payload, onSuccess) {
   const jobId = payload.jobId || currentJob.jobId;
   if (!jobId) { errorEl.hidden = false; errorEl.textContent = 'No jobId'; return; }
   errorEl.hidden = true;
+  els.stepError.hidden = true;
 
   noteAnalysisStart(jobId, msgType);
 
@@ -2447,6 +2448,9 @@ async function runAnalysis(button, errorEl, msgType, payload, onSuccess) {
     if (currentJob?.jobId === jobId) {
       errorEl.hidden = false;
       errorEl.textContent = e.message;
+      // The cards that hold errorEl are not on the Jawb tab; say it here.
+      els.stepError.hidden = false;
+      els.stepError.textContent = `${STEP_LABEL[MSG_STEP[msgType]] || 'That step'} failed: ${e.message}`;
     }
   } finally {
     noteAnalysisEnd(jobId, msgType);

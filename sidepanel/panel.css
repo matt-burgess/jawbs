@@ -1435,3 +1435,4 @@ mark.jc-flagged, li.jc-flagged {
 .jb-copies { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 4px; }
 .jb-copies .jc-btn { min-height: 24px; padding: 0 7px; font-size: 12px; }
 .jb-copies .jb-icon { order: -1; margin: 0 5px 0 0; }
+.jb-error { margin: 8px 0 0; padding: 8px 10px; border: 1px solid var(--jc-neg-line); border-radius: 4px; background: var(--jc-neg-weak); color: var(--jc-neg); font: 400 12px/1.4 var(--jc-font); }
