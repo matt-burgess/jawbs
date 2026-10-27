@@ -1129,11 +1129,34 @@ function renderStatusPill(job) {
 }
 
 
-// The pay answer for the jawb on screen, left where the application
-// autofill (content/externalFill.js) can read it on the employer's site.
-function publishPayAnswer(job) {
-  const answer = job && compView(job.analyses?.comp, compTargets || {})?.answer;
-  if (answer) chrome.storage.local.set({ 'ui.payAnswer': { jobId: String(job.jobId), number: answer.number, short: answer.short, at: Date.now() } }).catch(() => {});
+// What the "Jawbs kit" on an employer's application page offers for the
+// jawb on screen: the pay answer, the resume and the cover letter (text
+// and ready-to-print PDF payloads). Left in storage for
+// content/externalFill.js; the service worker prints the PDFs.
+let kitSeq = 0;
+async function publishKit(job) {
+  const seq = ++kitSeq;
+  if (!job?.jobId) return;
+  const a = job.analyses || {};
+  const st = stepStates(a);
+  const answer = st.done.comp ? compView(a.comp, compTargets || {})?.answer : null;
+  const company = (job.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, '');
+  const header = (st.done.resume || st.done.letter) ? await resumeHeader() : null;
+  if (seq !== kitSeq) return; // a newer render took over
+  const last = ((header?.name || '').trim().split(/\s+/).pop() || 'Candidate').replace(/[^A-Za-z0-9]+/g, '');
+  const kit = { jobId: String(job.jobId), company: job.posting?.company || '', at: Date.now(),
+    pay: answer ? { number: answer.number, short: answer.short } : null, resume: null, letter: null, print: {} };
+  if (st.done.resume) {
+    const r = a.resume.result || {};
+    const isV2 = r.summary != null || Array.isArray(r.experience);
+    kit.resume = resumeToPlainText(r);
+    kit.print.resume = { kind: 'Resume', filename: `${last}_${company}_Resume.pdf`, resume: isV2 ? r : null, header: isV2 ? header : null, body: isV2 ? null : kit.resume };
+  }
+  if (st.done.letter) {
+    kit.letter = a.coverLetter.result?.letter || '';
+    kit.print.letter = { kind: 'CoverLetter', filename: `${last}_${company}_CoverLetter.pdf`, body: kit.letter };
+  }
+  chrome.storage.local.set({ 'ui.kit': kit }).catch(() => {});
 }
 
 function renderAnalysisSection(job) {
@@ -1153,7 +1176,7 @@ function renderAnalysisSection(job) {
 
   updateCardStatuses(a);
   selectPane(activePane);
-  publishPayAnswer(job);
+  publishKit(job);
   renderSteps();
   pushFlyout();
 }

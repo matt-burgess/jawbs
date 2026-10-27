@@ -346,6 +346,18 @@ const handlers = {
     try { await chrome.tabs.remove(tabId); return { ok: true }; }
     catch (e) { return { ok: false, error: e.message }; }
   },
+  // Content-script-callable: the "Jawbs kit" on an application page asks
+  // for the resume or cover letter PDF. Only what the panel stored in
+  // ui.kit is ever printed; the page supplies nothing but which one.
+  'open-kit-pdf': async (msg) => {
+    const kit = (await chrome.storage.local.get('ui.kit'))['ui.kit'];
+    const print = kit?.print?.[msg.kind === 'letter' ? 'letter' : 'resume'];
+    if (!print) return { ok: false, error: 'nothing to print' };
+    const key = `print.${Date.now()}`;
+    await chrome.storage.session.set({ [key]: { ...print, paper: (await getDocumentSettings()).paper } });
+    await chrome.tabs.create({ url: `${chrome.runtime.getURL('print/print.html')}?k=${encodeURIComponent(key)}` });
+    return { ok: true };
+  },
   'mark-exported': async () => { await setLastExportAt(new Date().toISOString()); return { ok: true }; },
   'get-last-export': getLastExportAt,
   'get-usage': getUsage,

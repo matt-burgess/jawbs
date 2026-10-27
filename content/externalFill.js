@@ -136,10 +136,10 @@
   // Empty fields only; a field the user (or the ATS's own resume parser)
   // already filled is theirs.
   async function plan() {
-    const r = await chrome.storage.local.get([...Object.values(KEYS), 'settings.candidateName', 'settings.applicationProfile', 'ui.payAnswer', 'ui.applyClick', 'ui.activeApplicationJawbId']);
+    const r = await chrome.storage.local.get([...Object.values(KEYS), 'settings.candidateName', 'settings.applicationProfile', 'ui.kit', 'ui.applyClick', 'ui.activeApplicationJawbId']);
     // The pay answer from Comp, if it is for the job being applied to:
     // the one just opened from LinkedIn or the Jawbar, else the one on screen.
-    const pa = r['ui.payAnswer'];
+    const pa = r['ui.kit']?.pay ? { ...r['ui.kit'].pay, jobId: r['ui.kit'].jobId } : null;
     const click = r['ui.applyClick'];
     const recent = click && Date.now() - click.at < 6 * 60 * 60_000 ? String(click.jobId) : null;
     const pay = pa && [recent, r['ui.activeApplicationJawbId']].filter(Boolean).includes(String(pa.jobId)) ? pa : null;
@@ -255,4 +255,75 @@
   new MutationObserver(() => { clearTimeout(refreshTimer); refreshTimer = setTimeout(refresh, 600); })
     .observe(document.body, { childList: true, subtree: true });
   refresh();
+
+  // ---------- The Jawbs kit ----------
+  //
+  // What the user has been flipping back to the Jawbar for while applying:
+  // the pay answer, the resume and the cover letter, one click each, on
+  // this page. Shown for the job just opened from the Jawbar or LinkedIn
+  // (or the one on screen there). Nothing is typed into the form from here.
+  const kitHost = document.createElement('div');
+  kitHost.id = 'jc-kit';
+  const kitRoot = kitHost.attachShadow({ mode: 'open' });
+  let kitOpen = true;
+  let kitHidden = false; // dismissed for this page
+
+  const ruleOk = (kit, r) => {
+    const click = r['ui.applyClick'];
+    const recent = click && Date.now() - click.at < 6 * 60 * 60_000 ? String(click.jobId) : null;
+    return kit && [recent, r['ui.activeApplicationJawbId']].filter(Boolean).includes(String(kit.jobId));
+  };
+  async function copy(text, btn) {
+    try { await navigator.clipboard.writeText(text); } catch {
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    const was = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(() => { btn.textContent = was; }, 1200);
+  }
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) k === 'onclick' ? n.addEventListener('click', v) : n.setAttribute(k, v);
+    n.append(...kids.filter((x) => x != null));
+    return n;
+  };
+
+  async function paintKit() {
+    const r = await chrome.storage.local.get(['ui.kit', 'ui.applyClick', 'ui.activeApplicationJawbId']);
+    const kit = r['ui.kit'];
+    const has = kit && (kit.pay || kit.resume || kit.letter);
+    if (kitHidden || !has || !ruleOk(kit, r)) { kitHost.remove(); return; }
+    const row = (name, ...btns) => el('div', { class: 'r' }, el('span', {}, name), el('span', { class: 'b' }, ...btns));
+    const cbtn = (label, text) => { const b = el('button', { type: 'button' }, label); b.addEventListener('click', () => copy(text, b)); return b; };
+    const pbtn = (kind) => el('button', { type: 'button', onclick: () => chrome.runtime.sendMessage({ type: 'open-kit-pdf', kind }).catch(() => {}) }, 'PDF');
+    const rows = [
+      kit.pay?.number != null ? row(`Pay ${'$' + Number(kit.pay.number).toLocaleString('en-US')}`, cbtn('Copy', String(kit.pay.number))) : null,
+      kit.pay?.short ? row('Short answer', cbtn('Copy', kit.pay.short)) : null,
+      kit.resume ? row('Resume', pbtn('resume'), cbtn('Copy text', kit.resume)) : null,
+      kit.letter ? row('Cover letter', pbtn('letter'), cbtn('Copy', kit.letter)) : null,
+    ].filter(Boolean);
+    const head = el('div', { class: 'h' },
+      el('strong', {}, `Jawbs kit${kit.company ? ` · ${kit.company}` : ''}`),
+      el('button', { type: 'button', 'aria-label': kitOpen ? 'Collapse' : 'Expand', onclick: () => { kitOpen = !kitOpen; paintKit(); } }, kitOpen ? '–' : '+'),
+      el('button', { type: 'button', 'aria-label': 'Hide for this page', onclick: () => { kitHidden = true; kitHost.remove(); } }, '×'));
+    kitRoot.replaceChildren(el('style', {}, `
+      :host{all:initial;position:fixed;left:20px;bottom:20px;z-index:2147483646;font:13px/1.4 system-ui,-apple-system,sans-serif}
+      .k{width:290px;background:#0E131B;color:#E6EDF5;border:1px solid #3B4B61;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+      .h{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid #2B384A}
+      .h strong{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-top:1px solid #2B384A}
+      .r:first-of-type{border-top:0}
+      .b{display:flex;gap:6px}
+      button{font:600 12px/1 system-ui,sans-serif;color:#B3C0CF;background:transparent;border:1px solid #3B4B61;border-radius:4px;padding:6px 9px;cursor:pointer}
+      button:hover{color:#E6EDF5;border-color:#22CCEE}
+      .h button{border:0;padding:2px 6px;font-size:16px}`),
+      el('div', { class: 'k', role: 'region', 'aria-label': 'Jawbs kit' }, head, ...(kitOpen ? rows : [])));
+    if (!kitHost.isConnected) document.body.appendChild(kitHost);
+  }
+  // Top frame only: ATS pages that embed the form in an iframe get one kit, not two.
+  if (window.top === window) {
+    chrome.storage.onChanged.addListener((c) => { if (c['ui.kit'] || c['ui.applyClick']) paintKit(); });
+    paintKit();
+  }
 })();
