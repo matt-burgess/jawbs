@@ -349,8 +349,19 @@ const handlers = {
   // Content-script-callable: the "Jawbs kit" on an application page asks
   // for the resume or cover letter PDF. Only what the panel stored in
   // ui.kit is ever printed; the page supplies nothing but which one.
-  'open-kit-pdf': async (msg) => {
-    const kit = (await chrome.storage.local.get('ui.kit'))['ui.kit'];
+  // The kit a tab was opened with, copied when the tab was created so a later
+  // render of another jawb cannot swap it.
+  'kit-for-tab': async (_msg, sender) => {
+    const kit = (await chrome.storage.session.get(`kit.${sender?.tab?.id}`))[`kit.${sender?.tab?.id}`];
+    return { ok: true, data: kit ? { title: kit.title, company: kit.company, pay: kit.pay, resume: kit.resume, letter: kit.letter } : null };
+  },
+  'kit-dismiss': async (_msg, sender) => {
+    await chrome.storage.session.remove(`kit.${sender?.tab?.id}`);
+    return { ok: true };
+  },
+  'open-kit-pdf': async (msg, sender) => {
+    const kit = (await chrome.storage.session.get(`kit.${sender?.tab?.id}`))[`kit.${sender?.tab?.id}`];
+    if (!kit) return { ok: false, error: 'not a kit tab' };
     const print = kit?.print?.[msg.kind === 'letter' ? 'letter' : 'resume'];
     if (!print) return { ok: false, error: 'nothing to print' };
     const key = `print.${Date.now()}`;
@@ -362,6 +373,16 @@ const handlers = {
   'get-last-export': getLastExportAt,
   'get-usage': getUsage,
 };
+
+// The Jawbar's Open button marks the moment (kit.pending); the tab Chrome
+// creates right after is the kit's tab and keeps it as it navigates.
+chrome.tabs.onCreated.addListener(async (tab) => {
+  const pending = (await chrome.storage.session.get('kit.pending'))['kit.pending'];
+  if (!pending || Date.now() - pending > 5000) return;
+  const kit = (await chrome.storage.local.get('ui.kit'))['ui.kit'];
+  await chrome.storage.session.set({ 'kit.pending': 0, ...(kit ? { [`kit.${tab.id}`]: kit } : {}) });
+});
+chrome.tabs.onRemoved.addListener((tabId) => { chrome.storage.session.remove(`kit.${tabId}`).catch(() => {}); });
 
 // Handlers that are unsafe for a content-script to invoke — a
 // compromised page script on any listed ATS host could otherwise

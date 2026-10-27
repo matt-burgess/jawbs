@@ -42,6 +42,12 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["https://*/*"],
+      "exclude_matches": ["https://www.linkedin.com/*"],
+      "js": ["content/kit.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": ["https://www.linkedin.com/*"],
       "js": ["content/flyout.js"],
       "run_at": "document_idle"

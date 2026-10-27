@@ -1144,7 +1144,7 @@ async function publishKit(job) {
   const header = (st.done.resume || st.done.letter) ? await resumeHeader() : null;
   if (seq !== kitSeq) return; // a newer render took over
   const last = ((header?.name || '').trim().split(/\s+/).pop() || 'Candidate').replace(/[^A-Za-z0-9]+/g, '');
-  const kit = { jobId: String(job.jobId), company: job.posting?.company || '', at: Date.now(),
+  const kit = { jobId: String(job.jobId), title: job.posting?.title || '', company: job.posting?.company || '', at: Date.now(),
     pay: answer ? { number: answer.number, short: answer.short } : null, resume: null, letter: null, print: {} };
   if (st.done.resume) {
     const r = a.resume.result || {};
@@ -2720,6 +2720,8 @@ function paintApply(job, st, accent) {
     href: `https://www.google.com/search?q=${encodeURIComponent(q)}`, target: '_blank', rel: 'noopener noreferrer',
     title: "Google search for '[Company] Careers - [Jawb Title]'. It often lands directly on the same role on the company's own careers site.",
     onClick: () => {
+      // The tab Chrome opens next gets the Jawbs kit (service worker).
+      chrome.storage.session.set({ 'kit.pending': Date.now() }).catch(() => {});
       // Tells the application autofill whose application the next tab is.
       chrome.storage.local.set({ 'ui.applyClick': { jobId: String(job.jobId), title: p.title || '', company: p.company || '', at: Date.now() } }).catch(() => {});
       if (job.status && huntStageIndex(job.status) < 2 && !TERMINAL_STATES.has(status)) setJobStatus('applied', 'Opened the corp site');
