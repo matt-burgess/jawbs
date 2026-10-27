@@ -5,7 +5,7 @@ import {
   getModels,
   getProfile,
   getMasterResume,
-  getCompTargets,
+  getCompTargets, getCandidateName, getCandidateTagline, getContactEmail, getContactPhone, getContactLocation,
   getWritingSamples,
   getAutoAnalyzeEnabled,
   getLocalModelSettings,
@@ -48,6 +48,7 @@ import { MODEL_IDS } from './lib/models.js';
 import { FIT_SYSTEM, FIT_PROMPT_VERSION, buildFitUserMessage } from './lib/prompts/fit.js';
 import { COMP_SYSTEM, COMP_PROMPT_VERSION, buildCompUserMessage } from './lib/prompts/comp.js';
 import { normalizeComp } from './lib/jawbSteps.js';
+import { buildKit } from './lib/kit.js';
 import {
   BRIEF_SYSTEM, QUESTION_PROMPT_VERSION, buildBriefUserMessage,
 } from './lib/prompts/questionPrep.js';
@@ -354,6 +355,22 @@ const handlers = {
   'kit-for-tab': async (_msg, sender) => {
     const kit = (await chrome.storage.session.get(`kit.${sender?.tab?.id}`))[`kit.${sender?.tab?.id}`];
     return { ok: true, data: kit ? { title: kit.title, company: kit.company, pay: kit.pay, resume: kit.resume, letter: kit.letter } : null };
+  },
+  // Generate from the card: runs the same generation as the Jawbar's
+  // buttons, for the job this tab was opened with, and returns the kit.
+  'kit-generate': async (msg, sender) => {
+    const id = sender?.tab?.id;
+    const kit = (await chrome.storage.session.get(`kit.${id}`))[`kit.${id}`];
+    if (!kit) return { ok: false, error: 'not a kit tab' };
+    const kind = msg.kind === 'letter' ? 'letter' : 'resume';
+    await handlers[kind === 'letter' ? 'generate-letter' : 'generate-resume']({ jobId: kit.jobId });
+    const job = await getJob(kit.jobId);
+    const [name, tagline, email, phone, location, targets] = await Promise.all([
+      getCandidateName(), getCandidateTagline(), getContactEmail(), getContactPhone(), getContactLocation(), getCompTargets(),
+    ]);
+    const next = buildKit(job, { targets, header: { name, tagline, email, phone, location } });
+    await chrome.storage.session.set({ [`kit.${id}`]: next });
+    return { ok: true, data: next };
   },
   'kit-dismiss': async (_msg, sender) => {
     await chrome.storage.session.remove(`kit.${sender?.tab?.id}`);

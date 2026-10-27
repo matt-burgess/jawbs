@@ -11,8 +11,8 @@
   if (window.top !== window) return;
   let res;
   try { res = await chrome.runtime.sendMessage({ type: 'kit-for-tab' }); } catch { return; }
-  const kit = res?.data;
-  if (!kit || !(kit.pay || kit.resume || kit.letter)) return;
+  let kit = res?.data;
+  if (!kit) return;
 
   const host = document.createElement('div');
   host.id = 'jc-kit';
@@ -38,12 +38,32 @@
   const pdfBtn = (kind) => el('button', { type: 'button', onclick: () => chrome.runtime.sendMessage({ type: 'open-kit-pdf', kind }).catch(() => {}) }, 'PDF');
   const row = (name, ...btns) => el('div', { class: 'r' }, el('span', { class: 'n' }, name), el('span', { class: 'b' }, ...btns));
 
+  // Not generated yet: one button makes it here (the same generation as
+  // the Jawbar's), then the card offers it.
+  let busy = null; let error = '';
+  const genBtn = (kind, label) => {
+    const b = el('button', { type: 'button' }, busy === kind ? 'Generating\u2026' : label);
+    if (busy) b.disabled = true;
+    b.addEventListener('click', async () => {
+      busy = kind; error = ''; paint();
+      try {
+        const r = await chrome.runtime.sendMessage({ type: 'kit-generate', kind });
+        if (!r?.ok) throw new Error(r?.error || 'Failed');
+        kit = r.data;
+        if (kind === 'resume') chrome.runtime.sendMessage({ type: 'open-kit-pdf', kind }).catch(() => {});
+      } catch (e) { error = e.message; }
+      busy = null; paint();
+    });
+    return b;
+  };
+
   function paint() {
     const rows = [
       kit.pay?.number != null ? row(`Pay $${Number(kit.pay.number).toLocaleString('en-US')}`, copyBtn('Copy', String(kit.pay.number))) : null,
       kit.pay?.short ? row('Short answer', copyBtn('Copy', kit.pay.short)) : null,
-      kit.resume ? row('Resume', pdfBtn('resume'), copyBtn('Copy text', kit.resume)) : null,
-      kit.letter ? row('Cover letter', pdfBtn('letter'), copyBtn('Copy', kit.letter)) : null,
+      kit.resume ? row('Resume', pdfBtn('resume'), copyBtn('Copy text', kit.resume)) : row('Resume', genBtn('resume', 'Generate PDF')),
+      kit.letter ? row('Cover letter', pdfBtn('letter'), copyBtn('Copy', kit.letter)) : row('Cover letter', genBtn('letter', 'Generate')),
+      error ? el('div', { class: 'e' }, error) : null,
     ].filter(Boolean);
     const head = el('div', { class: 'h' },
       el('div', { class: 't' }, el('strong', {}, kit.title || 'Your application'), kit.company ? el('span', {}, kit.company) : null),
@@ -61,6 +81,8 @@
       .b{display:flex;gap:6px;flex:none}
       button{font:600 12px/1 system-ui,sans-serif;color:#B3C0CF;background:transparent;border:1px solid #3B4B61;border-radius:4px;padding:6px 10px;cursor:pointer}
       button:hover{color:#E6EDF5;border-color:#22CCEE}
+      button:disabled{opacity:.6;cursor:default}
+      .e{padding:8px 12px;border-top:1px solid #2B384A;color:#FF7373;font-size:12px}
       button.x{border:0;padding:2px 7px;font-size:18px;line-height:1}`),
       el('div', { class: 'k', role: 'dialog', 'aria-label': 'Jawbs kit' }, head, ...(open ? rows : [])));
   }

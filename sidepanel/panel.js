@@ -16,6 +16,8 @@ import { renderDocUnits, renderDocHistory, flaggedCount } from '../lib/unitView.
 import { docFromJob, undoTarget } from '../lib/documentHistory.js';
 import { STEPS, accentStep, scoreBand, fmtMoneyK, isFitSkeleton, stepStates, fitView, compView } from '../lib/jawbSteps.js';
 import { createFlyout } from '../lib/flyoutView.js';
+import { resumeToPlainText } from '../lib/resumeText.js';
+import { buildKit } from '../lib/kit.js';
 import { resumeFromUnits } from '../lib/documentUnits.js';
 import { nextTrim, trimNote } from '../lib/pageLimit.js';
 import { measurePages } from '../lib/pageMeasure.js';
@@ -1137,26 +1139,9 @@ let kitSeq = 0;
 async function publishKit(job) {
   const seq = ++kitSeq;
   if (!job?.jobId) return;
-  const a = job.analyses || {};
-  const st = stepStates(a);
-  const answer = st.done.comp ? compView(a.comp, compTargets || {})?.answer : null;
-  const company = (job.posting?.company || 'Company').replace(/[^A-Za-z0-9]+/g, '');
-  const header = (st.done.resume || st.done.letter) ? await resumeHeader() : null;
+  const header = await resumeHeader();
   if (seq !== kitSeq) return; // a newer render took over
-  const last = ((header?.name || '').trim().split(/\s+/).pop() || 'Candidate').replace(/[^A-Za-z0-9]+/g, '');
-  const kit = { jobId: String(job.jobId), title: job.posting?.title || '', company: job.posting?.company || '', at: Date.now(),
-    pay: answer ? { number: answer.number, short: answer.short } : null, resume: null, letter: null, print: {} };
-  if (st.done.resume) {
-    const r = a.resume.result || {};
-    const isV2 = r.summary != null || Array.isArray(r.experience);
-    kit.resume = resumeToPlainText(r);
-    kit.print.resume = { kind: 'Resume', filename: `${last}_${company}_Resume.pdf`, resume: isV2 ? r : null, header: isV2 ? header : null, body: isV2 ? null : kit.resume };
-  }
-  if (st.done.letter) {
-    kit.letter = a.coverLetter.result?.letter || '';
-    kit.print.letter = { kind: 'CoverLetter', filename: `${last}_${company}_CoverLetter.pdf`, body: kit.letter };
-  }
-  chrome.storage.local.set({ 'ui.kit': kit }).catch(() => {});
+  chrome.storage.local.set({ 'ui.kit': buildKit(job, { targets: compTargets, header }) }).catch(() => {});
 }
 
 function renderAnalysisSection(job) {
@@ -2225,55 +2210,6 @@ function renderHonestyChecks(flags = [], stretches = [], roles = []) {
   return out;
 }
 
-function resumeToPlainText(r) {
-  const lines = [];
-  // Legacy v1 shape
-  if (r.summaryParagraph || Array.isArray(r.sections)) {
-    if (r.summaryParagraph) { lines.push(r.summaryParagraph, ''); }
-    for (const s of r.sections || []) {
-      lines.push(s.heading || '', '');
-      for (const entry of s.entries || []) {
-        lines.push(entry.role || '');
-        for (const b of entry.bullets || []) lines.push(`• ${b.text}`);
-        lines.push('');
-      }
-    }
-    return lines.join('\n');
-  }
-  // v2 structured shape
-  if (r.headline) lines.push(r.headline, '');
-  if (r.summary) lines.push(r.summary, '');
-  if (Array.isArray(r.skills) && r.skills.length) lines.push('SKILLS', '', r.skills.join(' | '), '');
-  if (Array.isArray(r.experience) && r.experience.length) {
-    lines.push('EXPERIENCE', '');
-    for (const role of r.experience) {
-      lines.push(`${role.title || ''} · ${role.dates || ''}`);
-      const sub = [role.company, role.location].filter(Boolean).join(', ');
-      if (sub) lines.push(sub);
-      for (const b of role.bullets || []) lines.push(`• ${typeof b === 'string' ? b : (b?.text || '')}`);
-      lines.push('');
-    }
-  }
-  if (Array.isArray(r.earlierExperience) && r.earlierExperience.length) {
-    lines.push('EARLIER EXPERIENCE', '');
-    for (const role of r.earlierExperience) {
-      const bits = [role.company, role.detail, role.location, role.dates].filter(Boolean);
-      lines.push(`${role.title || ''}, ${bits.join(', ')}`);
-    }
-    lines.push('');
-  }
-  if (Array.isArray(r.certifications) && r.certifications.length) {
-    lines.push('CERTIFICATIONS & AWARDS', '');
-    for (const c of r.certifications) lines.push(`• ${typeof c === 'string' ? c : (c?.text || '')}`);
-    lines.push('');
-  }
-  if (Array.isArray(r.education) && r.education.length) {
-    lines.push('EDUCATION', '');
-    for (const e of r.education) lines.push(`${e.degree || ''}, ${e.school || ''}`);
-    lines.push('');
-  }
-  return lines.join('\n');
-}
 
 // ---------- Analysis triggers ----------
 
